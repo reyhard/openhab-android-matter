@@ -25,6 +25,7 @@ import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterController;
 import org.openhab.matter.companion.controller.MatterBootstrapState;
 import org.openhab.matter.companion.controller.MatterBootstrapStateRepository;
+import org.openhab.matter.companion.controller.MatterBootstrapStateResolver;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.controller.MatterControllerSelector;
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository;
@@ -87,6 +88,7 @@ public final class MainActivity extends Activity {
     private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
     private boolean persistedBootstrapStateUnreadable;
+    private MatterBootstrapState persistedBootstrapState = MatterBootstrapState.empty();
     private volatile boolean sseWatchActive;
     private Thread sseWatchThread;
 
@@ -98,6 +100,9 @@ public final class MainActivity extends Activity {
         loadPersistedConfig();
         loadPersistedBootstrapState();
         restoreState(savedInstanceState);
+        state.commissionedNodeId = MatterBootstrapStateResolver.resolveNodeId(
+                state.commissionedNodeId,
+                persistedBootstrapState);
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setFillViewport(true);
@@ -615,11 +620,8 @@ public final class MainActivity extends Activity {
     }
 
     private void loadPersistedBootstrapState() {
-        MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
-        persistedBootstrapStateUnreadable = bootstrapState.stateUnreadable();
-        if (bootstrapState.bootstrapNodeId() >= 0) {
-            state.commissionedNodeId = bootstrapState.bootstrapNodeId();
-        }
+        persistedBootstrapState = bootstrapStateRepository.load();
+        persistedBootstrapStateUnreadable = persistedBootstrapState.stateUnreadable();
     }
 
     private void saveBootstrapState(long nodeId) {
