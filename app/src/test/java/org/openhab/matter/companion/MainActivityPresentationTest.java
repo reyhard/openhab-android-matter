@@ -126,6 +126,14 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void redactsHostlessUrlPartsInsideDetails() {
+        assertEquals(
+                "Failed to reach file:/tmp/otbr and urn:thing",
+                MainActivityPresentation.safeTextForLog(
+                        "Failed to reach file:/tmp/otbr?token=abc#frag and urn:thing?token=abc"));
+    }
+
+    @Test
     public void redactsSensitiveUrlPartsWithUppercaseScheme() {
         assertEquals(
                 "HTTP://openhab.local:8080",
@@ -187,6 +195,14 @@ public class MainActivityPresentationTest {
                 "Errors: pin=<redacted>; pin=<redacted>; pin=<redacted>",
                 MainActivityPresentation.safeTextForLog(
                         "Errors: pin: 20202021; setup PIN 20202021; passcode 20202021"));
+    }
+
+    @Test
+    public void redactsMatterPinCodeFieldVariantsInsideDetails() {
+        assertEquals(
+                "Errors: pin=<redacted>; pin=<redacted>; pin=<redacted>; pin=<redacted>",
+                MainActivityPresentation.safeTextForLog(
+                        "Errors: setupPinCode=20202021; pin_code=20202021; setup-passcode: 20202021; setup_pin_code 20202021"));
     }
 
     @Test
