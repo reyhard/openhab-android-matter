@@ -10,8 +10,11 @@ public class QrScanIntentFactoryTest {
         QrScanIntentRequest request = QrScanIntentFactory.createScanRequest();
 
         assertEquals("com.google.zxing.client.android.SCAN", request.action());
+        assertEquals("SCAN_MODE", request.scanModeExtra());
         assertEquals("QR_CODE_MODE", request.scanMode());
+        assertEquals("SAVE_HISTORY", request.saveHistoryExtra());
         assertEquals(false, request.saveHistory());
+        assertEquals("SCAN_RESULT", request.scanResultExtra());
     }
 
     @Test

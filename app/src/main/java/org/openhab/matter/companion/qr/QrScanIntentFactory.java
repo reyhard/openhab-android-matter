@@ -9,15 +9,17 @@ public final class QrScanIntentFactory {
     public static QrScanIntentRequest createScanRequest() {
         return new QrScanIntentRequest(
                 QrScanContract.ACTION_SCAN,
+                QrScanContract.EXTRA_SCAN_MODE,
                 QrScanContract.QR_CODE_MODE,
+                QrScanContract.EXTRA_SAVE_HISTORY,
                 false);
     }
 
     public static Intent createScanIntent() {
         QrScanIntentRequest request = createScanRequest();
         Intent intent = new Intent(request.action());
-        intent.putExtra(QrScanContract.EXTRA_SCAN_MODE, request.scanMode());
-        intent.putExtra(QrScanContract.EXTRA_SAVE_HISTORY, request.saveHistory());
+        intent.putExtra(request.scanModeExtra(), request.scanMode());
+        intent.putExtra(request.saveHistoryExtra(), request.saveHistory());
         return intent;
     }
 

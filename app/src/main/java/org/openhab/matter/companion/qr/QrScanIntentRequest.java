@@ -2,12 +2,19 @@ package org.openhab.matter.companion.qr;
 
 public final class QrScanIntentRequest {
     private final String action;
+    private final String scanModeExtra;
     private final String scanMode;
+    private final String saveHistoryExtra;
     private final boolean saveHistory;
 
-    public QrScanIntentRequest(String action, String scanMode, boolean saveHistory) {
-        this.action = action == null ? "" : action;
-        this.scanMode = scanMode == null ? "" : scanMode;
+    QrScanIntentRequest(String action, String scanModeExtra, String scanMode, String saveHistoryExtra, boolean saveHistory) {
+        if (action == null || scanModeExtra == null || scanMode == null || saveHistoryExtra == null) {
+            throw new IllegalArgumentException("QR scan request fields must not be null");
+        }
+        this.action = action;
+        this.scanModeExtra = scanModeExtra;
+        this.scanMode = scanMode;
+        this.saveHistoryExtra = saveHistoryExtra;
         this.saveHistory = saveHistory;
     }
 
@@ -17,6 +24,18 @@ public final class QrScanIntentRequest {
 
     public String scanMode() {
         return scanMode;
+    }
+
+    public String scanModeExtra() {
+        return scanModeExtra;
+    }
+
+    public String saveHistoryExtra() {
+        return saveHistoryExtra;
+    }
+
+    public String scanResultExtra() {
+        return QrScanContract.EXTRA_SCAN_RESULT;
     }
 
     public boolean saveHistory() {
