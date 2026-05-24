@@ -3,8 +3,8 @@ package org.openhab.matter.companion.domain;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 
 public class MatterSetupPayloadParserTest {
     @Test
@@ -17,10 +17,12 @@ public class MatterSetupPayloadParserTest {
     }
 
     @Test
-    public void preservesQrPayloadWhenChipParserIsNeeded() {
-        MatterSetupPayload payload = MatterSetupPayloadParser.parse("MT:ABCDEF0123456789");
-        assertEquals("MT:ABCDEF0123456789", payload.rawPayload());
-        assertTrue(payload.requiresChipParser());
+    public void parsesQrPayloadLocally() {
+        MatterSetupPayload payload = MatterSetupPayloadParser.parse("MT:Y.K9042C00KA0648G00");
+        assertEquals("MT:Y.K9042C00KA0648G00", payload.rawPayload());
+        assertEquals(20202021L, payload.pin());
+        assertEquals(3840, payload.discriminator());
+        assertFalse(payload.requiresChipParser());
     }
 
     @Test
