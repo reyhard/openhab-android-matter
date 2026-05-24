@@ -110,6 +110,22 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void redactsNonHttpUrlPartsInsideDetails() {
+        assertEquals(
+                "Failed to reach ftp://otbr.local/path",
+                MainActivityPresentation.safeTextForLog(
+                        "Failed to reach ftp://user:secret@otbr.local/path?token=abc#frag"));
+    }
+
+    @Test
+    public void redactsOpaqueUrlPartsInsideDetails() {
+        assertEquals(
+                "Failed to reach ssh:otbr.local",
+                MainActivityPresentation.safeTextForLog(
+                        "Failed to reach ssh:user:secret@otbr.local?token=abc#frag"));
+    }
+
+    @Test
     public void redactsSensitiveUrlPartsWithUppercaseScheme() {
         assertEquals(
                 "HTTP://openhab.local:8080",
@@ -163,6 +179,14 @@ public class MainActivityPresentationTest {
         assertEquals(
                 "http://openhab.local/path@v1",
                 MainActivityPresentation.safeUrlForLog("http://openhab.local/path@v1?token=%zz#frag"));
+    }
+
+    @Test
+    public void redactsMatterPinVariantsInsideDetails() {
+        assertEquals(
+                "Errors: pin=<redacted>; pin=<redacted>; pin=<redacted>",
+                MainActivityPresentation.safeTextForLog(
+                        "Errors: pin: 20202021; setup PIN 20202021; passcode 20202021"));
     }
 
     @Test

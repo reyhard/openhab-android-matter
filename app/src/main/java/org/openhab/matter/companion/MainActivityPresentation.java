@@ -13,9 +13,11 @@ import java.util.regex.Pattern;
 
 final class MainActivityPresentation {
     private static final int PERMISSION_GRANTED = 0;
-    private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern URL_PATTERN = Pattern.compile(
+            "\\b[A-Za-z][A-Za-z0-9+.-]*://\\S+|\\b[A-Za-z][A-Za-z0-9+.-]*:\\S*@\\S+");
     private static final Pattern MATTER_QR_PAYLOAD_PATTERN = Pattern.compile("\\bMT:[0-9A-Z.-]+\\b");
-    private static final Pattern MATTER_PIN_PATTERN = Pattern.compile("(?i)\\bpin\\s*=\\s*\\d{8}\\b");
+    private static final Pattern MATTER_PIN_PATTERN = Pattern.compile(
+            "(?i)\\b(?:pin|setup\\s+pin|passcode)\\s*(?:=|:)?\\s*\\d{8}\\b");
     private static final Pattern MATTER_MANUAL_CODE_PATTERN = Pattern.compile("\\b(?:\\d{4}-\\d{4}-\\d{3}|\\d{11})\\b");
     private static final Pattern THREAD_DATASET_PATTERN = Pattern.compile("(?i)\\b(?:hex:)?[0-9a-f]{16,}\\b");
 
