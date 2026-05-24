@@ -17,6 +17,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.openhab.matter.companion.controller.ChipMatterController;
+import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.config.AppConfig;
 import org.openhab.matter.companion.config.AppConfigRepository;
 import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository;
@@ -72,6 +73,7 @@ public final class MainActivity extends Activity {
     private EditText payloadInput;
     private EditText openHabInput;
     private boolean nativeMatterControllerSelected;
+    private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
     private volatile boolean sseWatchActive;
     private Thread sseWatchThread;
@@ -164,6 +166,9 @@ public final class MainActivity extends Activity {
 
         setContentView(scrollView);
         output.setText(state.logs);
+        if (restoreNativeControllerSelection) {
+            restoreNativeChipControllerSelectionAsync();
+        }
         if (state.logs.isEmpty()) {
             append("Paste your OTBR Thread dataset and Matter setup payload. Sensitive input is validated but not echoed in this log.");
             if (persistedThreadDatasetUnreadable) {
@@ -311,17 +316,14 @@ public final class MainActivity extends Activity {
     }
 
     private void checkNativeChipController() {
-        append(MainActivityPresentation.nativeChipReadiness(chipMatterController.readiness()));
+        new Thread(() -> {
+            ChipMatterControllerStatus status = chipMatterController.readiness();
+            appendFromWorker(MainActivityPresentation.nativeChipReadiness(status));
+        }, "matter-chip-readiness").start();
     }
 
     private void useNativeChipControllerIfReady() {
-        MatterControllerSelection selection = MatterControllerSelector.select(
-                fakeMatterController,
-                chipMatterController,
-                true);
-        controller = selection.controller();
-        nativeMatterControllerSelected = selection.nativeSelected();
-        append(MainActivityPresentation.matterControllerSelection(selection));
+        selectNativeChipControllerAsync(true);
     }
 
     private void saveConfiguration() {
@@ -544,17 +546,7 @@ public final class MainActivity extends Activity {
         state.logs = savedInstanceState.getString(KEY_LOGS, "");
         state.temporaryCode = savedInstanceState.getString(KEY_TEMPORARY_CODE, "");
         state.commissionedNodeId = savedInstanceState.getLong(KEY_COMMISSIONED_NODE_ID, -1L);
-        if (savedInstanceState.getBoolean(KEY_NATIVE_CONTROLLER_SELECTED, false)) {
-            MatterControllerSelection selection = MatterControllerSelector.select(
-                    fakeMatterController,
-                    chipMatterController,
-                    true);
-            controller = selection.controller();
-            nativeMatterControllerSelected = selection.nativeSelected();
-            if (!selection.nativeSelected()) {
-                state.logs = state.logs + MainActivityPresentation.matterControllerSelection(selection) + "\n";
-            }
-        }
+        restoreNativeControllerSelection = savedInstanceState.getBoolean(KEY_NATIVE_CONTROLLER_SELECTED, false);
     }
 
     private void loadPersistedConfig() {
@@ -562,6 +554,27 @@ public final class MainActivity extends Activity {
         state.dataset = config.threadDataset();
         state.openHabBaseUrl = config.openHabBaseUrl();
         persistedThreadDatasetUnreadable = config.threadDatasetUnreadable();
+    }
+
+    private void restoreNativeChipControllerSelectionAsync() {
+        restoreNativeControllerSelection = false;
+        selectNativeChipControllerAsync(false);
+    }
+
+    private void selectNativeChipControllerAsync(boolean appendWhenSelected) {
+        new Thread(() -> {
+            MatterControllerSelection selection = MatterControllerSelector.select(
+                    fakeMatterController,
+                    chipMatterController,
+                    true);
+            runOnUiThread(() -> {
+                controller = selection.controller();
+                nativeMatterControllerSelected = selection.nativeSelected();
+                if (appendWhenSelected || !selection.nativeSelected()) {
+                    append(MainActivityPresentation.matterControllerSelection(selection));
+                }
+            });
+        }, "matter-controller-selection").start();
     }
 
     private int dp(int value) {

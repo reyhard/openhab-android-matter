@@ -200,4 +200,12 @@ public class MainActivityPresentationTest {
                 MainActivityPresentation.matterControllerOperationFailed(
                         "failed with pin=20202021 code=3497-0112-332 dataset hex:0E080000000000010000"));
     }
+
+    @Test
+    public void describesMatterControllerFailureWithoutLeakingQrSetupPayload() {
+        assertEquals(
+                "Matter controller operation failed: parser failed for <redacted-matter-qr-payload>",
+                MainActivityPresentation.matterControllerOperationFailed(
+                        "parser failed for MT:Y.K9042C00KA0648G00"));
+    }
 }
