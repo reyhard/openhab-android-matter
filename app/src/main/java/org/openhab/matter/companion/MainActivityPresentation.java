@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 
 final class MainActivityPresentation {
     private static final int PERMISSION_GRANTED = 0;
-    private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+");
+    private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+", Pattern.CASE_INSENSITIVE);
 
     private MainActivityPresentation() {
     }
@@ -56,11 +56,12 @@ final class MainActivityPresentation {
         String trimmed = value.trim();
         try {
             URI uri = new URI(trimmed);
-            if (!"http".equals(uri.getScheme()) && !"https".equals(uri.getScheme())) {
+            String scheme = uri.getScheme();
+            if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
                 return trimmed;
             }
             String path = uri.getRawPath();
-            return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), path, null, null).toString();
+            return new URI(scheme, null, uri.getHost(), uri.getPort(), path, null, null).toString();
         } catch (URISyntaxException | IllegalArgumentException ex) {
             return stripQueryAndFragment(trimmed).replaceFirst("://[^/@]+@", "://");
         }

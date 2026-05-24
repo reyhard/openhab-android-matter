@@ -104,4 +104,11 @@ public class MainActivityPresentationTest {
                 MainActivityPresentation.safeTextForLog(
                         "HTTP 200 from http://user:secret@openhab.local:8080/rest/inbox?token=abc#frag"));
     }
+
+    @Test
+    public void redactsSensitiveUrlPartsWithUppercaseScheme() {
+        assertEquals(
+                "HTTP://openhab.local:8080",
+                MainActivityPresentation.safeUrlForLog("HTTP://user:secret@openhab.local:8080?token=abc#frag"));
+    }
 }
