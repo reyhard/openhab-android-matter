@@ -111,4 +111,32 @@ public class MainActivityPresentationTest {
                 "HTTP://openhab.local:8080",
                 MainActivityPresentation.safeUrlForLog("HTTP://user:secret@openhab.local:8080?token=abc#frag"));
     }
+
+    @Test
+    public void describesEncryptedConfigSave() {
+        assertEquals(
+                "Saved Thread dataset in encrypted app storage and saved openHAB base URL. Setup payloads and PINs are not saved.",
+                MainActivityPresentation.encryptedConfigSaved());
+    }
+
+    @Test
+    public void warnsWhenEncryptedThreadDatasetCannotBeRead() {
+        assertEquals(
+                "Stored Thread dataset could not be decrypted. Paste and save the dataset again to continue.",
+                MainActivityPresentation.threadDatasetUnreadable());
+    }
+
+    @Test
+    public void describesMatterSseEvent() {
+        assertEquals(
+                "openHAB Inbox SSE: Matter Inbox entry detected.",
+                MainActivityPresentation.openHabInboxSseEvent(true));
+    }
+
+    @Test
+    public void describesNonMatterSseEvent() {
+        assertEquals(
+                "openHAB Inbox SSE: event received but no Matter Inbox entry detected yet.",
+                MainActivityPresentation.openHabInboxSseEvent(false));
+    }
 }

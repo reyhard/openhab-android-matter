@@ -37,6 +37,21 @@ final class MainActivityPresentation {
         return "openHAB Inbox observation: no Matter Inbox entry detected.";
     }
 
+    static String encryptedConfigSaved() {
+        return "Saved Thread dataset in encrypted app storage and saved openHAB base URL. Setup payloads and PINs are not saved.";
+    }
+
+    static String threadDatasetUnreadable() {
+        return "Stored Thread dataset could not be decrypted. Paste and save the dataset again to continue.";
+    }
+
+    static String openHabInboxSseEvent(boolean matterEntryDetected) {
+        if (matterEntryDetected) {
+            return "openHAB Inbox SSE: Matter Inbox entry detected.";
+        }
+        return "openHAB Inbox SSE: event received but no Matter Inbox entry detected yet.";
+    }
+
     static String runtimePermissionRequestResult(String[] permissions, int[] grantResults) {
         if (permissions == null || grantResults == null || permissions.length == 0 || permissions.length != grantResults.length) {
             return runtimePermissionRequestDeniedOrInterrupted();

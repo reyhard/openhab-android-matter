@@ -11,8 +11,10 @@ This branch builds an installable Android APK with:
 - Local Matter `MT:` QR setup payload decoding for PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.
 - openHAB REST readiness checking via the configured base URL.
 - openHAB Inbox observation via `/rest/inbox` to report whether a Matter Inbox entry is visible.
+- openHAB Inbox SSE observation via `/rest/events?topics=openhab/inbox/*`.
 - Runtime commissioning permission readiness checks for the current Android SDK version.
-- App-private persistence for the OTBR Thread dataset and openHAB base URL.
+- Encrypted app-private storage for the OTBR Thread dataset using Android Keystore-backed AES-GCM.
+- App-private persistence for the openHAB base URL.
 - A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
 - A native Android UI that displays the temporary code and openHAB Matter Scan Input instructions.
 

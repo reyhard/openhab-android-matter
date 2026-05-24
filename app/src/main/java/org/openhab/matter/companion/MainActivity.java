@@ -26,6 +26,7 @@ import org.openhab.matter.companion.openhab.HttpOpenHabClient;
 import org.openhab.matter.companion.openhab.HttpOpenHabInboxClient;
 import org.openhab.matter.companion.openhab.OpenHabClient;
 import org.openhab.matter.companion.openhab.OpenHabInboxClient;
+import org.openhab.matter.companion.openhab.OpenHabInboxSseClient;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 import org.openhab.matter.companion.openhab.OpenHabStatus;
 import org.openhab.matter.companion.permissions.CommissioningPermissionPlanner;
@@ -53,11 +54,13 @@ public final class MainActivity extends Activity {
     private final MatterController controller = new FakeMatterController();
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
     private final OpenHabInboxClient openHabInboxClient = new HttpOpenHabInboxClient();
+    private final OpenHabInboxSseClient openHabInboxSseClient = new OpenHabInboxSseClient();
     private AppConfigRepository configRepository;
     private TextView output;
     private EditText datasetInput;
     private EditText payloadInput;
     private EditText openHabInput;
+    private boolean persistedThreadDatasetUnreadable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,6 +105,7 @@ public final class MainActivity extends Activity {
         Button checkOpenHab = button("Check openHAB readiness");
         Button checkPermissions = button("Check commissioning permissions");
         Button checkInbox = button("Check openHAB Inbox");
+        Button watchInboxSse = button("Watch openHAB Inbox SSE");
         Button saveConfig = button("Save dataset and openHAB URL");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
@@ -112,6 +116,7 @@ public final class MainActivity extends Activity {
         checkOpenHab.setOnClickListener(view -> checkOpenHabReadiness());
         checkPermissions.setOnClickListener(view -> checkCommissioningPermissions());
         checkInbox.setOnClickListener(view -> checkOpenHabInbox());
+        watchInboxSse.setOnClickListener(view -> watchOpenHabInboxSse());
         saveConfig.setOnClickListener(view -> saveConfiguration());
 
         root.addView(title);
@@ -129,6 +134,7 @@ public final class MainActivity extends Activity {
         root.addView(checkOpenHab);
         root.addView(checkPermissions);
         root.addView(checkInbox);
+        root.addView(watchInboxSse);
         root.addView(saveConfig);
         root.addView(section("Guide output"));
         root.addView(output);
@@ -137,6 +143,9 @@ public final class MainActivity extends Activity {
         output.setText(state.logs);
         if (state.logs.isEmpty()) {
             append("Paste your OTBR Thread dataset and Matter setup payload. Sensitive input is validated but not echoed in this log.");
+            if (persistedThreadDatasetUnreadable) {
+                append(MainActivityPresentation.threadDatasetUnreadable());
+            }
         }
     }
 
@@ -218,7 +227,7 @@ public final class MainActivity extends Activity {
                 ThreadDataset.parse(state.dataset);
             }
             configRepository.save(new AppConfig(state.dataset, state.openHabBaseUrl));
-            append("Saved Thread dataset and openHAB base URL. Setup payloads and PINs are not saved.");
+            append(MainActivityPresentation.encryptedConfigSaved());
         } catch (Exception ex) {
             append("Configuration was not saved. Check the Thread dataset format; sensitive values are not repeated in this log.");
         }
@@ -297,6 +306,29 @@ public final class MainActivity extends Activity {
                 }
             });
         }, "openhab-inbox-check").start();
+    }
+
+    private void watchOpenHabInboxSse() {
+        state.openHabBaseUrl = openHabInput.getText().toString();
+        if (state.openHabBaseUrl == null || state.openHabBaseUrl.trim().isEmpty()) {
+            append("Enter an openHAB base URL first.");
+            return;
+        }
+
+        String baseUrl = state.openHabBaseUrl.trim();
+        append("Watching openHAB Inbox SSE at " + MainActivityPresentation.safeUrlForLog(baseUrl) + " ...");
+        new Thread(() -> {
+            try {
+                openHabInboxSseClient.observe(baseUrl, event -> {
+                    runOnUiThread(() -> append(MainActivityPresentation.openHabInboxSseEvent(
+                            event.matterEntryDetected())));
+                    return !event.matterEntryDetected();
+                });
+            } catch (Exception ex) {
+                runOnUiThread(() -> append("openHAB Inbox SSE observation failed: "
+                        + MainActivityPresentation.safeTextForLog(ex.getMessage())));
+            }
+        }, "openhab-inbox-sse").start();
     }
 
     private String payloadSummary(MatterSetupPayload payload) {
@@ -388,6 +420,7 @@ public final class MainActivity extends Activity {
         AppConfig config = configRepository.load();
         state.dataset = config.threadDataset();
         state.openHabBaseUrl = config.openHabBaseUrl();
+        persistedThreadDatasetUnreadable = config.threadDatasetUnreadable();
     }
 
     private int dp(int value) {

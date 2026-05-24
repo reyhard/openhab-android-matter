@@ -9,8 +9,10 @@
 - Matter `MT:` QR setup payload parser decodes PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.
 - openHAB REST readiness check calls `/rest/` from a configured base URL.
 - openHAB Inbox observation calls `/rest/inbox` from a configured base URL and reports whether a Matter Inbox entry was detected.
+- openHAB SSE streaming observes `/rest/events?topics=openhab/inbox/*` and reports Matter Inbox events.
 - Runtime commissioning permission readiness uses the Android SDK-specific permission plan and requests missing runtime permissions.
-- App-private configuration persistence stores the OTBR Thread dataset and openHAB base URL only.
+- Android Keystore-backed AES-GCM encrypted app-private storage stores the OTBR Thread dataset.
+- App-private configuration persistence stores the openHAB base URL.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 
 ## Not Implemented Yet
@@ -18,8 +20,7 @@
 - Camera QR scanning.
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
-- openHAB SSE streaming of Inbox changes after the user enters the temporary setup code.
-- Encrypted storage for Thread datasets and future Matter fabric keys.
+- Encrypted storage for future Matter fabric keys.
 
 ## Production Replacement Seam
 
