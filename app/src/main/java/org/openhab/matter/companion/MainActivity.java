@@ -11,6 +11,9 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import org.openhab.matter.companion.config.AppConfig;
+import org.openhab.matter.companion.config.AppConfigRepository;
+import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository;
 import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterController;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
@@ -39,6 +42,7 @@ public final class MainActivity extends Activity {
     private final AppState state = new AppState();
     private final MatterController controller = new FakeMatterController();
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
+    private AppConfigRepository configRepository;
     private TextView output;
     private EditText datasetInput;
     private EditText payloadInput;
@@ -47,6 +51,8 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        configRepository = new SharedPreferencesAppConfigRepository(this);
+        loadPersistedConfig();
         restoreState(savedInstanceState);
 
         ScrollView scrollView = new ScrollView(this);
@@ -83,6 +89,7 @@ public final class MainActivity extends Activity {
         Button openWindow = button("Simulate open commissioning window");
         Button wifiHandoff = button("Wi-Fi / multi-admin openHAB handoff");
         Button checkOpenHab = button("Check openHAB readiness");
+        Button saveConfig = button("Save dataset and openHAB URL");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
 
@@ -90,6 +97,7 @@ public final class MainActivity extends Activity {
         openWindow.setOnClickListener(view -> runOpenCommissioningWindow());
         wifiHandoff.setOnClickListener(view -> showWifiInstructions());
         checkOpenHab.setOnClickListener(view -> checkOpenHabReadiness());
+        saveConfig.setOnClickListener(view -> saveConfiguration());
 
         root.addView(title);
         root.addView(subtitle);
@@ -104,6 +112,7 @@ public final class MainActivity extends Activity {
         root.addView(openWindow);
         root.addView(wifiHandoff);
         root.addView(checkOpenHab);
+        root.addView(saveConfig);
         root.addView(section("Guide output"));
         root.addView(output);
 
@@ -172,6 +181,20 @@ public final class MainActivity extends Activity {
 
         append("Wi-Fi / multi-admin handoff selected. The phone is not commissioning this device in demo mode.");
         append(OpenHabInstructions.scanInputInstructionsWithoutEcho());
+    }
+
+    private void saveConfiguration() {
+        state.dataset = datasetInput.getText().toString();
+        state.openHabBaseUrl = openHabInput.getText().toString();
+        try {
+            if (state.dataset != null && !state.dataset.trim().isEmpty()) {
+                ThreadDataset.parse(state.dataset);
+            }
+            configRepository.save(new AppConfig(state.dataset, state.openHabBaseUrl));
+            append("Saved Thread dataset and openHAB base URL. Setup payloads and PINs are not saved.");
+        } catch (Exception ex) {
+            append("Configuration was not saved. Check the Thread dataset format; sensitive values are not repeated in this log.");
+        }
     }
 
     private void checkOpenHabReadiness() {
@@ -282,6 +305,12 @@ public final class MainActivity extends Activity {
         state.logs = savedInstanceState.getString(KEY_LOGS, "");
         state.temporaryCode = savedInstanceState.getString(KEY_TEMPORARY_CODE, "");
         state.commissionedNodeId = savedInstanceState.getLong(KEY_COMMISSIONED_NODE_ID, -1L);
+    }
+
+    private void loadPersistedConfig() {
+        AppConfig config = configRepository.load();
+        state.dataset = config.threadDataset();
+        state.openHabBaseUrl = config.openHabBaseUrl();
     }
 
     private int dp(int value) {

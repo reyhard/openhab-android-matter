@@ -10,12 +10,14 @@ This branch builds an installable Android APK with:
 - Matter setup payload validation for explicit `pin=...;disc=...` input.
 - Local Matter `MT:` QR setup payload decoding for PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.
 - openHAB REST readiness checking via the configured base URL.
+- App-private persistence for the OTBR Thread dataset and openHAB base URL.
 - A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
 - A native Android UI that displays the temporary code and openHAB Matter Scan Input instructions.
 
 The real connectedhomeip/CHIP JNI controller is intentionally isolated behind `MatterController`. `ChipMatterController` is present as the replacement point for the native implementation.
 
 This MVP does not perform real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or OpenCommissioningWindow calls yet.
+Setup payloads, setup PINs, QR payloads, Matter fabric keys, and device credentials are not persisted.
 
 ## Build Configuration
 
