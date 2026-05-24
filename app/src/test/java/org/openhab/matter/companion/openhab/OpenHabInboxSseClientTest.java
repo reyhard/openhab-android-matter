@@ -88,6 +88,31 @@ public class OpenHabInboxSseClientTest {
         assertEquals(0, received.size());
     }
 
+    @Test
+    public void stopsBeforeDispatchWhenCancelledAfterReadingEventBlock() throws Exception {
+        OneShotSseServer server = new OneShotSseServer(
+                "event: message\n"
+                        + "data: {\"topic\":\"openhab/inbox/matter:node:abc/added\",\"payload\":{\"thingUID\":\"matter:node:abc\"}}\n\n");
+        server.start();
+        List<OpenHabInboxEvent> received = new ArrayList<>();
+        AtomicBoolean firstSixChecks = new AtomicBoolean(true);
+        int[] checks = new int[] {0};
+
+        new OpenHabInboxSseClient().observe(server.baseUrl(), event -> {
+            received.add(event);
+            return true;
+        }, () -> {
+            checks[0]++;
+            if (checks[0] > 6) {
+                firstSixChecks.set(false);
+            }
+            return firstSixChecks.get();
+        });
+        server.join();
+
+        assertEquals(0, received.size());
+    }
+
     private static final class OneShotSseServer {
         private final String body;
         private final ServerSocket serverSocket;

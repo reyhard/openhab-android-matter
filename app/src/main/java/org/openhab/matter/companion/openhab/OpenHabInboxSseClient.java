@@ -60,7 +60,8 @@ public final class OpenHabInboxSseClient {
             String line;
             while (shouldContinue.getAsBoolean() && (line = readLine(reader, shouldContinue)) != null) {
                 if (line.isEmpty()) {
-                    if (block.length() > 0 && !dispatchEvent(block.toString(), listener)) {
+                    if (block.length() > 0 && shouldContinue.getAsBoolean()
+                            && !dispatchEvent(block.toString(), listener)) {
                         return;
                     }
                     block.setLength(0);
