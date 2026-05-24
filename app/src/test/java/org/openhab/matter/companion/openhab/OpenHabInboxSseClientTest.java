@@ -11,6 +11,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -68,6 +69,23 @@ public class OpenHabInboxSseClientTest {
         } catch (IOException expected) {
             assertTrue(expected.getMessage().contains("Unsupported protocol"));
         }
+    }
+
+    @Test
+    public void stopsBeforeDispatchWhenCancellationSupplierIsFalse() throws Exception {
+        OneShotSseServer server = new OneShotSseServer(
+                "event: message\n"
+                        + "data: {\"topic\":\"openhab/inbox/matter:node:abc/added\",\"payload\":{\"thingUID\":\"matter:node:abc\"}}\n\n");
+        server.start();
+        List<OpenHabInboxEvent> received = new ArrayList<>();
+
+        new OpenHabInboxSseClient().observe(server.baseUrl(), event -> {
+            received.add(event);
+            return true;
+        }, new AtomicBoolean(false)::get);
+        server.join();
+
+        assertEquals(0, received.size());
     }
 
     private static final class OneShotSseServer {

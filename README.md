@@ -20,7 +20,7 @@ This branch builds an installable Android APK with:
 
 The real connectedhomeip/CHIP JNI controller is intentionally isolated behind `MatterController`. `ChipMatterController` is present as the replacement point for the native implementation.
 
-This MVP does not perform real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
+This MVP does not perform Camera QR scanning, real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
 Setup payloads, setup PINs, QR payloads, Matter fabric keys, and device credentials are not persisted.
 
 ## Build Configuration

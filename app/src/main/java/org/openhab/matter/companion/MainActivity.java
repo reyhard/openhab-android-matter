@@ -61,6 +61,8 @@ public final class MainActivity extends Activity {
     private EditText payloadInput;
     private EditText openHabInput;
     private boolean persistedThreadDatasetUnreadable;
+    private volatile boolean sseWatchActive;
+    private Thread sseWatchThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -157,6 +159,12 @@ public final class MainActivity extends Activity {
         }
 
         append(MainActivityPresentation.runtimePermissionRequestResult(permissions, grantResults));
+    }
+
+    @Override
+    protected void onStop() {
+        stopOpenHabInboxSseWatch();
+        super.onStop();
     }
 
     @Override
@@ -314,21 +322,42 @@ public final class MainActivity extends Activity {
             append("Enter an openHAB base URL first.");
             return;
         }
+        if (sseWatchThread != null && sseWatchThread.isAlive()) {
+            append("openHAB Inbox SSE watch is already running.");
+            return;
+        }
 
         String baseUrl = state.openHabBaseUrl.trim();
         append("Watching openHAB Inbox SSE at " + MainActivityPresentation.safeUrlForLog(baseUrl) + " ...");
-        new Thread(() -> {
+        sseWatchActive = true;
+        Thread watcher = new Thread(() -> {
             try {
                 openHabInboxSseClient.observe(baseUrl, event -> {
                     runOnUiThread(() -> append(MainActivityPresentation.openHabInboxSseEvent(
                             event.matterEntryDetected())));
                     return !event.matterEntryDetected();
-                });
+                }, () -> sseWatchActive && !Thread.currentThread().isInterrupted());
             } catch (Exception ex) {
-                runOnUiThread(() -> append("openHAB Inbox SSE observation failed: "
-                        + MainActivityPresentation.safeTextForLog(ex.getMessage())));
+                if (sseWatchActive) {
+                    runOnUiThread(() -> append("openHAB Inbox SSE observation failed: "
+                            + MainActivityPresentation.safeTextForLog(ex.getMessage())));
+                }
+            } finally {
+                sseWatchActive = false;
+                if (Thread.currentThread() == sseWatchThread) {
+                    sseWatchThread = null;
+                }
             }
-        }, "openhab-inbox-sse").start();
+        }, "openhab-inbox-sse");
+        sseWatchThread = watcher;
+        watcher.start();
+    }
+
+    private void stopOpenHabInboxSseWatch() {
+        sseWatchActive = false;
+        if (sseWatchThread != null) {
+            sseWatchThread.interrupt();
+        }
     }
 
     private String payloadSummary(MatterSetupPayload payload) {
