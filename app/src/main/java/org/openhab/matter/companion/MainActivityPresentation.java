@@ -114,7 +114,7 @@ final class MainActivityPresentation {
             URI uri = new URI(trimmed);
             String scheme = uri.getScheme();
             if (scheme == null || uri.getHost() == null) {
-                return stripQueryAndFragment(trimmed).replaceFirst("://[^/@]+@", "://");
+                return sanitizeUrlFallback(trimmed);
             }
             String path = uri.getRawPath();
             return new URI(scheme, null, uri.getHost(), uri.getPort(), path, null, null).toString();
@@ -162,5 +162,10 @@ final class MainActivityPresentation {
             endIndex = Math.min(endIndex, fragmentIndex);
         }
         return value.substring(0, endIndex);
+    }
+
+    private static String sanitizeUrlFallback(String value) {
+        String stripped = stripQueryAndFragment(value).replaceFirst("://[^/@]+@", "://");
+        return stripped.replaceFirst("^([A-Za-z][A-Za-z0-9+.-]*:)[^/?#@]+@", "$1");
     }
 }
