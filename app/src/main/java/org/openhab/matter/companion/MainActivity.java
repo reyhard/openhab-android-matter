@@ -147,16 +147,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        boolean allGranted = true;
-        for (int result : grantResults) {
-            if (result != PackageManager.PERMISSION_GRANTED) {
-                allGranted = false;
-                break;
-            }
-        }
-        append(allGranted
-                ? "Runtime commissioning permission request completed: all requested permissions granted."
-                : "Runtime commissioning permission request completed: one or more permissions were denied.");
+        append(MainActivityPresentation.runtimePermissionRequestResult(permissions, grantResults));
     }
 
     @Override
@@ -240,7 +231,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        append("Checking openHAB REST readiness at " + state.openHabBaseUrl.trim() + " ...");
+        append("Checking openHAB REST readiness at " + MainActivityPresentation.safeUrlForLog(state.openHabBaseUrl) + " ...");
         new Thread(() -> {
             OpenHabStatus status;
             try {
@@ -252,7 +243,7 @@ public final class MainActivity extends Activity {
             runOnUiThread(() -> {
                 append(finalStatus.message());
                 if (finalStatus.details() != null && !finalStatus.details().isEmpty()) {
-                    append(finalStatus.details());
+                    append(MainActivityPresentation.safeTextForLog(finalStatus.details()));
                 }
             });
         }, "openhab-readiness-check").start();
@@ -289,7 +280,7 @@ public final class MainActivity extends Activity {
         }
 
         String baseUrl = state.openHabBaseUrl.trim();
-        append("Checking openHAB Inbox at " + baseUrl + " ...");
+        append("Checking openHAB Inbox at " + MainActivityPresentation.safeUrlForLog(baseUrl) + " ...");
         new Thread(() -> {
             OpenHabInboxStatus status;
             try {
@@ -302,7 +293,7 @@ public final class MainActivity extends Activity {
                 append(MainActivityPresentation.openHabInboxResult(finalStatus));
                 append(finalStatus.message());
                 if (finalStatus.details() != null && !finalStatus.details().isEmpty()) {
-                    append(finalStatus.details());
+                    append(MainActivityPresentation.safeTextForLog(finalStatus.details()));
                 }
             });
         }, "openhab-inbox-check").start();

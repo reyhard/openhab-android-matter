@@ -58,4 +58,50 @@ public class MainActivityPresentationTest {
                 "openHAB Inbox observation: no Matter Inbox entry detected.",
                 MainActivityPresentation.openHabInboxResult(status));
     }
+
+    @Test
+    public void describesUnreachableInboxSeparatelyFromMissingMatterEntry() {
+        OpenHabInboxStatus status = new OpenHabInboxStatus(
+                false,
+                false,
+                "openHAB Inbox is not reachable",
+                "Connection refused");
+
+        assertEquals(
+                "openHAB Inbox observation failed: openHAB Inbox was not reachable.",
+                MainActivityPresentation.openHabInboxResult(status));
+    }
+
+    @Test
+    public void describesIncompletePermissionResultAsNotGranted() {
+        assertEquals(
+                "Runtime commissioning permission request completed: one or more permissions were denied or the request was interrupted.",
+                MainActivityPresentation.runtimePermissionRequestResult(
+                        new String[] {"android.permission.BLUETOOTH_SCAN"},
+                        new int[] {}));
+    }
+
+    @Test
+    public void describesGrantedPermissionResultOnlyWhenEachPermissionHasGrantedResult() {
+        assertEquals(
+                "Runtime commissioning permission request completed: all requested permissions granted.",
+                MainActivityPresentation.runtimePermissionRequestResult(
+                        new String[] {"android.permission.BLUETOOTH_SCAN"},
+                        new int[] {0}));
+    }
+
+    @Test
+    public void redactsSensitiveUrlPartsBeforeLogging() {
+        assertEquals(
+                "http://openhab.local:8080",
+                MainActivityPresentation.safeUrlForLog("http://user:secret@openhab.local:8080?token=abc#frag"));
+    }
+
+    @Test
+    public void redactsSensitiveUrlPartsInsideDetails() {
+        assertEquals(
+                "HTTP 200 from http://openhab.local:8080/rest/inbox",
+                MainActivityPresentation.safeTextForLog(
+                        "HTTP 200 from http://user:secret@openhab.local:8080/rest/inbox?token=abc#frag"));
+    }
 }
