@@ -1,0 +1,19 @@
+package org.openhab.matter.companion.config;
+
+public final class AppConfig {
+    private final String threadDataset;
+    private final String openHabBaseUrl;
+
+    public AppConfig(String threadDataset, String openHabBaseUrl) {
+        this.threadDataset = threadDataset == null ? "" : threadDataset;
+        this.openHabBaseUrl = openHabBaseUrl == null ? "" : openHabBaseUrl;
+    }
+
+    public String threadDataset() {
+        return threadDataset;
+    }
+
+    public String openHabBaseUrl() {
+        return openHabBaseUrl;
+    }
+}
