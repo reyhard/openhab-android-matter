@@ -114,7 +114,7 @@ final class MainActivityPresentation {
             URI uri = new URI(trimmed);
             String scheme = uri.getScheme();
             if (scheme == null || uri.getHost() == null) {
-                return trimmed;
+                return stripQueryAndFragment(trimmed).replaceFirst("://[^/@]+@", "://");
             }
             String path = uri.getRawPath();
             return new URI(scheme, null, uri.getHost(), uri.getPort(), path, null, null).toString();
