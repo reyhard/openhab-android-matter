@@ -9,23 +9,35 @@ public final class SharedPreferencesAppConfigRepository implements AppConfigRepo
     private static final String KEY_OPENHAB_BASE_URL = "openhab_base_url";
 
     private final SharedPreferences preferences;
+    private final SecureAppConfigMapper mapper;
 
     public SharedPreferencesAppConfigRepository(Context context) {
-        preferences = context.getSharedPreferences(PREFERENCE_FILE, Context.MODE_PRIVATE);
+        this(context.getSharedPreferences(PREFERENCE_FILE, Context.MODE_PRIVATE),
+                new SecureAppConfigMapper(new AndroidKeystoreSecretCodec()));
+    }
+
+    SharedPreferencesAppConfigRepository(SharedPreferences preferences, SecureAppConfigMapper mapper) {
+        this.preferences = preferences;
+        this.mapper = mapper;
     }
 
     @Override
     public AppConfig load() {
-        return new AppConfig(
+        return mapper.fromStoredValues(
                 preferences.getString(KEY_THREAD_DATASET, ""),
                 preferences.getString(KEY_OPENHAB_BASE_URL, ""));
     }
 
     @Override
     public void save(AppConfig config) {
-        preferences.edit()
-                .putString(KEY_THREAD_DATASET, config.threadDataset())
-                .putString(KEY_OPENHAB_BASE_URL, config.openHabBaseUrl())
-                .apply();
+        try {
+            SecureAppConfigMapper.StoredConfig storedConfig = mapper.toStoredValues(config);
+            preferences.edit()
+                    .putString(KEY_THREAD_DATASET, storedConfig.threadDataset())
+                    .putString(KEY_OPENHAB_BASE_URL, storedConfig.openHabBaseUrl())
+                    .apply();
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to save app config", e);
+        }
     }
 }
