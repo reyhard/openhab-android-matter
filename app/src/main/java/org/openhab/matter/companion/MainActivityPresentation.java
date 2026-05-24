@@ -13,6 +13,9 @@ import java.util.regex.Pattern;
 final class MainActivityPresentation {
     private static final int PERMISSION_GRANTED = 0;
     private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MATTER_PIN_PATTERN = Pattern.compile("(?i)\\bpin\\s*=\\s*\\d{8}\\b");
+    private static final Pattern MATTER_MANUAL_CODE_PATTERN = Pattern.compile("\\b(?:\\d{4}-\\d{4}-\\d{3}|\\d{11})\\b");
+    private static final Pattern THREAD_DATASET_PATTERN = Pattern.compile("(?i)\\b(?:hex:)?[0-9a-f]{16,}\\b");
 
     private MainActivityPresentation() {
     }
@@ -121,7 +124,7 @@ final class MainActivityPresentation {
             matcher.appendReplacement(sanitized, Matcher.quoteReplacement(safeUrlForLog(matcher.group())));
         }
         matcher.appendTail(sanitized);
-        return sanitized.toString();
+        return redactMatterSecrets(sanitized.toString());
     }
 
     private static String joinPermissions(List<String> permissions) {
@@ -130,6 +133,12 @@ final class MainActivityPresentation {
 
     private static String runtimePermissionRequestDeniedOrInterrupted() {
         return "Runtime commissioning permission request completed: one or more permissions were denied or the request was interrupted.";
+    }
+
+    private static String redactMatterSecrets(String value) {
+        String redacted = MATTER_PIN_PATTERN.matcher(value).replaceAll("pin=<redacted>");
+        redacted = MATTER_MANUAL_CODE_PATTERN.matcher(redacted).replaceAll("<redacted-matter-code>");
+        return THREAD_DATASET_PATTERN.matcher(redacted).replaceAll("<redacted-thread-dataset>");
     }
 
     private static String stripQueryAndFragment(String value) {

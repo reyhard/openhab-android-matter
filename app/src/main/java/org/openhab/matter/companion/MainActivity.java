@@ -49,6 +49,7 @@ public final class MainActivity extends Activity {
     private static final String KEY_LOGS = "logs";
     private static final String KEY_TEMPORARY_CODE = "temporaryCode";
     private static final String KEY_COMMISSIONED_NODE_ID = "commissionedNodeId";
+    private static final String KEY_NATIVE_CONTROLLER_SELECTED = "nativeControllerSelected";
     private static final int COMMISSIONING_PERMISSION_REQUEST = 2001;
     private static final int QR_SCAN_REQUEST = 3001;
     private static final int DATASET_INPUT_ID = 1001;
@@ -219,6 +220,7 @@ public final class MainActivity extends Activity {
         outState.putString(KEY_LOGS, state.logs);
         outState.putString(KEY_TEMPORARY_CODE, state.temporaryCode);
         outState.putLong(KEY_COMMISSIONED_NODE_ID, state.commissionedNodeId);
+        outState.putBoolean(KEY_NATIVE_CONTROLLER_SELECTED, nativeMatterControllerSelected);
     }
 
     private void runCommissioning() {
@@ -235,36 +237,49 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        try {
-            append(nativeMatterControllerSelected
-                    ? "Starting native CHIP Thread commissioning."
-                    : "Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
-            append("Validated Thread dataset without displaying it.");
-            append(payloadSummary(payload));
-            state.commissionedNodeId = controller.commissionBleThread(dataset, payload, step -> append(step.message()));
-            append("Bootstrap node id: " + state.commissionedNodeId);
-        } catch (Exception ex) {
-            append(MainActivityPresentation.matterControllerOperationFailed(ex.getMessage()));
-        }
+        MatterController selectedController = controller;
+        append(nativeMatterControllerSelected
+                ? "Starting native CHIP Thread commissioning."
+                : "Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
+        append("Validated Thread dataset without displaying it.");
+        append(payloadSummary(payload));
+        new Thread(() -> {
+            try {
+                long nodeId = selectedController.commissionBleThread(dataset, payload, step -> appendFromWorker(step.message()));
+                runOnUiThread(() -> {
+                    state.commissionedNodeId = nodeId;
+                    append("Bootstrap node id: " + state.commissionedNodeId);
+                });
+            } catch (Exception ex) {
+                appendFromWorker(MainActivityPresentation.matterControllerOperationFailed(ex.getMessage()));
+            }
+        }, "matter-commissioning").start();
     }
 
     private void runOpenCommissioningWindow() {
-        try {
-            if (state.commissionedNodeId < 0) {
-                append("Run simulated Thread commissioning first so the demo has a bootstrap node id.");
-                return;
-            }
-
-            append(nativeMatterControllerSelected
-                    ? "Opening native CHIP commissioning window."
-                    : "Opening a simulated commissioning window. This does not call a real Matter controller.");
-            state.temporaryCode = controller.openCommissioningWindow(state.commissionedNodeId, 300, 3840,
-                    step -> append(step.message()));
-            append(OpenHabInstructions.scanInputInstructions(state.temporaryCode));
-            append(OpenHabInstructions.troubleshooting());
-        } catch (Exception ex) {
-            append("Error: " + ex.getMessage());
+        if (state.commissionedNodeId < 0) {
+            append("Run simulated Thread commissioning first so the demo has a bootstrap node id.");
+            return;
         }
+
+        MatterController selectedController = controller;
+        long nodeId = state.commissionedNodeId;
+        append(nativeMatterControllerSelected
+                ? "Opening native CHIP commissioning window."
+                : "Opening a simulated commissioning window. This does not call a real Matter controller.");
+        new Thread(() -> {
+            try {
+                String temporaryCode = selectedController.openCommissioningWindow(nodeId, 300, 3840,
+                        step -> appendFromWorker(step.message()));
+                runOnUiThread(() -> {
+                    state.temporaryCode = temporaryCode;
+                    append(OpenHabInstructions.scanInputInstructions(state.temporaryCode));
+                    append(OpenHabInstructions.troubleshooting());
+                });
+            } catch (Exception ex) {
+                appendFromWorker(MainActivityPresentation.matterControllerOperationFailed(ex.getMessage()));
+            }
+        }, "matter-open-commissioning-window").start();
     }
 
     private void showWifiInstructions() {
@@ -515,6 +530,10 @@ public final class MainActivity extends Activity {
         output.setText(state.logs);
     }
 
+    private void appendFromWorker(String message) {
+        runOnUiThread(() -> append(message));
+    }
+
     private void restoreState(Bundle savedInstanceState) {
         if (savedInstanceState == null) {
             return;
@@ -525,6 +544,17 @@ public final class MainActivity extends Activity {
         state.logs = savedInstanceState.getString(KEY_LOGS, "");
         state.temporaryCode = savedInstanceState.getString(KEY_TEMPORARY_CODE, "");
         state.commissionedNodeId = savedInstanceState.getLong(KEY_COMMISSIONED_NODE_ID, -1L);
+        if (savedInstanceState.getBoolean(KEY_NATIVE_CONTROLLER_SELECTED, false)) {
+            MatterControllerSelection selection = MatterControllerSelector.select(
+                    fakeMatterController,
+                    chipMatterController,
+                    true);
+            controller = selection.controller();
+            nativeMatterControllerSelected = selection.nativeSelected();
+            if (!selection.nativeSelected()) {
+                state.logs = state.logs + MainActivityPresentation.matterControllerSelection(selection) + "\n";
+            }
+        }
     }
 
     private void loadPersistedConfig() {

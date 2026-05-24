@@ -192,4 +192,12 @@ public class MainActivityPresentationTest {
                 MainActivityPresentation.matterControllerOperationFailed(
                         "HTTP 500 from http://user:secret@chip.local:5540?token=abc"));
     }
+
+    @Test
+    public void describesMatterControllerFailureWithoutLeakingMatterSecrets() {
+        assertEquals(
+                "Matter controller operation failed: failed with pin=<redacted> code=<redacted-matter-code> dataset <redacted-thread-dataset>",
+                MainActivityPresentation.matterControllerOperationFailed(
+                        "failed with pin=20202021 code=3497-0112-332 dataset hex:0E080000000000010000"));
+    }
 }
