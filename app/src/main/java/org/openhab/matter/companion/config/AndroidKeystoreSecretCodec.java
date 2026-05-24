@@ -5,7 +5,6 @@ import android.security.keystore.KeyProperties;
 
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.SecureRandom;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -25,7 +24,7 @@ public final class AndroidKeystoreSecretCodec implements SecretCodec {
     }
 
     private AesGcmSecretCodec delegate() throws GeneralSecurityException {
-        return new AesGcmSecretCodec(loadOrCreateKey(), new SecureRandom());
+        return new AesGcmSecretCodec(loadOrCreateKey());
     }
 
     private SecretKey loadOrCreateKey() throws GeneralSecurityException {

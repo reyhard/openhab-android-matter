@@ -2,7 +2,6 @@ package org.openhab.matter.companion.config;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.SecureRandom;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
@@ -15,11 +14,13 @@ public final class AesGcmSecretCodec implements SecretCodec {
     private static final int TAG_BITS = 128;
 
     private final SecretKey key;
-    private final SecureRandom secureRandom;
 
-    public AesGcmSecretCodec(SecretKey key, SecureRandom secureRandom) {
+    public AesGcmSecretCodec(SecretKey key) {
         this.key = key;
-        this.secureRandom = secureRandom;
+    }
+
+    public AesGcmSecretCodec(SecretKey key, @SuppressWarnings("unused") java.security.SecureRandom secureRandom) {
+        this(key);
     }
 
     @Override
@@ -28,12 +29,13 @@ public final class AesGcmSecretCodec implements SecretCodec {
             return "";
         }
 
-        byte[] iv = new byte[IV_BYTES];
-        secureRandom.nextBytes(iv);
-
         Cipher cipher = Cipher.getInstance(TRANSFORMATION);
-        cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, iv));
+        cipher.init(Cipher.ENCRYPT_MODE, key);
         byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+        byte[] iv = cipher.getIV();
+        if (iv == null || iv.length != IV_BYTES) {
+            throw new GeneralSecurityException("Unexpected GCM IV length");
+        }
 
         Base64.Encoder encoder = Base64.getEncoder();
         return ENCRYPTED_PREFIX + encoder.encodeToString(iv) + ":" + encoder.encodeToString(ciphertext);

@@ -17,15 +17,23 @@ public final class SecureAppConfigMapper {
 
     public AppConfig fromStoredValues(String threadDataset, String openHabBaseUrl) {
         String safeThreadDataset = threadDataset == null ? "" : threadDataset;
-        if (!safeThreadDataset.startsWith(SecretCodec.ENCRYPTED_PREFIX)) {
+        if (isLegacyPlaintextThreadDataset(safeThreadDataset)) {
             return new AppConfig(safeThreadDataset, openHabBaseUrl);
+        }
+        if (safeThreadDataset.isEmpty()) {
+            return new AppConfig("", openHabBaseUrl);
         }
 
         try {
             return new AppConfig(secretCodec.decode(safeThreadDataset), openHabBaseUrl);
         } catch (GeneralSecurityException e) {
-            return new AppConfig("", openHabBaseUrl);
+            return new AppConfig("", openHabBaseUrl, true);
         }
+    }
+
+    public boolean isLegacyPlaintextThreadDataset(String threadDataset) {
+        String safeThreadDataset = threadDataset == null ? "" : threadDataset;
+        return !safeThreadDataset.isEmpty() && !safeThreadDataset.startsWith(SecretCodec.ENCRYPTED_PREFIX);
     }
 
     public static final class StoredConfig {

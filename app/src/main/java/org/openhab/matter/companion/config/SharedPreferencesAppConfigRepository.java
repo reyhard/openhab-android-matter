@@ -23,9 +23,17 @@ public final class SharedPreferencesAppConfigRepository implements AppConfigRepo
 
     @Override
     public AppConfig load() {
-        return mapper.fromStoredValues(
-                preferences.getString(KEY_THREAD_DATASET, ""),
-                preferences.getString(KEY_OPENHAB_BASE_URL, ""));
+        String storedThreadDataset = preferences.getString(KEY_THREAD_DATASET, "");
+        String storedOpenHabBaseUrl = preferences.getString(KEY_OPENHAB_BASE_URL, "");
+        AppConfig config = mapper.fromStoredValues(storedThreadDataset, storedOpenHabBaseUrl);
+        if (mapper.isLegacyPlaintextThreadDataset(storedThreadDataset)) {
+            try {
+                save(config);
+            } catch (IllegalStateException ignored) {
+                // Loading legacy plaintext should not fail app startup if migration cannot be written.
+            }
+        }
+        return config;
     }
 
     @Override

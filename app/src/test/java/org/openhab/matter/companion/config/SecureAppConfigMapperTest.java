@@ -15,8 +15,20 @@ public class SecureAppConfigMapperTest {
         SecureAppConfigMapper.StoredConfig stored = mapper.toStoredValues(
                 new AppConfig("hex:001122", "http://openhab.local:8080"));
 
-        assertEquals("encoded(hex:001122)", stored.threadDataset());
+        assertEquals("enc:v1:encoded(hex:001122)", stored.threadDataset());
         assertEquals("http://openhab.local:8080", stored.openHabBaseUrl());
+    }
+
+    @Test
+    public void decodesStoredEncryptedThreadDataset() throws Exception {
+        SecretCodec codec = new FixedSecretCodec();
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
+
+        AppConfig config = mapper.fromStoredValues("enc:v1:encoded(hex:001122)",
+                "http://openhab.local:8080");
+
+        assertEquals("hex:001122", config.threadDataset());
+        assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
     }
 
     @Test
@@ -40,20 +52,30 @@ public class SecureAppConfigMapperTest {
 
         assertEquals("", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
+        assertEquals(true, config.threadDatasetUnreadable());
+    }
+
+    @Test
+    public void detectsLegacyPlaintextThreadDataset() {
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(new FixedSecretCodec());
+
+        assertEquals(true, mapper.isLegacyPlaintextThreadDataset("hex:legacy"));
+        assertEquals(false, mapper.isLegacyPlaintextThreadDataset(""));
+        assertEquals(false, mapper.isLegacyPlaintextThreadDataset("enc:v1:encoded(hex:001122)"));
     }
 
     private static final class FixedSecretCodec implements SecretCodec {
         @Override
         public String encode(String plaintext) {
-            return "encoded(" + plaintext + ")";
+            return "enc:v1:encoded(" + plaintext + ")";
         }
 
         @Override
         public String decode(String encoded) throws GeneralSecurityException {
-            if (!encoded.startsWith("encoded(") || !encoded.endsWith(")")) {
+            if (!encoded.startsWith("enc:v1:encoded(") || !encoded.endsWith(")")) {
                 throw new GeneralSecurityException("broken");
             }
-            return encoded.substring("encoded(".length(), encoded.length() - 1);
+            return encoded.substring("enc:v1:encoded(".length(), encoded.length() - 1);
         }
     }
 }

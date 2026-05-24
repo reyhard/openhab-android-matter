@@ -39,4 +39,24 @@ public class AesGcmSecretCodecTest {
         String encoded = codec.encode("hex:00112233445566778899aabbccddeeff");
         codec.decode(encoded.substring(0, encoded.length() - 2) + "AA");
     }
+
+    @Test
+    public void encryptionUsesCipherGeneratedIv() throws Exception {
+        SecretKey key = new SecretKeySpec(new byte[] {
+                1, 2, 3, 4, 5, 6, 7, 8,
+                9, 10, 11, 12, 13, 14, 15, 16
+        }, "AES");
+        SecretCodec codec = new AesGcmSecretCodec(key, new ThrowingSecureRandom());
+
+        String encoded = codec.encode("hex:00112233445566778899aabbccddeeff");
+
+        assertEquals("hex:00112233445566778899aabbccddeeff", codec.decode(encoded));
+    }
+
+    private static final class ThrowingSecureRandom extends SecureRandom {
+        @Override
+        public void nextBytes(byte[] bytes) {
+            throw new AssertionError("Codec should let Cipher generate the encryption IV");
+        }
+    }
 }
