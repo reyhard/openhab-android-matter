@@ -21,7 +21,7 @@ public final class SecureMatterBootstrapStateMapper {
     public MatterBootstrapState fromStoredValues(long bootstrapNodeId, String controllerState) {
         String safeControllerState = controllerState == null ? "" : controllerState;
         if (safeControllerState.isEmpty()) {
-            return MatterBootstrapState.empty();
+            return new MatterBootstrapState(bootstrapNodeId, "", false);
         }
 
         try {

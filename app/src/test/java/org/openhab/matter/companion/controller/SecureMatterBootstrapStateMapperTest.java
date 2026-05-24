@@ -52,6 +52,17 @@ public class SecureMatterBootstrapStateMapperTest {
         assertEquals(false, state.stateUnreadable());
     }
 
+    @Test
+    public void emptyStoredControllerStatePreservesReadableNodeId() {
+        SecureMatterBootstrapStateMapper mapper = new SecureMatterBootstrapStateMapper(new FixedSecretCodec());
+
+        MatterBootstrapState state = mapper.fromStoredValues(1234L, "");
+
+        assertEquals(1234L, state.bootstrapNodeId());
+        assertEquals("", state.controllerState());
+        assertEquals(false, state.stateUnreadable());
+    }
+
     private static final class FixedSecretCodec implements SecretCodec {
         @Override
         public String encode(String plaintext) {
