@@ -14,6 +14,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class OpenHabInboxSseClientTest {
     @Test
@@ -36,6 +37,37 @@ public class OpenHabInboxSseClientTest {
         assertEquals(1, received.size());
         assertTrue(received.get(0).matterEntryDetected());
         assertEquals("openhab/inbox/matter:node:abc/added", received.get(0).topic());
+    }
+
+    @Test
+    public void ignoresKeepAliveEventsUntilInboxMessageArrives() throws Exception {
+        OneShotSseServer server = new OneShotSseServer(
+                "event: alive\n"
+                        + "data: {}\n\n"
+                        + "event: message\n"
+                        + "data: {\"topic\":\"openhab/inbox/matter:node:abc/added\",\"payload\":{\"thingUID\":\"matter:node:abc\"}}\n\n");
+        server.start();
+        List<OpenHabInboxEvent> received = new ArrayList<>();
+
+        new OpenHabInboxSseClient().observe(server.baseUrl(), event -> {
+            received.add(event);
+            return false;
+        });
+        server.join();
+
+        assertEquals(1, received.size());
+        assertEquals("openhab/inbox/matter:node:abc/added", received.get(0).topic());
+        assertTrue(received.get(0).matterEntryDetected());
+    }
+
+    @Test
+    public void rejectsNonHttpUrlsAsIoException() throws Exception {
+        try {
+            new OpenHabInboxSseClient().observe("file:/tmp/openhab-events", event -> false);
+            fail("Expected IOException");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("Unsupported protocol"));
+        }
     }
 
     private static final class OneShotSseServer {

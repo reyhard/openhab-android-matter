@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
@@ -16,6 +17,9 @@ public final class OpenHabInboxSseClient {
         HttpURLConnection connection = null;
         try {
             URL url = eventsUrl(baseUrl);
+            if (!"http".equals(url.getProtocol()) && !"https".equals(url.getProtocol())) {
+                throw new IOException("Unsupported protocol: " + url.getProtocol());
+            }
             connection = (HttpURLConnection) url.openConnection();
             connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
             connection.setReadTimeout(READ_TIMEOUT_MILLIS);
@@ -48,9 +52,9 @@ public final class OpenHabInboxSseClient {
                 new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
             StringBuilder block = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
+            while ((line = readLine(reader)) != null) {
                 if (line.isEmpty()) {
-                    if (block.length() > 0 && !listener.onEvent(OpenHabInboxSseParser.parse(block.toString()))) {
+                    if (block.length() > 0 && !dispatchEvent(block.toString(), listener)) {
                         return;
                     }
                     block.setLength(0);
@@ -59,7 +63,25 @@ public final class OpenHabInboxSseClient {
                 }
             }
             if (block.length() > 0) {
-                listener.onEvent(OpenHabInboxSseParser.parse(block.toString()));
+                dispatchEvent(block.toString(), listener);
+            }
+        }
+    }
+
+    private static boolean dispatchEvent(String block, OpenHabInboxEventListener listener) {
+        OpenHabInboxEvent event = OpenHabInboxSseParser.parse(block);
+        if (event.topic().isEmpty()) {
+            return true;
+        }
+        return listener.onEvent(event);
+    }
+
+    private static String readLine(BufferedReader reader) throws IOException {
+        while (true) {
+            try {
+                return reader.readLine();
+            } catch (SocketTimeoutException ignored) {
+                // SSE streams are long-lived; delayed keep-alives should not stop observation.
             }
         }
     }
