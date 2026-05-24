@@ -149,6 +149,20 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void describesExternalQrScannerTrustBoundary() {
+        assertEquals(
+                "This opens an installed external QR scanner app. Only continue if you trust that scanner with Matter setup codes.",
+                MainActivityPresentation.externalQrScannerTrustNotice());
+    }
+
+    @Test
+    public void describesInvalidExternalQrScannerResult() {
+        assertEquals(
+                "QR scanner returned text that is not a supported Matter setup payload.",
+                MainActivityPresentation.invalidExternalQrScannerResult());
+    }
+
+    @Test
     public void describesNativeChipReadiness() {
         ChipMatterControllerStatus status = new ChipMatterControllerStatus(false, "openhab_matter_chip", false, "missing");
 

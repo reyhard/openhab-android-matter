@@ -57,6 +57,14 @@ final class MainActivityPresentation {
         return "No external QR scanner app is installed. Paste the Matter code manually or install a scanner that supports ZXing scan intents.";
     }
 
+    static String externalQrScannerTrustNotice() {
+        return "This opens an installed external QR scanner app. Only continue if you trust that scanner with Matter setup codes.";
+    }
+
+    static String invalidExternalQrScannerResult() {
+        return "QR scanner returned text that is not a supported Matter setup payload.";
+    }
+
     static String nativeChipReadiness(ChipMatterControllerStatus status) {
         if (status.ready()) {
             return "Native CHIP controller ready: " + status.libraryName();

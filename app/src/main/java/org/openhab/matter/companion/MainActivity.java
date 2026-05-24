@@ -1,6 +1,7 @@
 package org.openhab.matter.companion;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -189,9 +190,9 @@ public final class MainActivity extends Activity {
             append("QR scanner did not return a Matter payload.");
             return;
         }
-        String scanResult = QrScanIntentFactory.extractResult(data);
+        String scanResult = QrScanIntentFactory.extractMatterSetupPayload(data);
         if (scanResult.isEmpty()) {
-            append("QR scanner returned no Matter payload.");
+            append(MainActivityPresentation.invalidExternalQrScannerResult());
             return;
         }
         state.setupPayload = scanResult;
@@ -260,8 +261,16 @@ public final class MainActivity extends Activity {
     }
 
     private void scanMatterQrWithExternalScanner() {
+        new AlertDialog.Builder(this)
+                .setTitle("External QR scanner")
+                .setMessage(MainActivityPresentation.externalQrScannerTrustNotice())
+                .setPositiveButton("Open scanner", (dialog, which) -> launchExternalQrScanner())
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void launchExternalQrScanner() {
         try {
-            append("Opening an installed external QR scanner app. Review scanner app trust before scanning Matter setup codes.");
             startActivityForResult(QrScanIntentFactory.createScanIntent(), QR_SCAN_REQUEST);
         } catch (ActivityNotFoundException ex) {
             append(MainActivityPresentation.externalQrScannerMissing());

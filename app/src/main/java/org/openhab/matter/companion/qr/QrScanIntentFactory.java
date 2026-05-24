@@ -2,6 +2,8 @@ package org.openhab.matter.companion.qr;
 
 import android.content.Intent;
 
+import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
+
 public final class QrScanIntentFactory {
     private QrScanIntentFactory() {
     }
@@ -30,7 +32,27 @@ public final class QrScanIntentFactory {
         return extractResultText(data.getStringExtra(QrScanContract.EXTRA_SCAN_RESULT));
     }
 
+    public static String extractMatterSetupPayload(Intent data) {
+        if (data == null) {
+            return "";
+        }
+        return extractMatterSetupPayloadText(data.getStringExtra(QrScanContract.EXTRA_SCAN_RESULT));
+    }
+
     public static String extractResultText(String result) {
         return result == null ? "" : result.trim();
+    }
+
+    public static String extractMatterSetupPayloadText(String result) {
+        String scanResult = extractResultText(result);
+        if (scanResult.isEmpty()) {
+            return "";
+        }
+        try {
+            MatterSetupPayloadParser.parse(scanResult);
+            return scanResult;
+        } catch (IllegalArgumentException ex) {
+            return "";
+        }
     }
 }

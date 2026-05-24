@@ -27,4 +27,15 @@ public class QrScanIntentFactoryTest {
     public void missingScanResultReturnsEmptyString() {
         assertEquals("", QrScanIntentFactory.extractResultText(null));
     }
+
+    @Test
+    public void validatesSupportedMatterScanResult() {
+        assertEquals("MT:Y.K9042C00KA0648G00",
+                QrScanIntentFactory.extractMatterSetupPayloadText("  MT:Y.K9042C00KA0648G00  "));
+    }
+
+    @Test
+    public void rejectsUnsupportedMatterScanResult() {
+        assertEquals("", QrScanIntentFactory.extractMatterSetupPayloadText("https://example.test/not-matter"));
+    }
 }
