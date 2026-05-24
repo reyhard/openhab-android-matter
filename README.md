@@ -15,12 +15,14 @@ This branch builds an installable Android APK with:
 - Runtime commissioning permission readiness checks for the current Android SDK version.
 - Encrypted app-private storage for the OTBR Thread dataset using Android Keystore-backed AES-GCM.
 - App-private persistence for the openHAB base URL.
+- External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
+- Native CHIP controller readiness diagnostics report whether the JNI library is available.
 - A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
 - A native Android UI that displays the temporary code and openHAB Matter Scan Input instructions.
 
 The real connectedhomeip/CHIP JNI controller is intentionally isolated behind `MatterController`. `ChipMatterController` is present as the replacement point for the native implementation.
 
-This MVP does not perform Camera QR scanning, real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
+This MVP does not perform native CameraX QR scanning/in-app QR decoding, real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
 Setup payloads, setup PINs, QR payloads, Matter fabric keys, and device credentials are not persisted.
 
 ## Build Configuration

@@ -1,5 +1,6 @@
 package org.openhab.matter.companion;
 
+import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 
 import java.net.URI;
@@ -50,6 +51,17 @@ final class MainActivityPresentation {
             return "openHAB Inbox SSE: Matter Inbox entry detected.";
         }
         return "openHAB Inbox SSE: event received but no Matter Inbox entry detected yet.";
+    }
+
+    static String externalQrScannerMissing() {
+        return "No external QR scanner app is installed. Paste the Matter code manually or install a scanner that supports ZXing scan intents.";
+    }
+
+    static String nativeChipReadiness(ChipMatterControllerStatus status) {
+        if (status.ready()) {
+            return "Native CHIP controller ready: " + status.libraryName();
+        }
+        return "Native CHIP controller not ready: " + status.message();
     }
 
     static String runtimePermissionRequestResult(String[] permissions, int[] grantResults) {

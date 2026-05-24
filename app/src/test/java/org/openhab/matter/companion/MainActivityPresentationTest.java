@@ -1,6 +1,7 @@
 package org.openhab.matter.companion;
 
 import org.junit.Test;
+import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 
 import java.util.Arrays;
@@ -138,5 +139,21 @@ public class MainActivityPresentationTest {
         assertEquals(
                 "openHAB Inbox SSE: event received but no Matter Inbox entry detected yet.",
                 MainActivityPresentation.openHabInboxSseEvent(false));
+    }
+
+    @Test
+    public void describesExternalQrScannerMissing() {
+        assertEquals(
+                "No external QR scanner app is installed. Paste the Matter code manually or install a scanner that supports ZXing scan intents.",
+                MainActivityPresentation.externalQrScannerMissing());
+    }
+
+    @Test
+    public void describesNativeChipReadiness() {
+        ChipMatterControllerStatus status = new ChipMatterControllerStatus(false, "openhab_matter_chip", false, "missing");
+
+        assertEquals(
+                "Native CHIP controller not ready: missing",
+                MainActivityPresentation.nativeChipReadiness(status));
     }
 }

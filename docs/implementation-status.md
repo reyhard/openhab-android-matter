@@ -13,11 +13,13 @@
 - Runtime commissioning permission readiness uses the Android SDK-specific permission plan and requests missing runtime permissions.
 - Android Keystore-backed AES-GCM encrypted app-private storage stores the OTBR Thread dataset.
 - App-private configuration persistence stores the openHAB base URL.
+- External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
+- Native CHIP controller readiness diagnostics report whether the JNI library is available.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 
 ## Not Implemented Yet
 
-- Camera QR scanning.
+- Native CameraX QR scanning and in-app QR decoding.
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
 - Encrypted storage for future Matter fabric keys.

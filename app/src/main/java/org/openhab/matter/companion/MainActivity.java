@@ -1,6 +1,8 @@
 package org.openhab.matter.companion;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
@@ -13,6 +15,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import org.openhab.matter.companion.controller.ChipMatterController;
 import org.openhab.matter.companion.config.AppConfig;
 import org.openhab.matter.companion.config.AppConfigRepository;
 import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository;
@@ -30,6 +33,7 @@ import org.openhab.matter.companion.openhab.OpenHabInboxSseClient;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 import org.openhab.matter.companion.openhab.OpenHabStatus;
 import org.openhab.matter.companion.permissions.CommissioningPermissionPlanner;
+import org.openhab.matter.companion.qr.QrScanIntentFactory;
 import org.openhab.matter.companion.ui.AppState;
 
 import java.util.ArrayList;
@@ -43,6 +47,7 @@ public final class MainActivity extends Activity {
     private static final String KEY_TEMPORARY_CODE = "temporaryCode";
     private static final String KEY_COMMISSIONED_NODE_ID = "commissionedNodeId";
     private static final int COMMISSIONING_PERMISSION_REQUEST = 2001;
+    private static final int QR_SCAN_REQUEST = 3001;
     private static final int DATASET_INPUT_ID = 1001;
     private static final int PAYLOAD_INPUT_ID = 1002;
     private static final int OPENHAB_INPUT_ID = 1003;
@@ -52,6 +57,7 @@ public final class MainActivity extends Activity {
 
     private final AppState state = new AppState();
     private final MatterController controller = new FakeMatterController();
+    private final ChipMatterController chipMatterController = new ChipMatterController();
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
     private final OpenHabInboxClient openHabInboxClient = new HttpOpenHabInboxClient();
     private final OpenHabInboxSseClient openHabInboxSseClient = new OpenHabInboxSseClient();
@@ -104,10 +110,12 @@ public final class MainActivity extends Activity {
         Button commissionThread = button("Simulate Thread commissioning");
         Button openWindow = button("Simulate open commissioning window");
         Button wifiHandoff = button("Wi-Fi / multi-admin openHAB handoff");
+        Button scanQr = button("Scan Matter QR with installed scanner");
         Button checkOpenHab = button("Check openHAB readiness");
         Button checkPermissions = button("Check commissioning permissions");
         Button checkInbox = button("Check openHAB Inbox");
         Button watchInboxSse = button("Watch openHAB Inbox SSE");
+        Button checkChip = button("Check native CHIP controller");
         Button saveConfig = button("Save dataset and openHAB URL");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
@@ -115,10 +123,12 @@ public final class MainActivity extends Activity {
         commissionThread.setOnClickListener(view -> runCommissioning());
         openWindow.setOnClickListener(view -> runOpenCommissioningWindow());
         wifiHandoff.setOnClickListener(view -> showWifiInstructions());
+        scanQr.setOnClickListener(view -> scanMatterQrWithExternalScanner());
         checkOpenHab.setOnClickListener(view -> checkOpenHabReadiness());
         checkPermissions.setOnClickListener(view -> checkCommissioningPermissions());
         checkInbox.setOnClickListener(view -> checkOpenHabInbox());
         watchInboxSse.setOnClickListener(view -> watchOpenHabInboxSse());
+        checkChip.setOnClickListener(view -> checkNativeChipController());
         saveConfig.setOnClickListener(view -> saveConfiguration());
 
         root.addView(title);
@@ -133,10 +143,12 @@ public final class MainActivity extends Activity {
         root.addView(commissionThread);
         root.addView(openWindow);
         root.addView(wifiHandoff);
+        root.addView(scanQr);
         root.addView(checkOpenHab);
         root.addView(checkPermissions);
         root.addView(checkInbox);
         root.addView(watchInboxSse);
+        root.addView(checkChip);
         root.addView(saveConfig);
         root.addView(section("Guide output"));
         root.addView(output);
@@ -165,6 +177,26 @@ public final class MainActivity extends Activity {
     protected void onStop() {
         stopOpenHabInboxSseWatch();
         super.onStop();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != QR_SCAN_REQUEST) {
+            return;
+        }
+        if (resultCode != RESULT_OK) {
+            append("QR scanner did not return a Matter payload.");
+            return;
+        }
+        String scanResult = QrScanIntentFactory.extractResult(data);
+        if (scanResult.isEmpty()) {
+            append("QR scanner returned no Matter payload.");
+            return;
+        }
+        state.setupPayload = scanResult;
+        payloadInput.setText(scanResult);
+        append("Scanned Matter QR payload and populated setup payload input.");
     }
 
     @Override
@@ -225,6 +257,19 @@ public final class MainActivity extends Activity {
 
         append("Wi-Fi / multi-admin handoff selected. The phone is not commissioning this device in demo mode.");
         append(OpenHabInstructions.scanInputInstructionsWithoutEcho());
+    }
+
+    private void scanMatterQrWithExternalScanner() {
+        try {
+            append("Opening an installed external QR scanner app. Review scanner app trust before scanning Matter setup codes.");
+            startActivityForResult(QrScanIntentFactory.createScanIntent(), QR_SCAN_REQUEST);
+        } catch (ActivityNotFoundException ex) {
+            append(MainActivityPresentation.externalQrScannerMissing());
+        }
+    }
+
+    private void checkNativeChipController() {
+        append(MainActivityPresentation.nativeChipReadiness(chipMatterController.readiness()));
     }
 
     private void saveConfiguration() {
