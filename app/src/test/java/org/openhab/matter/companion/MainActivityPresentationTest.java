@@ -248,6 +248,13 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void warnsWhenBootstrapStateCannotBeRead() {
+        assertEquals(
+                "Stored Matter bootstrap controller state could not be decrypted. Re-run Thread commissioning before opening a commissioning window.",
+                MainActivityPresentation.bootstrapStateUnreadable());
+    }
+
+    @Test
     public void describesMatterSseEvent() {
         assertEquals(
                 "openHAB Inbox SSE: Matter Inbox entry detected.",

@@ -26,19 +26,26 @@ public final class SharedPreferencesMatterBootstrapStateRepository implements Ma
 
     @Override
     public MatterBootstrapState load() {
-        long bootstrapNodeId = preferences.getLong(KEY_BOOTSTRAP_NODE_ID, -1L);
-        String controllerState = preferences.getString(KEY_CONTROLLER_STATE, "");
-        return mapper.fromStoredValues(bootstrapNodeId, controllerState);
+        try {
+            long bootstrapNodeId = preferences.getLong(KEY_BOOTSTRAP_NODE_ID, -1L);
+            String controllerState = preferences.getString(KEY_CONTROLLER_STATE, "");
+            return mapper.fromStoredValues(bootstrapNodeId, controllerState);
+        } catch (ClassCastException e) {
+            return new MatterBootstrapState(-1L, "", true);
+        }
     }
 
     @Override
     public void save(MatterBootstrapState state) {
         try {
             SecureMatterBootstrapStateMapper.StoredBootstrapState storedState = mapper.toStoredValues(state);
-            preferences.edit()
+            boolean saved = preferences.edit()
                     .putLong(KEY_BOOTSTRAP_NODE_ID, storedState.bootstrapNodeId())
                     .putString(KEY_CONTROLLER_STATE, storedState.controllerState())
-                    .apply();
+                    .commit();
+            if (!saved) {
+                throw new IllegalStateException("Unable to commit Matter bootstrap state");
+            }
         } catch (Exception e) {
             throw new IllegalStateException("Unable to save Matter bootstrap state", e);
         }
@@ -46,9 +53,12 @@ public final class SharedPreferencesMatterBootstrapStateRepository implements Ma
 
     @Override
     public void clear() {
-        preferences.edit()
+        boolean cleared = preferences.edit()
                 .remove(KEY_BOOTSTRAP_NODE_ID)
                 .remove(KEY_CONTROLLER_STATE)
-                .apply();
+                .commit();
+        if (!cleared) {
+            throw new IllegalStateException("Unable to clear Matter bootstrap state");
+        }
     }
 }

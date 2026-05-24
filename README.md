@@ -17,6 +17,7 @@ This branch builds an installable Android APK with:
 - Encrypted app-private storage for the OTBR Thread dataset using Android Keystore-backed AES-GCM.
 - App-private persistence for the openHAB base URL.
 - App-private persistence for the OTBR base URL.
+- Encrypted app-private bootstrap controller state repository for future native Matter fabric/controller state.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP controller readiness diagnostics report whether the JNI library is available.
 - Runtime controller selection can switch from the simulated controller to `ChipMatterController` when the native JNI library is bundled and readiness passes.
@@ -26,7 +27,8 @@ This branch builds an installable Android APK with:
 The real connectedhomeip/CHIP JNI controller is intentionally isolated behind `MatterController`. `ChipMatterController` is present as the replacement point for the native implementation.
 
 This MVP does not perform native CameraX QR scanning/in-app QR decoding, real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
-Setup payloads, setup PINs, QR payloads, Matter fabric keys, and device credentials are not persisted.
+Setup payloads, setup PINs, QR payloads, and device credentials are not persisted.
+The bootstrap controller state repository currently persists the bootstrap node id and provides an encrypted opaque state slot; real connectedhomeip fabric key material is not persisted or restored yet because the native CHIP layer does not emit it.
 
 ## Build Configuration
 
@@ -69,3 +71,4 @@ The remaining production work is to replace `FakeMatterController` with a connec
 - `openCommissioningWindow(nodeId, timeout, discriminator)`
 
 Until that native library is bundled, the app is installable and validates the openHAB user flow, but it does not actually provision Matter devices.
+When that native library is added, its persistent controller/fabric material should be written through the encrypted bootstrap state repository instead of logs or plaintext app config.

@@ -55,6 +55,10 @@ final class MainActivityPresentation {
         return "Stored Thread dataset could not be decrypted. Paste and save the dataset again to continue.";
     }
 
+    static String bootstrapStateUnreadable() {
+        return "Stored Matter bootstrap controller state could not be decrypted. Re-run Thread commissioning before opening a commissioning window.";
+    }
+
     static String openHabInboxSseEvent(boolean matterEntryDetected) {
         if (matterEntryDetected) {
             return "openHAB Inbox SSE: Matter Inbox entry detected.";

@@ -23,8 +23,11 @@ import org.openhab.matter.companion.config.AppConfigRepository;
 import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository;
 import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterController;
+import org.openhab.matter.companion.controller.MatterBootstrapState;
+import org.openhab.matter.companion.controller.MatterBootstrapStateRepository;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.controller.MatterControllerSelector;
+import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
 import org.openhab.matter.companion.domain.OpenHabInstructions;
@@ -74,6 +77,7 @@ public final class MainActivity extends Activity {
     private final OtbrClient otbrClient = new HttpOtbrClient();
     private MatterController controller = fakeMatterController;
     private AppConfigRepository configRepository;
+    private MatterBootstrapStateRepository bootstrapStateRepository;
     private TextView output;
     private EditText datasetInput;
     private EditText payloadInput;
@@ -82,6 +86,7 @@ public final class MainActivity extends Activity {
     private boolean nativeMatterControllerSelected;
     private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
+    private boolean persistedBootstrapStateUnreadable;
     private volatile boolean sseWatchActive;
     private Thread sseWatchThread;
 
@@ -89,7 +94,9 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         configRepository = new SharedPreferencesAppConfigRepository(this);
+        bootstrapStateRepository = new SharedPreferencesMatterBootstrapStateRepository(this);
         loadPersistedConfig();
+        loadPersistedBootstrapState();
         restoreState(savedInstanceState);
 
         ScrollView scrollView = new ScrollView(this);
@@ -189,6 +196,9 @@ public final class MainActivity extends Activity {
             if (persistedThreadDatasetUnreadable) {
                 append(MainActivityPresentation.threadDatasetUnreadable());
             }
+            if (persistedBootstrapStateUnreadable) {
+                append(MainActivityPresentation.bootstrapStateUnreadable());
+            }
         }
     }
 
@@ -270,6 +280,7 @@ public final class MainActivity extends Activity {
                 long nodeId = selectedController.commissionBleThread(dataset, payload, step -> appendFromWorker(step.message()));
                 runOnUiThread(() -> {
                     state.commissionedNodeId = nodeId;
+                    saveBootstrapState(nodeId);
                     append("Bootstrap node id: " + state.commissionedNodeId);
                 });
             } catch (Exception ex) {
@@ -280,6 +291,7 @@ public final class MainActivity extends Activity {
 
     private void runOpenCommissioningWindow() {
         if (state.commissionedNodeId < 0) {
+            clearBootstrapState();
             append("Run simulated Thread commissioning first so the demo has a bootstrap node id.");
             return;
         }
@@ -600,6 +612,30 @@ public final class MainActivity extends Activity {
         state.openHabBaseUrl = config.openHabBaseUrl();
         state.otbrBaseUrl = config.otbrBaseUrl();
         persistedThreadDatasetUnreadable = config.threadDatasetUnreadable();
+    }
+
+    private void loadPersistedBootstrapState() {
+        MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
+        persistedBootstrapStateUnreadable = bootstrapState.stateUnreadable();
+        if (bootstrapState.bootstrapNodeId() >= 0) {
+            state.commissionedNodeId = bootstrapState.bootstrapNodeId();
+        }
+    }
+
+    private void saveBootstrapState(long nodeId) {
+        try {
+            bootstrapStateRepository.save(new MatterBootstrapState(nodeId, "", false));
+        } catch (IllegalStateException ex) {
+            append("Matter bootstrap controller state could not be saved. Re-run Thread commissioning if the app restarts before opening a commissioning window.");
+        }
+    }
+
+    private void clearBootstrapState() {
+        try {
+            bootstrapStateRepository.clear();
+        } catch (IllegalStateException ex) {
+            append("Matter bootstrap controller state could not be cleared. Re-run Thread commissioning before opening a commissioning window.");
+        }
     }
 
     private void restoreNativeChipControllerSelectionAsync() {
