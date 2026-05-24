@@ -165,7 +165,18 @@ final class MainActivityPresentation {
     }
 
     private static String sanitizeUrlFallback(String value) {
-        String stripped = stripQueryAndFragment(value).replaceFirst("://.*@", "://");
-        return stripped.replaceFirst("^([A-Za-z][A-Za-z0-9+.-]*:).*@([^/?#]+.*)$", "$1$2");
+        String stripped = stripQueryAndFragment(value);
+        int authorityStart = stripped.indexOf("://");
+        if (authorityStart >= 0) {
+            int hostStart = authorityStart + 3;
+            int pathStart = stripped.indexOf('/', hostStart);
+            int authorityEnd = pathStart >= 0 ? pathStart : stripped.length();
+            int userInfoEnd = stripped.lastIndexOf('@', authorityEnd - 1);
+            if (userInfoEnd >= hostStart) {
+                return stripped.substring(0, hostStart) + stripped.substring(userInfoEnd + 1);
+            }
+            return stripped;
+        }
+        return stripped.replaceFirst("^([A-Za-z][A-Za-z0-9+.-]*:).*@(.*)$", "$1$2");
     }
 }

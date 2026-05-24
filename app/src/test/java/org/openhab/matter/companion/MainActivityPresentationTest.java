@@ -152,6 +152,20 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void redactsHostlessOpaqueUserInfoBeforePath() {
+        assertEquals(
+                "ssh:/tmp",
+                MainActivityPresentation.safeUrlForLog("ssh:user:secret@/tmp?token=abc#frag"));
+    }
+
+    @Test
+    public void preservesPathAtSignWhenUriParsingFails() {
+        assertEquals(
+                "http://openhab.local/path@v1",
+                MainActivityPresentation.safeUrlForLog("http://openhab.local/path@v1?token=%zz#frag"));
+    }
+
+    @Test
     public void describesEncryptedConfigSave() {
         assertEquals(
                 "Saved Thread dataset in encrypted app storage, saved OTBR base URL, and saved openHAB base URL. Setup payloads and PINs are not saved.",
