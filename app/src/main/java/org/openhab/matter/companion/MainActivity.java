@@ -22,6 +22,8 @@ import org.openhab.matter.companion.config.AppConfigRepository;
 import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository;
 import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterController;
+import org.openhab.matter.companion.controller.MatterControllerSelection;
+import org.openhab.matter.companion.controller.MatterControllerSelector;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
 import org.openhab.matter.companion.domain.OpenHabInstructions;
@@ -57,16 +59,18 @@ public final class MainActivity extends Activity {
     private static final int MUTED_COLOR = Color.rgb(74, 94, 90);
 
     private final AppState state = new AppState();
-    private final MatterController controller = new FakeMatterController();
+    private final MatterController fakeMatterController = new FakeMatterController();
     private final ChipMatterController chipMatterController = new ChipMatterController();
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
     private final OpenHabInboxClient openHabInboxClient = new HttpOpenHabInboxClient();
     private final OpenHabInboxSseClient openHabInboxSseClient = new OpenHabInboxSseClient();
+    private MatterController controller = fakeMatterController;
     private AppConfigRepository configRepository;
     private TextView output;
     private EditText datasetInput;
     private EditText payloadInput;
     private EditText openHabInput;
+    private boolean nativeMatterControllerSelected;
     private boolean persistedThreadDatasetUnreadable;
     private volatile boolean sseWatchActive;
     private Thread sseWatchThread;
@@ -117,6 +121,7 @@ public final class MainActivity extends Activity {
         Button checkInbox = button("Check openHAB Inbox");
         Button watchInboxSse = button("Watch openHAB Inbox SSE");
         Button checkChip = button("Check native CHIP controller");
+        Button useNativeChip = button("Use native CHIP controller if ready");
         Button saveConfig = button("Save dataset and openHAB URL");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
@@ -130,6 +135,7 @@ public final class MainActivity extends Activity {
         checkInbox.setOnClickListener(view -> checkOpenHabInbox());
         watchInboxSse.setOnClickListener(view -> watchOpenHabInboxSse());
         checkChip.setOnClickListener(view -> checkNativeChipController());
+        useNativeChip.setOnClickListener(view -> useNativeChipControllerIfReady());
         saveConfig.setOnClickListener(view -> saveConfiguration());
 
         root.addView(title);
@@ -150,6 +156,7 @@ public final class MainActivity extends Activity {
         root.addView(checkInbox);
         root.addView(watchInboxSse);
         root.addView(checkChip);
+        root.addView(useNativeChip);
         root.addView(saveConfig);
         root.addView(section("Guide output"));
         root.addView(output);
@@ -218,17 +225,26 @@ public final class MainActivity extends Activity {
         state.dataset = datasetInput.getText().toString();
         state.setupPayload = payloadInput.getText().toString();
 
+        ThreadDataset dataset;
+        MatterSetupPayload payload;
         try {
-            ThreadDataset dataset = ThreadDataset.parse(state.dataset);
-            MatterSetupPayload payload = MatterSetupPayloadParser.parse(state.setupPayload);
+            dataset = ThreadDataset.parse(state.dataset);
+            payload = MatterSetupPayloadParser.parse(state.setupPayload);
+        } catch (Exception ex) {
+            append("Commissioning input could not be validated. Check the dataset and setup payload format; sensitive values are not repeated in this log.");
+            return;
+        }
 
-            append("Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
+        try {
+            append(nativeMatterControllerSelected
+                    ? "Starting native CHIP Thread commissioning."
+                    : "Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
             append("Validated Thread dataset without displaying it.");
             append(payloadSummary(payload));
             state.commissionedNodeId = controller.commissionBleThread(dataset, payload, step -> append(step.message()));
-            append("Simulated bootstrap node id: " + state.commissionedNodeId);
+            append("Bootstrap node id: " + state.commissionedNodeId);
         } catch (Exception ex) {
-            append("Commissioning input could not be validated. Check the dataset and setup payload format; sensitive values are not repeated in this log.");
+            append(MainActivityPresentation.matterControllerOperationFailed(ex.getMessage()));
         }
     }
 
@@ -239,7 +255,9 @@ public final class MainActivity extends Activity {
                 return;
             }
 
-            append("Opening a simulated commissioning window. This does not call a real Matter controller.");
+            append(nativeMatterControllerSelected
+                    ? "Opening native CHIP commissioning window."
+                    : "Opening a simulated commissioning window. This does not call a real Matter controller.");
             state.temporaryCode = controller.openCommissioningWindow(state.commissionedNodeId, 300, 3840,
                     step -> append(step.message()));
             append(OpenHabInstructions.scanInputInstructions(state.temporaryCode));
@@ -279,6 +297,16 @@ public final class MainActivity extends Activity {
 
     private void checkNativeChipController() {
         append(MainActivityPresentation.nativeChipReadiness(chipMatterController.readiness()));
+    }
+
+    private void useNativeChipControllerIfReady() {
+        MatterControllerSelection selection = MatterControllerSelector.select(
+                fakeMatterController,
+                chipMatterController,
+                true);
+        controller = selection.controller();
+        nativeMatterControllerSelected = selection.nativeSelected();
+        append(MainActivityPresentation.matterControllerSelection(selection));
     }
 
     private void saveConfiguration() {

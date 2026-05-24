@@ -15,6 +15,7 @@
 - App-private configuration persistence stores the openHAB base URL.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP controller readiness diagnostics report whether the JNI library is available.
+- Runtime controller selection can switch from the simulated controller to `ChipMatterController` when the native JNI library is bundled and readiness passes.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 
 ## Not Implemented Yet

@@ -17,6 +17,7 @@ This branch builds an installable Android APK with:
 - App-private persistence for the openHAB base URL.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP controller readiness diagnostics report whether the JNI library is available.
+- Runtime controller selection can switch from the simulated controller to `ChipMatterController` when the native JNI library is bundled and readiness passes.
 - A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
 - A native Android UI that displays the temporary code and openHAB Matter Scan Input instructions.
 

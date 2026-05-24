@@ -1,6 +1,7 @@
 package org.openhab.matter.companion;
 
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
+import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 
 import java.net.URI;
@@ -70,6 +71,14 @@ final class MainActivityPresentation {
             return "Native CHIP controller ready: " + status.libraryName();
         }
         return "Native CHIP controller not ready: " + status.message();
+    }
+
+    static String matterControllerSelection(MatterControllerSelection selection) {
+        return "Matter controller selection: " + selection.message();
+    }
+
+    static String matterControllerOperationFailed(String message) {
+        return "Matter controller operation failed: " + safeTextForLog(message);
     }
 
     static String runtimePermissionRequestResult(String[] permissions, int[] grantResults) {

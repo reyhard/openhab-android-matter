@@ -2,6 +2,8 @@ package org.openhab.matter.companion;
 
 import org.junit.Test;
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
+import org.openhab.matter.companion.controller.FakeMatterController;
+import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 
 import java.util.Arrays;
@@ -169,5 +171,25 @@ public class MainActivityPresentationTest {
         assertEquals(
                 "Native CHIP controller not ready: missing",
                 MainActivityPresentation.nativeChipReadiness(status));
+    }
+
+    @Test
+    public void describesMatterControllerSelection() {
+        MatterControllerSelection selection = new MatterControllerSelection(
+                new FakeMatterController(),
+                true,
+                "Using native CHIP controller: custom_chip");
+
+        assertEquals(
+                "Matter controller selection: Using native CHIP controller: custom_chip",
+                MainActivityPresentation.matterControllerSelection(selection));
+    }
+
+    @Test
+    public void describesMatterControllerFailureWithoutLeakingUrlSecrets() {
+        assertEquals(
+                "Matter controller operation failed: HTTP 500 from http://chip.local:5540",
+                MainActivityPresentation.matterControllerOperationFailed(
+                        "HTTP 500 from http://user:secret@chip.local:5540?token=abc"));
     }
 }
