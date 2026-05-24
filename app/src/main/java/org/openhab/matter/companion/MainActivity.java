@@ -1,7 +1,9 @@
 package org.openhab.matter.companion;
 
 import android.app.Activity;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.ViewGroup;
@@ -21,9 +23,16 @@ import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
 import org.openhab.matter.companion.domain.OpenHabInstructions;
 import org.openhab.matter.companion.domain.ThreadDataset;
 import org.openhab.matter.companion.openhab.HttpOpenHabClient;
+import org.openhab.matter.companion.openhab.HttpOpenHabInboxClient;
 import org.openhab.matter.companion.openhab.OpenHabClient;
+import org.openhab.matter.companion.openhab.OpenHabInboxClient;
+import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 import org.openhab.matter.companion.openhab.OpenHabStatus;
+import org.openhab.matter.companion.permissions.CommissioningPermissionPlanner;
 import org.openhab.matter.companion.ui.AppState;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class MainActivity extends Activity {
     private static final String KEY_DATASET = "dataset";
@@ -32,6 +41,7 @@ public final class MainActivity extends Activity {
     private static final String KEY_LOGS = "logs";
     private static final String KEY_TEMPORARY_CODE = "temporaryCode";
     private static final String KEY_COMMISSIONED_NODE_ID = "commissionedNodeId";
+    private static final int COMMISSIONING_PERMISSION_REQUEST = 2001;
     private static final int DATASET_INPUT_ID = 1001;
     private static final int PAYLOAD_INPUT_ID = 1002;
     private static final int OPENHAB_INPUT_ID = 1003;
@@ -42,6 +52,7 @@ public final class MainActivity extends Activity {
     private final AppState state = new AppState();
     private final MatterController controller = new FakeMatterController();
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
+    private final OpenHabInboxClient openHabInboxClient = new HttpOpenHabInboxClient();
     private AppConfigRepository configRepository;
     private TextView output;
     private EditText datasetInput;
@@ -89,6 +100,8 @@ public final class MainActivity extends Activity {
         Button openWindow = button("Simulate open commissioning window");
         Button wifiHandoff = button("Wi-Fi / multi-admin openHAB handoff");
         Button checkOpenHab = button("Check openHAB readiness");
+        Button checkPermissions = button("Check commissioning permissions");
+        Button checkInbox = button("Check openHAB Inbox");
         Button saveConfig = button("Save dataset and openHAB URL");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
@@ -97,6 +110,8 @@ public final class MainActivity extends Activity {
         openWindow.setOnClickListener(view -> runOpenCommissioningWindow());
         wifiHandoff.setOnClickListener(view -> showWifiInstructions());
         checkOpenHab.setOnClickListener(view -> checkOpenHabReadiness());
+        checkPermissions.setOnClickListener(view -> checkCommissioningPermissions());
+        checkInbox.setOnClickListener(view -> checkOpenHabInbox());
         saveConfig.setOnClickListener(view -> saveConfiguration());
 
         root.addView(title);
@@ -112,6 +127,8 @@ public final class MainActivity extends Activity {
         root.addView(openWindow);
         root.addView(wifiHandoff);
         root.addView(checkOpenHab);
+        root.addView(checkPermissions);
+        root.addView(checkInbox);
         root.addView(saveConfig);
         root.addView(section("Guide output"));
         root.addView(output);
@@ -121,6 +138,25 @@ public final class MainActivity extends Activity {
         if (state.logs.isEmpty()) {
             append("Paste your OTBR Thread dataset and Matter setup payload. Sensitive input is validated but not echoed in this log.");
         }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != COMMISSIONING_PERMISSION_REQUEST) {
+            return;
+        }
+
+        boolean allGranted = true;
+        for (int result : grantResults) {
+            if (result != PackageManager.PERMISSION_GRANTED) {
+                allGranted = false;
+                break;
+            }
+        }
+        append(allGranted
+                ? "Runtime commissioning permission request completed: all requested permissions granted."
+                : "Runtime commissioning permission request completed: one or more permissions were denied.");
     }
 
     @Override
@@ -220,6 +256,56 @@ public final class MainActivity extends Activity {
                 }
             });
         }, "openhab-readiness-check").start();
+    }
+
+    private void checkCommissioningPermissions() {
+        List<String> requiredPermissions = CommissioningPermissionPlanner.requiredPermissions(Build.VERSION.SDK_INT);
+        if (requiredPermissions.isEmpty()) {
+            append(MainActivityPresentation.runtimePermissionsNotNeeded());
+            return;
+        }
+
+        List<String> missingPermissions = new ArrayList<>();
+        for (String permission : requiredPermissions) {
+            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+                missingPermissions.add(permission);
+            }
+        }
+
+        if (missingPermissions.isEmpty()) {
+            append(MainActivityPresentation.runtimePermissionsAlreadyGranted(requiredPermissions));
+            return;
+        }
+
+        append(MainActivityPresentation.runtimePermissionsRequested(missingPermissions));
+        requestPermissions(missingPermissions.toArray(new String[0]), COMMISSIONING_PERMISSION_REQUEST);
+    }
+
+    private void checkOpenHabInbox() {
+        state.openHabBaseUrl = openHabInput.getText().toString();
+        if (state.openHabBaseUrl == null || state.openHabBaseUrl.trim().isEmpty()) {
+            append("Enter an openHAB base URL first.");
+            return;
+        }
+
+        String baseUrl = state.openHabBaseUrl.trim();
+        append("Checking openHAB Inbox at " + baseUrl + " ...");
+        new Thread(() -> {
+            OpenHabInboxStatus status;
+            try {
+                status = openHabInboxClient.checkInbox(baseUrl);
+            } catch (Exception ex) {
+                status = new OpenHabInboxStatus(false, false, "openHAB Inbox check failed", ex.getMessage());
+            }
+            OpenHabInboxStatus finalStatus = status;
+            runOnUiThread(() -> {
+                append(MainActivityPresentation.openHabInboxResult(finalStatus));
+                append(finalStatus.message());
+                if (finalStatus.details() != null && !finalStatus.details().isEmpty()) {
+                    append(finalStatus.details());
+                }
+            });
+        }, "openhab-inbox-check").start();
     }
 
     private String payloadSummary(MatterSetupPayload payload) {
