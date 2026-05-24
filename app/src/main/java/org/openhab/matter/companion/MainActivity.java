@@ -17,25 +17,32 @@ import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
 import org.openhab.matter.companion.domain.OpenHabInstructions;
 import org.openhab.matter.companion.domain.ThreadDataset;
+import org.openhab.matter.companion.openhab.HttpOpenHabClient;
+import org.openhab.matter.companion.openhab.OpenHabClient;
+import org.openhab.matter.companion.openhab.OpenHabStatus;
 import org.openhab.matter.companion.ui.AppState;
 
 public final class MainActivity extends Activity {
     private static final String KEY_DATASET = "dataset";
     private static final String KEY_SETUP_PAYLOAD = "setupPayload";
+    private static final String KEY_OPENHAB_BASE_URL = "openHabBaseUrl";
     private static final String KEY_LOGS = "logs";
     private static final String KEY_TEMPORARY_CODE = "temporaryCode";
     private static final String KEY_COMMISSIONED_NODE_ID = "commissionedNodeId";
     private static final int DATASET_INPUT_ID = 1001;
     private static final int PAYLOAD_INPUT_ID = 1002;
+    private static final int OPENHAB_INPUT_ID = 1003;
     private static final int PANEL_COLOR = Color.rgb(255, 251, 240);
     private static final int TEXT_COLOR = Color.rgb(36, 50, 48);
     private static final int MUTED_COLOR = Color.rgb(74, 94, 90);
 
     private final AppState state = new AppState();
     private final MatterController controller = new FakeMatterController();
+    private final OpenHabClient openHabClient = new HttpOpenHabClient();
     private TextView output;
     private EditText datasetInput;
     private EditText payloadInput;
+    private EditText openHabInput;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,16 +75,21 @@ public final class MainActivity extends Activity {
         payloadInput = input("Matter setup payload: MT:... or pin=20202021;disc=3840;vendor=Aqara;product=U200", false);
         payloadInput.setId(PAYLOAD_INPUT_ID);
         payloadInput.setText(state.setupPayload);
+        openHabInput = input("openHAB base URL, for example http://openhab.local:8080", false);
+        openHabInput.setId(OPENHAB_INPUT_ID);
+        openHabInput.setText(state.openHabBaseUrl);
 
         Button commissionThread = button("Simulate Thread commissioning");
         Button openWindow = button("Simulate open commissioning window");
         Button wifiHandoff = button("Wi-Fi / multi-admin openHAB handoff");
+        Button checkOpenHab = button("Check openHAB readiness");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
 
         commissionThread.setOnClickListener(view -> runCommissioning());
         openWindow.setOnClickListener(view -> runOpenCommissioningWindow());
         wifiHandoff.setOnClickListener(view -> showWifiInstructions());
+        checkOpenHab.setOnClickListener(view -> checkOpenHabReadiness());
 
         root.addView(title);
         root.addView(subtitle);
@@ -86,9 +98,12 @@ public final class MainActivity extends Activity {
         root.addView(datasetInput);
         root.addView(section("Matter setup payload"));
         root.addView(payloadInput);
+        root.addView(section("openHAB readiness"));
+        root.addView(openHabInput);
         root.addView(commissionThread);
         root.addView(openWindow);
         root.addView(wifiHandoff);
+        root.addView(checkOpenHab);
         root.addView(section("Guide output"));
         root.addView(output);
 
@@ -104,8 +119,10 @@ public final class MainActivity extends Activity {
         super.onSaveInstanceState(outState);
         state.dataset = datasetInput.getText().toString();
         state.setupPayload = payloadInput.getText().toString();
+        state.openHabBaseUrl = openHabInput.getText().toString();
         outState.putString(KEY_DATASET, state.dataset);
         outState.putString(KEY_SETUP_PAYLOAD, state.setupPayload);
+        outState.putString(KEY_OPENHAB_BASE_URL, state.openHabBaseUrl);
         outState.putString(KEY_LOGS, state.logs);
         outState.putString(KEY_TEMPORARY_CODE, state.temporaryCode);
         outState.putLong(KEY_COMMISSIONED_NODE_ID, state.commissionedNodeId);
@@ -118,18 +135,14 @@ public final class MainActivity extends Activity {
         try {
             ThreadDataset dataset = ThreadDataset.parse(state.dataset);
             MatterSetupPayload payload = MatterSetupPayloadParser.parse(state.setupPayload);
-            if (payload.requiresChipParser()) {
-                append("MT: QR/manual payload detected. The CHIP parser is required to decode it; for this MVP enter explicit fields instead: pin=...;disc=...;vendor=...;product=...");
-                return;
-            }
 
             append("Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
             append("Validated Thread dataset without displaying it.");
-            append("Validated explicit Matter PIN and discriminator without displaying the PIN.");
+            append(payloadSummary(payload));
             state.commissionedNodeId = controller.commissionBleThread(dataset, payload, step -> append(step.message()));
             append("Simulated bootstrap node id: " + state.commissionedNodeId);
         } catch (Exception ex) {
-            append("Error: " + ex.getMessage());
+            append("Commissioning input could not be validated. Check the dataset and setup payload format; sensitive values are not repeated in this log.");
         }
     }
 
@@ -159,6 +172,43 @@ public final class MainActivity extends Activity {
 
         append("Wi-Fi / multi-admin handoff selected. The phone is not commissioning this device in demo mode.");
         append(OpenHabInstructions.scanInputInstructionsWithoutEcho());
+    }
+
+    private void checkOpenHabReadiness() {
+        state.openHabBaseUrl = openHabInput.getText().toString();
+        if (state.openHabBaseUrl == null || state.openHabBaseUrl.trim().isEmpty()) {
+            append("Enter an openHAB base URL first.");
+            return;
+        }
+
+        append("Checking openHAB REST readiness at " + state.openHabBaseUrl.trim() + " ...");
+        new Thread(() -> {
+            OpenHabStatus status;
+            try {
+                status = openHabClient.checkReadiness(state.openHabBaseUrl);
+            } catch (Exception ex) {
+                status = new OpenHabStatus(false, "openHAB readiness check failed", ex.getMessage());
+            }
+            OpenHabStatus finalStatus = status;
+            runOnUiThread(() -> {
+                append(finalStatus.message());
+                if (finalStatus.details() != null && !finalStatus.details().isEmpty()) {
+                    append(finalStatus.details());
+                }
+            });
+        }, "openhab-readiness-check").start();
+    }
+
+    private String payloadSummary(MatterSetupPayload payload) {
+        if (payload.rawPayload().startsWith("MT:")) {
+            return "Decoded Matter QR payload: discriminator " + payload.discriminator()
+                    + ", vendor ID " + payload.vendorId()
+                    + ", product ID " + payload.productId()
+                    + ", commissioning flow " + payload.commissioningFlow()
+                    + ", discovery capabilities " + payload.discoveryCapabilities()
+                    + ". Setup PIN decoded and hidden.";
+        }
+        return "Validated explicit Matter setup PIN and discriminator without displaying the PIN.";
     }
 
     private EditText input(String hint, boolean multiLine) {
@@ -228,6 +278,7 @@ public final class MainActivity extends Activity {
         }
         state.dataset = savedInstanceState.getString(KEY_DATASET, "");
         state.setupPayload = savedInstanceState.getString(KEY_SETUP_PAYLOAD, "");
+        state.openHabBaseUrl = savedInstanceState.getString(KEY_OPENHAB_BASE_URL, "");
         state.logs = savedInstanceState.getString(KEY_LOGS, "");
         state.temporaryCode = savedInstanceState.getString(KEY_TEMPORARY_CODE, "");
         state.commissionedNodeId = savedInstanceState.getLong(KEY_COMMISSIONED_NODE_ID, -1L);

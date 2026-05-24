@@ -8,6 +8,8 @@ This branch builds an installable Android APK with:
 
 - Thread dataset validation.
 - Matter setup payload validation for explicit `pin=...;disc=...` input.
+- Local Matter `MT:` QR setup payload decoding for PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.
+- openHAB REST readiness checking via the configured base URL.
 - A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
 - A native Android UI that displays the temporary code and openHAB Matter Scan Input instructions.
 
