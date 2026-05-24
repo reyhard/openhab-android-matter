@@ -136,7 +136,7 @@ public final class MainActivity extends Activity {
         Button watchInboxSse = button("Watch openHAB Inbox SSE");
         Button checkChip = button("Check native CHIP controller");
         Button useNativeChip = button("Use native CHIP controller if ready");
-        Button saveConfig = button("Save dataset and openHAB URL");
+        Button saveConfig = button("Save dataset, OTBR URL, and openHAB URL");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
 

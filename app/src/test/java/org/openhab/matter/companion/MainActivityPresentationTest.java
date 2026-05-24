@@ -117,6 +117,13 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void redactsSensitiveUrlPartsForUnsupportedSchemes() {
+        assertEquals(
+                "ftp://otbr.local/path",
+                MainActivityPresentation.safeUrlForLog("ftp://user:secret@otbr.local/path?token=abc#frag"));
+    }
+
+    @Test
     public void describesEncryptedConfigSave() {
         assertEquals(
                 "Saved Thread dataset in encrypted app storage, saved OTBR base URL, and saved openHAB base URL. Setup payloads and PINs are not saved.",

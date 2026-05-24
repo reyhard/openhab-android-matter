@@ -113,7 +113,7 @@ final class MainActivityPresentation {
         try {
             URI uri = new URI(trimmed);
             String scheme = uri.getScheme();
-            if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+            if (scheme == null || uri.getHost() == null) {
                 return trimmed;
             }
             String path = uri.getRawPath();
