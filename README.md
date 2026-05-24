@@ -1,21 +1,58 @@
 # openhab-android-matter
-Matter pairing helper
 
-## Android Build
+Android companion app for openHAB Matter pairing.
 
-This repository contains an Android application scaffold for the openHAB Matter pairing helper.
+## Current MVP
 
-Build configuration:
+This branch builds an installable Android APK with:
 
-- Android Gradle Plugin 8.11.1
-- Gradle wrapper 8.14
-- Compile SDK 36
-- Target SDK 35
-- Min SDK 26
-- Java 17
+- Thread dataset validation.
+- Matter setup payload validation for explicit `pin=...;disc=...` input.
+- A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
+- A native Android UI that displays the temporary code and openHAB Matter Scan Input instructions.
 
-Verify the scaffold and build a debug APK with:
+The real connectedhomeip/CHIP JNI controller is intentionally isolated behind `MatterController`. `ChipMatterController` is present as the replacement point for the native implementation.
+
+This MVP does not perform real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or OpenCommissioningWindow calls yet.
+
+## Build Configuration
+
+This workspace uses:
+
+- Android SDK: `D:\Tools\Android\SDK`
+- Android Gradle Plugin: `8.11.1`
+- Compile SDK: `36`
+- Target SDK: `35`
+- Min SDK: `26`
+- Java: `17`
+
+## Build
+
+Build and test the debug APK:
 
 ```powershell
-.\gradlew.bat :app:assembleDebug --offline
+.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --offline
 ```
+
+The APK is written to:
+
+```text
+app\build\outputs\apk\debug\app-debug.apk
+```
+
+## Install
+
+Connect an Android device with USB debugging enabled, then run:
+
+```powershell
+D:\Tools\Android\SDK\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk
+```
+
+## Real CHIP Controller Work
+
+The remaining production work is to replace `FakeMatterController` with a connectedhomeip-backed `ChipMatterController` that implements:
+
+- `commissionBleThread(datasetHex, pin, discriminator)`
+- `openCommissioningWindow(nodeId, timeout, discriminator)`
+
+Until that native library is bundled, the app is installable and validates the openHAB user flow, but it does not actually provision Matter devices.
