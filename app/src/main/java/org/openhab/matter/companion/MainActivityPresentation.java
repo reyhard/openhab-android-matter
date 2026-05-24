@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 final class MainActivityPresentation {
     private static final int PERMISSION_GRANTED = 0;
     private static final Pattern URL_PATTERN = Pattern.compile(
-            "\\b[A-Za-z][A-Za-z0-9+.-]*:(?://\\S+|\\S*[?@]\\S*)");
+            "\\b[A-Za-z][A-Za-z0-9+.-]*:(?://\\S+|\\S*[?@#]\\S*)");
     private static final Pattern MATTER_QR_PAYLOAD_PATTERN = Pattern.compile("\\bMT:[0-9A-Z.-]+\\b");
     private static final Pattern MATTER_PIN_PATTERN = Pattern.compile(
             "(?i)\\b(?:pin(?:[-_\\s]?code)?|setup[-_\\s]?(?:pin(?:[-_\\s]?code)?|passcode)|passcode)"

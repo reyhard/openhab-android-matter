@@ -134,6 +134,14 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void redactsHostlessUrlFragmentPartsInsideDetails() {
+        assertEquals(
+                "Failed to reach file:/tmp/otbr and urn:thing",
+                MainActivityPresentation.safeTextForLog(
+                        "Failed to reach file:/tmp/otbr#access_token=abc and urn:thing#token=abc"));
+    }
+
+    @Test
     public void redactsSensitiveUrlPartsWithUppercaseScheme() {
         assertEquals(
                 "HTTP://openhab.local:8080",
