@@ -5,6 +5,7 @@ import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
+import org.openhab.matter.companion.otbr.OtbrStatus;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -118,8 +119,28 @@ public class MainActivityPresentationTest {
     @Test
     public void describesEncryptedConfigSave() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage and saved openHAB base URL. Setup payloads and PINs are not saved.",
+                "Saved Thread dataset in encrypted app storage, saved OTBR base URL, and saved openHAB base URL. Setup payloads and PINs are not saved.",
                 MainActivityPresentation.encryptedConfigSaved());
+    }
+
+    @Test
+    public void describesReachableOtbrConnectivity() {
+        assertEquals(
+                "OTBR connectivity: endpoint reachable.",
+                MainActivityPresentation.otbrConnectivityResult(new OtbrStatus(
+                        true,
+                        "OTBR endpoint is reachable",
+                        "HTTP 200 from http://otbr.local")));
+    }
+
+    @Test
+    public void describesUnreachableOtbrConnectivity() {
+        assertEquals(
+                "OTBR connectivity failed: endpoint was not reachable.",
+                MainActivityPresentation.otbrConnectivityResult(new OtbrStatus(
+                        false,
+                        "OTBR endpoint is not reachable",
+                        "Connection refused")));
     }
 
     @Test

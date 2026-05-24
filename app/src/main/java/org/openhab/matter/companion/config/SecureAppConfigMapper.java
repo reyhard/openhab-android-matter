@@ -12,22 +12,27 @@ public final class SecureAppConfigMapper {
     public StoredConfig toStoredValues(AppConfig config) throws GeneralSecurityException {
         return new StoredConfig(
                 secretCodec.encode(config.threadDataset()),
-                config.openHabBaseUrl());
+                config.openHabBaseUrl(),
+                config.otbrBaseUrl());
     }
 
     public AppConfig fromStoredValues(String threadDataset, String openHabBaseUrl) {
+        return fromStoredValues(threadDataset, openHabBaseUrl, "");
+    }
+
+    public AppConfig fromStoredValues(String threadDataset, String openHabBaseUrl, String otbrBaseUrl) {
         String safeThreadDataset = threadDataset == null ? "" : threadDataset;
         if (isLegacyPlaintextThreadDataset(safeThreadDataset)) {
-            return new AppConfig(safeThreadDataset, openHabBaseUrl);
+            return new AppConfig(safeThreadDataset, openHabBaseUrl, otbrBaseUrl);
         }
         if (safeThreadDataset.isEmpty()) {
-            return new AppConfig("", openHabBaseUrl);
+            return new AppConfig("", openHabBaseUrl, otbrBaseUrl);
         }
 
         try {
-            return new AppConfig(secretCodec.decode(safeThreadDataset), openHabBaseUrl);
+            return new AppConfig(secretCodec.decode(safeThreadDataset), openHabBaseUrl, otbrBaseUrl);
         } catch (GeneralSecurityException e) {
-            return new AppConfig("", openHabBaseUrl, true);
+            return new AppConfig("", openHabBaseUrl, otbrBaseUrl, true);
         }
     }
 
@@ -39,10 +44,12 @@ public final class SecureAppConfigMapper {
     public static final class StoredConfig {
         private final String threadDataset;
         private final String openHabBaseUrl;
+        private final String otbrBaseUrl;
 
-        StoredConfig(String threadDataset, String openHabBaseUrl) {
+        StoredConfig(String threadDataset, String openHabBaseUrl, String otbrBaseUrl) {
             this.threadDataset = threadDataset == null ? "" : threadDataset;
             this.openHabBaseUrl = openHabBaseUrl == null ? "" : openHabBaseUrl;
+            this.otbrBaseUrl = otbrBaseUrl == null ? "" : otbrBaseUrl;
         }
 
         public String threadDataset() {
@@ -51,6 +58,10 @@ public final class SecureAppConfigMapper {
 
         public String openHabBaseUrl() {
             return openHabBaseUrl;
+        }
+
+        public String otbrBaseUrl() {
+            return otbrBaseUrl;
         }
     }
 }

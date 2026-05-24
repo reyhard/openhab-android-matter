@@ -3,6 +3,7 @@ package org.openhab.matter.companion;
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
+import org.openhab.matter.companion.otbr.OtbrStatus;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -44,7 +45,7 @@ final class MainActivityPresentation {
     }
 
     static String encryptedConfigSaved() {
-        return "Saved Thread dataset in encrypted app storage and saved openHAB base URL. Setup payloads and PINs are not saved.";
+        return "Saved Thread dataset in encrypted app storage, saved OTBR base URL, and saved openHAB base URL. Setup payloads and PINs are not saved.";
     }
 
     static String threadDatasetUnreadable() {
@@ -56,6 +57,13 @@ final class MainActivityPresentation {
             return "openHAB Inbox SSE: Matter Inbox entry detected.";
         }
         return "openHAB Inbox SSE: event received but no Matter Inbox entry detected yet.";
+    }
+
+    static String otbrConnectivityResult(OtbrStatus status) {
+        if (status.reachable()) {
+            return "OTBR connectivity: endpoint reachable.";
+        }
+        return "OTBR connectivity failed: endpoint was not reachable.";
     }
 
     static String externalQrScannerMissing() {

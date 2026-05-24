@@ -10,9 +10,11 @@
 - openHAB REST readiness check calls `/rest/` from a configured base URL.
 - openHAB Inbox observation calls `/rest/inbox` from a configured base URL and reports whether a Matter Inbox entry was detected.
 - openHAB SSE streaming observes `/rest/events?topics=openhab/inbox/*` and reports Matter Inbox events.
+- OTBR connectivity diagnostics check a configured base URL before Thread commissioning.
 - Runtime commissioning permission readiness uses the Android SDK-specific permission plan and requests missing runtime permissions.
 - Android Keystore-backed AES-GCM encrypted app-private storage stores the OTBR Thread dataset.
 - App-private configuration persistence stores the openHAB base URL.
+- App-private configuration persistence stores the OTBR base URL.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP controller readiness diagnostics report whether the JNI library is available.
 - Runtime controller selection can switch from the simulated controller to `ChipMatterController` when the native JNI library is bundled and readiness passes.

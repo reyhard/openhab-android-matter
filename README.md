@@ -12,9 +12,11 @@ This branch builds an installable Android APK with:
 - openHAB REST readiness checking via the configured base URL.
 - openHAB Inbox observation via `/rest/inbox` to report whether a Matter Inbox entry is visible.
 - openHAB Inbox SSE observation via `/rest/events?topics=openhab/inbox/*`.
+- OTBR connectivity diagnostics via a configured base URL.
 - Runtime commissioning permission readiness checks for the current Android SDK version.
 - Encrypted app-private storage for the OTBR Thread dataset using Android Keystore-backed AES-GCM.
 - App-private persistence for the openHAB base URL.
+- App-private persistence for the OTBR base URL.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP controller readiness diagnostics report whether the JNI library is available.
 - Runtime controller selection can switch from the simulated controller to `ChipMatterController` when the native JNI library is bundled and readiness passes.

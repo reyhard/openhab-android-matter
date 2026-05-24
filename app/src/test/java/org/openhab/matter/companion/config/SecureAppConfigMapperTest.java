@@ -13,22 +13,25 @@ public class SecureAppConfigMapperTest {
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
         SecureAppConfigMapper.StoredConfig stored = mapper.toStoredValues(
-                new AppConfig("hex:001122", "http://openhab.local:8080"));
+                new AppConfig("hex:001122", "http://openhab.local:8080", "http://otbr.local"));
 
         assertEquals("enc:v1:encoded(hex:001122)", stored.threadDataset());
         assertEquals("http://openhab.local:8080", stored.openHabBaseUrl());
+        assertEquals("http://otbr.local", stored.otbrBaseUrl());
     }
 
     @Test
-    public void decodesStoredEncryptedThreadDataset() throws Exception {
+    public void decodesStoredEncryptedThreadDatasetAndOtbrUrl() throws Exception {
         SecretCodec codec = new FixedSecretCodec();
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
         AppConfig config = mapper.fromStoredValues("enc:v1:encoded(hex:001122)",
-                "http://openhab.local:8080");
+                "http://openhab.local:8080",
+                "http://otbr.local");
 
         assertEquals("hex:001122", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
+        assertEquals("http://otbr.local", config.otbrBaseUrl());
     }
 
     @Test
@@ -36,10 +39,11 @@ public class SecureAppConfigMapperTest {
         SecretCodec codec = new FixedSecretCodec();
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
-        AppConfig config = mapper.fromStoredValues("hex:legacy", "http://openhab.local:8080");
+        AppConfig config = mapper.fromStoredValues("hex:legacy", "http://openhab.local:8080", "http://otbr.local");
 
         assertEquals("hex:legacy", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
+        assertEquals("http://otbr.local", config.otbrBaseUrl());
     }
 
     @Test
@@ -48,10 +52,12 @@ public class SecureAppConfigMapperTest {
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
         AppConfig config = mapper.fromStoredValues(SecretCodec.ENCRYPTED_PREFIX + "broken",
-                "http://openhab.local:8080");
+                "http://openhab.local:8080",
+                "http://otbr.local");
 
         assertEquals("", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
+        assertEquals("http://otbr.local", config.otbrBaseUrl());
         assertEquals(true, config.threadDatasetUnreadable());
     }
 

@@ -36,6 +36,9 @@ import org.openhab.matter.companion.openhab.OpenHabInboxClient;
 import org.openhab.matter.companion.openhab.OpenHabInboxSseClient;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 import org.openhab.matter.companion.openhab.OpenHabStatus;
+import org.openhab.matter.companion.otbr.HttpOtbrClient;
+import org.openhab.matter.companion.otbr.OtbrClient;
+import org.openhab.matter.companion.otbr.OtbrStatus;
 import org.openhab.matter.companion.permissions.CommissioningPermissionPlanner;
 import org.openhab.matter.companion.qr.QrScanIntentFactory;
 import org.openhab.matter.companion.ui.AppState;
@@ -47,6 +50,7 @@ public final class MainActivity extends Activity {
     private static final String KEY_DATASET = "dataset";
     private static final String KEY_SETUP_PAYLOAD = "setupPayload";
     private static final String KEY_OPENHAB_BASE_URL = "openHabBaseUrl";
+    private static final String KEY_OTBR_BASE_URL = "otbrBaseUrl";
     private static final String KEY_LOGS = "logs";
     private static final String KEY_TEMPORARY_CODE = "temporaryCode";
     private static final String KEY_COMMISSIONED_NODE_ID = "commissionedNodeId";
@@ -56,6 +60,7 @@ public final class MainActivity extends Activity {
     private static final int DATASET_INPUT_ID = 1001;
     private static final int PAYLOAD_INPUT_ID = 1002;
     private static final int OPENHAB_INPUT_ID = 1003;
+    private static final int OTBR_INPUT_ID = 1004;
     private static final int PANEL_COLOR = Color.rgb(255, 251, 240);
     private static final int TEXT_COLOR = Color.rgb(36, 50, 48);
     private static final int MUTED_COLOR = Color.rgb(74, 94, 90);
@@ -66,12 +71,14 @@ public final class MainActivity extends Activity {
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
     private final OpenHabInboxClient openHabInboxClient = new HttpOpenHabInboxClient();
     private final OpenHabInboxSseClient openHabInboxSseClient = new OpenHabInboxSseClient();
+    private final OtbrClient otbrClient = new HttpOtbrClient();
     private MatterController controller = fakeMatterController;
     private AppConfigRepository configRepository;
     private TextView output;
     private EditText datasetInput;
     private EditText payloadInput;
     private EditText openHabInput;
+    private EditText otbrInput;
     private boolean nativeMatterControllerSelected;
     private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
@@ -108,6 +115,9 @@ public final class MainActivity extends Activity {
         datasetInput = input("Thread Active Operational Dataset hex", true);
         datasetInput.setId(DATASET_INPUT_ID);
         datasetInput.setText(state.dataset);
+        otbrInput = input("OTBR base URL, for example http://otbr.local", false);
+        otbrInput.setId(OTBR_INPUT_ID);
+        otbrInput.setText(state.otbrBaseUrl);
         payloadInput = input("Matter setup payload: MT:... or pin=20202021;disc=3840;vendor=Aqara;product=U200", false);
         payloadInput.setId(PAYLOAD_INPUT_ID);
         payloadInput.setText(state.setupPayload);
@@ -119,6 +129,7 @@ public final class MainActivity extends Activity {
         Button openWindow = button("Simulate open commissioning window");
         Button wifiHandoff = button("Wi-Fi / multi-admin openHAB handoff");
         Button scanQr = button("Scan Matter QR with installed scanner");
+        Button checkOtbr = button("Check OTBR connectivity");
         Button checkOpenHab = button("Check openHAB readiness");
         Button checkPermissions = button("Check commissioning permissions");
         Button checkInbox = button("Check openHAB Inbox");
@@ -133,6 +144,7 @@ public final class MainActivity extends Activity {
         openWindow.setOnClickListener(view -> runOpenCommissioningWindow());
         wifiHandoff.setOnClickListener(view -> showWifiInstructions());
         scanQr.setOnClickListener(view -> scanMatterQrWithExternalScanner());
+        checkOtbr.setOnClickListener(view -> checkOtbrConnectivity());
         checkOpenHab.setOnClickListener(view -> checkOpenHabReadiness());
         checkPermissions.setOnClickListener(view -> checkCommissioningPermissions());
         checkInbox.setOnClickListener(view -> checkOpenHabInbox());
@@ -146,6 +158,8 @@ public final class MainActivity extends Activity {
         root.addView(demoNotice);
         root.addView(section("Thread dataset"));
         root.addView(datasetInput);
+        root.addView(section("OTBR connectivity"));
+        root.addView(otbrInput);
         root.addView(section("Matter setup payload"));
         root.addView(payloadInput);
         root.addView(section("openHAB readiness"));
@@ -154,6 +168,7 @@ public final class MainActivity extends Activity {
         root.addView(openWindow);
         root.addView(wifiHandoff);
         root.addView(scanQr);
+        root.addView(checkOtbr);
         root.addView(checkOpenHab);
         root.addView(checkPermissions);
         root.addView(checkInbox);
@@ -219,9 +234,11 @@ public final class MainActivity extends Activity {
         state.dataset = datasetInput.getText().toString();
         state.setupPayload = payloadInput.getText().toString();
         state.openHabBaseUrl = openHabInput.getText().toString();
+        state.otbrBaseUrl = otbrInput.getText().toString();
         outState.putString(KEY_DATASET, state.dataset);
         outState.putString(KEY_SETUP_PAYLOAD, state.setupPayload);
         outState.putString(KEY_OPENHAB_BASE_URL, state.openHabBaseUrl);
+        outState.putString(KEY_OTBR_BASE_URL, state.otbrBaseUrl);
         outState.putString(KEY_LOGS, state.logs);
         outState.putString(KEY_TEMPORARY_CODE, state.temporaryCode);
         outState.putLong(KEY_COMMISSIONED_NODE_ID, state.commissionedNodeId);
@@ -329,15 +346,42 @@ public final class MainActivity extends Activity {
     private void saveConfiguration() {
         state.dataset = datasetInput.getText().toString();
         state.openHabBaseUrl = openHabInput.getText().toString();
+        state.otbrBaseUrl = otbrInput.getText().toString();
         try {
             if (state.dataset != null && !state.dataset.trim().isEmpty()) {
                 ThreadDataset.parse(state.dataset);
             }
-            configRepository.save(new AppConfig(state.dataset, state.openHabBaseUrl));
+            configRepository.save(new AppConfig(state.dataset, state.openHabBaseUrl, state.otbrBaseUrl));
             append(MainActivityPresentation.encryptedConfigSaved());
         } catch (Exception ex) {
             append("Configuration was not saved. Check the Thread dataset format; sensitive values are not repeated in this log.");
         }
+    }
+
+    private void checkOtbrConnectivity() {
+        state.otbrBaseUrl = otbrInput.getText().toString();
+        if (state.otbrBaseUrl == null || state.otbrBaseUrl.trim().isEmpty()) {
+            append("Enter an OTBR base URL first.");
+            return;
+        }
+
+        String baseUrl = state.otbrBaseUrl.trim();
+        append("Checking OTBR connectivity at " + MainActivityPresentation.safeUrlForLog(baseUrl) + " ...");
+        new Thread(() -> {
+            OtbrStatus status;
+            try {
+                status = otbrClient.checkReadiness(baseUrl);
+            } catch (Exception ex) {
+                status = new OtbrStatus(false, "OTBR connectivity check failed", ex.getMessage());
+            }
+            OtbrStatus finalStatus = status;
+            runOnUiThread(() -> {
+                append(MainActivityPresentation.otbrConnectivityResult(finalStatus));
+                if (finalStatus.details() != null && !finalStatus.details().isEmpty()) {
+                    append(MainActivityPresentation.safeTextForLog(finalStatus.details()));
+                }
+            });
+        }, "otbr-connectivity-check").start();
     }
 
     private void checkOpenHabReadiness() {
@@ -543,6 +587,7 @@ public final class MainActivity extends Activity {
         state.dataset = savedInstanceState.getString(KEY_DATASET, "");
         state.setupPayload = savedInstanceState.getString(KEY_SETUP_PAYLOAD, "");
         state.openHabBaseUrl = savedInstanceState.getString(KEY_OPENHAB_BASE_URL, "");
+        state.otbrBaseUrl = savedInstanceState.getString(KEY_OTBR_BASE_URL, "");
         state.logs = savedInstanceState.getString(KEY_LOGS, "");
         state.temporaryCode = savedInstanceState.getString(KEY_TEMPORARY_CODE, "");
         state.commissionedNodeId = savedInstanceState.getLong(KEY_COMMISSIONED_NODE_ID, -1L);
@@ -553,6 +598,7 @@ public final class MainActivity extends Activity {
         AppConfig config = configRepository.load();
         state.dataset = config.threadDataset();
         state.openHabBaseUrl = config.openHabBaseUrl();
+        state.otbrBaseUrl = config.otbrBaseUrl();
         persistedThreadDatasetUnreadable = config.threadDatasetUnreadable();
     }
 

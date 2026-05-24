@@ -13,16 +13,18 @@ public class InMemoryAppConfigRepositoryTest {
 
         assertEquals("", config.threadDataset());
         assertEquals("", config.openHabBaseUrl());
+        assertEquals("", config.otbrBaseUrl());
     }
 
     @Test
-    public void saveAndLoadPersistsDatasetAndOpenHabBaseUrl() {
+    public void saveAndLoadPersistsDatasetOpenHabBaseUrlAndOtbrBaseUrl() {
         AppConfigRepository repository = new InMemoryAppConfigRepository();
 
-        repository.save(new AppConfig("hex:0E080000000000010000", "http://openhab.local:8080"));
+        repository.save(new AppConfig("hex:0E080000000000010000", "http://openhab.local:8080", "http://otbr.local"));
         AppConfig config = repository.load();
 
         assertEquals("hex:0E080000000000010000", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
+        assertEquals("http://otbr.local", config.otbrBaseUrl());
     }
 }
