@@ -119,7 +119,7 @@ final class MainActivityPresentation {
             String path = uri.getRawPath();
             return new URI(scheme, null, uri.getHost(), uri.getPort(), path, null, null).toString();
         } catch (URISyntaxException | IllegalArgumentException ex) {
-            return stripQueryAndFragment(trimmed).replaceFirst("://[^/@]+@", "://");
+            return sanitizeUrlFallback(trimmed);
         }
     }
 
@@ -165,7 +165,7 @@ final class MainActivityPresentation {
     }
 
     private static String sanitizeUrlFallback(String value) {
-        String stripped = stripQueryAndFragment(value).replaceFirst("://[^/@]+@", "://");
-        return stripped.replaceFirst("^([A-Za-z][A-Za-z0-9+.-]*:)[^/?#@]+@", "$1");
+        String stripped = stripQueryAndFragment(value).replaceFirst("://.*@", "://");
+        return stripped.replaceFirst("^([A-Za-z][A-Za-z0-9+.-]*:).*@([^/?#]+.*)$", "$1$2");
     }
 }

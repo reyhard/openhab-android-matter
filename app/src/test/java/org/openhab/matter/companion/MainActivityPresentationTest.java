@@ -138,6 +138,20 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void redactsSlashContainingUserInfoForOpaqueUnsupportedSchemes() {
+        assertEquals(
+                "ssh:otbr.local",
+                MainActivityPresentation.safeUrlForLog("ssh:user:tok/en@otbr.local?token=abc#frag"));
+    }
+
+    @Test
+    public void redactsUserInfoWhenUriParsingFails() {
+        assertEquals(
+                "ssh:otbr.local",
+                MainActivityPresentation.safeUrlForLog("ssh:user:secret@otbr.local?token=%zz#frag"));
+    }
+
+    @Test
     public void describesEncryptedConfigSave() {
         assertEquals(
                 "Saved Thread dataset in encrypted app storage, saved OTBR base URL, and saved openHAB base URL. Setup payloads and PINs are not saved.",
