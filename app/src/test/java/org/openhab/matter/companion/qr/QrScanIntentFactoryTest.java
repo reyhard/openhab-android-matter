@@ -35,6 +35,12 @@ public class QrScanIntentFactoryTest {
     }
 
     @Test
+    public void normalizesInAppScanResultPayload() {
+        assertEquals("MT:Y.K9042C00KA0648G00",
+                QrScanIntentFactory.createScanResultPayload("  MT:Y.K9042C00KA0648G00  "));
+    }
+
+    @Test
     public void rejectsUnsupportedMatterScanResult() {
         assertEquals("", QrScanIntentFactory.extractMatterSetupPayloadText("https://example.test/not-matter"));
     }

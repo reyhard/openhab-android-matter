@@ -25,6 +25,16 @@ public final class QrScanIntentFactory {
         return intent;
     }
 
+    public static Intent createScanResultIntent(String result) {
+        Intent intent = new Intent();
+        intent.putExtra(QrScanContract.EXTRA_SCAN_RESULT, createScanResultPayload(result));
+        return intent;
+    }
+
+    public static String createScanResultPayload(String result) {
+        return extractResultText(result);
+    }
+
     public static String extractResult(Intent data) {
         if (data == null) {
             return "";
