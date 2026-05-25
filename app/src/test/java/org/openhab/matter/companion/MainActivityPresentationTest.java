@@ -2,6 +2,7 @@ package org.openhab.matter.companion;
 
 import org.junit.Test;
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
+import org.openhab.matter.companion.controller.ConnectedHomeIpControllerArtifactsStatus;
 import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
@@ -348,6 +349,29 @@ public class MainActivityPresentationTest {
                 MainActivityPresentation.nativeChipReadiness(status));
     }
 
+    @Test
+    public void describesReadyConnectedHomeIpArtifacts() {
+        ConnectedHomeIpControllerArtifactsStatus status = new ConnectedHomeIpControllerArtifactsStatus(
+                true,
+                "CHIPController",
+                "connectedhomeip Android controller artifacts are ready");
+
+        assertEquals(
+                "connectedhomeip Android controller artifacts ready: CHIPController.",
+                MainActivityPresentation.connectedHomeIpArtifacts(status));
+    }
+
+    @Test
+    public void describesMissingConnectedHomeIpArtifacts() {
+        ConnectedHomeIpControllerArtifactsStatus status = new ConnectedHomeIpControllerArtifactsStatus(
+                false,
+                "CHIPController",
+                "Missing connectedhomeip controller class: chip.platform.AndroidChipPlatform");
+
+        assertEquals(
+                "connectedhomeip Android controller artifacts not ready: Missing connectedhomeip controller class: chip.platform.AndroidChipPlatform",
+                MainActivityPresentation.connectedHomeIpArtifacts(status));
+    }
     @Test
     public void describesMatterControllerSelection() {
         MatterControllerSelection selection = new MatterControllerSelection(

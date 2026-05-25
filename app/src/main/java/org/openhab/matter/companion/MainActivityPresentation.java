@@ -1,6 +1,7 @@
 package org.openhab.matter.companion;
 
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
+import org.openhab.matter.companion.controller.ConnectedHomeIpControllerArtifactsStatus;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 import org.openhab.matter.companion.otbr.OtbrStatus;
@@ -112,6 +113,12 @@ final class MainActivityPresentation {
                 + ". Developer attestation bypass: " + onOff(status.attestationBypassEnabled()) + ".";
     }
 
+    static String connectedHomeIpArtifacts(ConnectedHomeIpControllerArtifactsStatus status) {
+        if (status.ready()) {
+            return "connectedhomeip Android controller artifacts ready: " + status.libraryName() + ".";
+        }
+        return "connectedhomeip Android controller artifacts not ready: " + status.message();
+    }
     static String matterControllerSelection(MatterControllerSelection selection) {
         return "Matter controller selection: " + selection.message();
     }
