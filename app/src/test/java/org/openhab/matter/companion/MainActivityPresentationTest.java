@@ -290,6 +290,20 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void describesCameraPermissionRequiredForInAppScanner() {
+        assertEquals(
+                "Camera permission is required for in-app Matter QR scanning.",
+                MainActivityPresentation.cameraPermissionRequired());
+    }
+
+    @Test
+    public void describesInvalidInAppQrScannerResult() {
+        assertEquals(
+                "In-app QR scanner did not return a supported Matter setup payload.",
+                MainActivityPresentation.invalidInAppQrScannerResult());
+    }
+
+    @Test
     public void describesNativeChipReadiness() {
         ChipMatterControllerStatus status = new ChipMatterControllerStatus(false, "openhab_matter_chip", false, "missing");
 

@@ -2,6 +2,7 @@ package org.openhab.matter.companion;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -44,6 +45,7 @@ import org.openhab.matter.companion.otbr.HttpOtbrClient;
 import org.openhab.matter.companion.otbr.OtbrClient;
 import org.openhab.matter.companion.otbr.OtbrStatus;
 import org.openhab.matter.companion.permissions.CommissioningPermissionPlanner;
+import org.openhab.matter.companion.qr.InAppQrScannerActivity;
 import org.openhab.matter.companion.qr.QrScanIntentFactory;
 import org.openhab.matter.companion.ui.AppState;
 
@@ -61,6 +63,8 @@ public final class MainActivity extends Activity {
     private static final String KEY_NATIVE_CONTROLLER_SELECTED = "nativeControllerSelected";
     private static final int COMMISSIONING_PERMISSION_REQUEST = 2001;
     private static final int QR_SCAN_REQUEST = 3001;
+    private static final int IN_APP_QR_SCAN_REQUEST = 3002;
+    private static final int CAMERA_PERMISSION_REQUEST = 3003;
     private static final int DATASET_INPUT_ID = 1001;
     private static final int PAYLOAD_INPUT_ID = 1002;
     private static final int OPENHAB_INPUT_ID = 1003;
@@ -140,6 +144,7 @@ public final class MainActivity extends Activity {
         Button commissionThread = button("Simulate Thread commissioning");
         Button openWindow = button("Simulate open commissioning window");
         Button wifiHandoff = button("Wi-Fi / multi-admin openHAB handoff");
+        Button scanQrInApp = button("Scan Matter QR in app");
         Button scanQr = button("Scan Matter QR with installed scanner");
         Button checkOtbr = button("Check OTBR connectivity");
         Button checkOpenHab = button("Check openHAB readiness");
@@ -155,6 +160,7 @@ public final class MainActivity extends Activity {
         commissionThread.setOnClickListener(view -> runCommissioning());
         openWindow.setOnClickListener(view -> runOpenCommissioningWindow());
         wifiHandoff.setOnClickListener(view -> showWifiInstructions());
+        scanQrInApp.setOnClickListener(view -> scanMatterQrInApp());
         scanQr.setOnClickListener(view -> scanMatterQrWithExternalScanner());
         checkOtbr.setOnClickListener(view -> checkOtbrConnectivity());
         checkOpenHab.setOnClickListener(view -> checkOpenHabReadiness());
@@ -179,6 +185,7 @@ public final class MainActivity extends Activity {
         root.addView(commissionThread);
         root.addView(openWindow);
         root.addView(wifiHandoff);
+        root.addView(scanQrInApp);
         root.addView(scanQr);
         root.addView(checkOtbr);
         root.addView(checkOpenHab);
@@ -210,6 +217,14 @@ public final class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                launchInAppQrScanner();
+            } else {
+                append(MainActivityPresentation.cameraPermissionRequired());
+            }
+            return;
+        }
         if (requestCode != COMMISSIONING_PERMISSION_REQUEST) {
             return;
         }
@@ -226,6 +241,10 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == IN_APP_QR_SCAN_REQUEST) {
+            handleInAppQrScannerResult(resultCode, data);
+            return;
+        }
         if (requestCode != QR_SCAN_REQUEST) {
             return;
         }
@@ -241,6 +260,21 @@ public final class MainActivity extends Activity {
         state.setupPayload = scanResult;
         payloadInput.setText(scanResult);
         append("Scanned Matter QR payload and populated setup payload input.");
+    }
+
+    private void handleInAppQrScannerResult(int resultCode, Intent data) {
+        if (resultCode != RESULT_OK) {
+            append(MainActivityPresentation.invalidInAppQrScannerResult());
+            return;
+        }
+        String scanResult = QrScanIntentFactory.extractMatterSetupPayload(data);
+        if (scanResult.isEmpty()) {
+            append(MainActivityPresentation.invalidInAppQrScannerResult());
+            return;
+        }
+        state.setupPayload = scanResult;
+        payloadInput.setText(scanResult);
+        append("Scanned Matter QR payload in app and populated setup payload input.");
     }
 
     @Override
@@ -339,6 +373,18 @@ public final class MainActivity extends Activity {
                 .setPositiveButton("Open scanner", (dialog, which) -> launchExternalQrScanner())
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void scanMatterQrInApp() {
+        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchInAppQrScanner();
+            return;
+        }
+        requestPermissions(new String[] {Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+    }
+
+    private void launchInAppQrScanner() {
+        startActivityForResult(new Intent(this, InAppQrScannerActivity.class), IN_APP_QR_SCAN_REQUEST);
     }
 
     private void launchExternalQrScanner() {

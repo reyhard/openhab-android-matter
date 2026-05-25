@@ -1,9 +1,14 @@
 package org.openhab.matter.companion.qr;
 
+import android.content.Intent;
+
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 import static org.junit.Assert.assertEquals;
 
+@RunWith(RobolectricTestRunner.class)
 public class QrScanIntentFactoryTest {
     @Test
     public void createsQrScannerIntentRequest() {
@@ -35,9 +40,10 @@ public class QrScanIntentFactoryTest {
     }
 
     @Test
-    public void normalizesInAppScanResultPayload() {
-        assertEquals("MT:Y.K9042C00KA0648G00",
-                QrScanIntentFactory.createScanResultPayload("  MT:Y.K9042C00KA0648G00  "));
+    public void createsInAppScanResultIntent() {
+        Intent data = QrScanIntentFactory.createScanResultIntent("  MT:Y.K9042C00KA0648G00  ");
+
+        assertEquals("MT:Y.K9042C00KA0648G00", QrScanIntentFactory.extractMatterSetupPayload(data));
     }
 
     @Test

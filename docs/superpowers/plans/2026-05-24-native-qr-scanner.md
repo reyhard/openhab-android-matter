@@ -64,7 +64,7 @@ android.useAndroidX=true
 Add dependencies:
 
 ```gradle
-def camerax_version = "1.6.0"
+def camerax_version = "1.6.1"
 implementation "androidx.core:core:1.16.0"
 implementation "androidx.activity:activity:1.10.1"
 implementation "androidx.camera:camera-core:$camerax_version"
@@ -221,6 +221,6 @@ git commit -m "feat: wire in-app QR scanner"
 
 ## Self-Review Notes
 
-- CameraX 1.6.0 is current in AndroidX release notes as of March 25, 2026; ML Kit docs list bundled barcode scanning `com.google.mlkit:barcode-scanning:17.3.0`.
+- CameraX 1.6.1 includes the AndroidX Camera 1.6.x `ListenableFuture` compile fix; ML Kit docs list bundled barcode scanning `com.google.mlkit:barcode-scanning:17.3.0`.
 - This plan requires online dependency resolution once because CameraX and ML Kit are not present in the local Gradle cache.
 - This plan does not implement real BLE/PASE/CASE/Thread provisioning or connectedhomeip; it removes the native QR scanning gap only.

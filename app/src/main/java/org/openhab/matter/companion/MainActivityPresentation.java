@@ -85,6 +85,14 @@ final class MainActivityPresentation {
         return "QR scanner returned text that is not a supported Matter setup payload.";
     }
 
+    static String cameraPermissionRequired() {
+        return "Camera permission is required for in-app Matter QR scanning.";
+    }
+
+    static String invalidInAppQrScannerResult() {
+        return "In-app QR scanner did not return a supported Matter setup payload.";
+    }
+
     static String nativeChipReadiness(ChipMatterControllerStatus status) {
         if (status.ready()) {
             return "Native CHIP controller ready: " + status.libraryName();

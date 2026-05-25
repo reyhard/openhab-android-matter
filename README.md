@@ -18,6 +18,7 @@ This branch builds an installable Android APK with:
 - App-private persistence for the openHAB base URL.
 - App-private persistence for the OTBR base URL.
 - Encrypted app-private bootstrap controller state repository for future native Matter fabric/controller state.
+- Native in-app Matter QR scanning using CameraX and ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP controller readiness diagnostics report whether the JNI library is available.
 - Runtime controller selection can switch from the simulated controller to `ChipMatterController` when the native JNI library is bundled and readiness passes.
@@ -26,7 +27,7 @@ This branch builds an installable Android APK with:
 
 The real connectedhomeip/CHIP JNI controller is intentionally isolated behind `MatterController`. `ChipMatterController` is present as the replacement point for the native implementation.
 
-This MVP does not perform native CameraX QR scanning/in-app QR decoding, real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
+This MVP does not perform real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
 Setup payloads, setup PINs, QR payloads, and device credentials are not persisted.
 The bootstrap controller state repository currently persists the bootstrap node id and provides an encrypted opaque state slot; real connectedhomeip fabric key material is not persisted or restored yet because the native CHIP layer does not emit it.
 

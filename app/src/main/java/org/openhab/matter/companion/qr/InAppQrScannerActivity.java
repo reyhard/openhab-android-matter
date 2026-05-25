@@ -32,6 +32,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class InAppQrScannerActivity extends ComponentActivity {
+    private static final int CAMERA_PERMISSION_REQUEST = 4101;
+
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
     private final BarcodeScanner scanner = BarcodeScanning.getClient(
             new BarcodeScannerOptions.Builder()
@@ -44,11 +46,28 @@ public final class InAppQrScannerActivity extends ComponentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            setResult(RESULT_CANCELED);
-            finish();
+            requestPermissions(new String[] {Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
             return;
         }
 
+        showScanner();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != CAMERA_PERMISSION_REQUEST) {
+            return;
+        }
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            showScanner();
+            return;
+        }
+        setResult(RESULT_CANCELED);
+        finish();
+    }
+
+    private void showScanner() {
         PreviewView previewView = new PreviewView(this);
         previewView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -144,17 +163,21 @@ public final class InAppQrScannerActivity extends ComponentActivity {
         InputImage inputImage = InputImage.fromMediaImage(
                 mediaImage,
                 imageProxy.getImageInfo().getRotationDegrees());
-        scanner.process(inputImage)
-                .addOnSuccessListener(barcodes -> {
-                    for (Barcode barcode : barcodes) {
-                        String payload = QrScanIntentFactory.extractMatterSetupPayloadText(barcode.getRawValue());
-                        if (!payload.isEmpty()) {
-                            deliverResult(payload);
-                            return;
+        try {
+            scanner.process(inputImage)
+                    .addOnSuccessListener(barcodes -> {
+                        for (Barcode barcode : barcodes) {
+                            String payload = QrScanIntentFactory.extractMatterSetupPayloadText(barcode.getRawValue());
+                            if (!payload.isEmpty()) {
+                                deliverResult(payload);
+                                return;
+                            }
                         }
-                    }
-                })
-                .addOnCompleteListener(task -> imageProxy.close());
+                    })
+                    .addOnCompleteListener(task -> imageProxy.close());
+        } catch (RuntimeException ex) {
+            imageProxy.close();
+        }
     }
 
     private void deliverResult(String payload) {

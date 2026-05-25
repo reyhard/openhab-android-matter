@@ -16,6 +16,7 @@
 - App-private configuration persistence stores the openHAB base URL.
 - App-private configuration persistence stores the OTBR base URL.
 - Encrypted app-private bootstrap controller state repository stores the bootstrap node id and reserves an encrypted opaque controller-state slot.
+- Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP controller readiness diagnostics report whether the JNI library is available.
 - Runtime controller selection can switch from the simulated controller to `ChipMatterController` when the native JNI library is bundled and readiness passes.
@@ -23,7 +24,6 @@
 
 ## Not Implemented Yet
 
-- Native CameraX QR scanning and in-app QR decoding.
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
 - Real connectedhomeip Matter fabric key persistence and restore; the encrypted bootstrap state repository is present, but the native layer does not yet emit or consume fabric material.
