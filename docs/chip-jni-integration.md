@@ -27,11 +27,11 @@ kind=connectedhomeip;version=<build-or-sdk-version>;production=true;message=<ope
 
 The Android app treats any bridge that is missing metadata, has `production=false`, or has `kind` other than `connectedhomeip` as not ready and continues with the simulated controller.
 
-`controllerState` is opaque connectedhomeip controller/fabric material loaded from the encrypted bootstrap repository. The native bridge must not log it. It must return updated state in semicolon-separated result metadata:
+`controllerState` is opaque connectedhomeip controller/fabric material loaded from the encrypted bootstrap repository. The native bridge must not log it. It must return updated state as UTF-8 Base64 in semicolon-separated result metadata so delimiters, newlines, and serialized binary-safe text do not corrupt parsing:
 
 ```text
-nodeId=<decimal-node-id>;controllerState=<opaque-updated-state>
-temporaryCode=<manual-or-qr-code>;controllerState=<opaque-updated-state>
+nodeId=<decimal-node-id>;controllerStateBase64=<base64-opaque-updated-state>
+temporaryCode=<manual-or-qr-code>;controllerStateBase64=<base64-opaque-updated-state>
 ```
 
 The Java layer rejects missing node IDs and missing or blank temporary setup codes instead of treating them as successful commissioning.

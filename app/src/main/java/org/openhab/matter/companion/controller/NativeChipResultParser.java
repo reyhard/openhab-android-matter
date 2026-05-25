@@ -2,6 +2,8 @@ package org.openhab.matter.companion.controller;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 
 public final class NativeChipResultParser {
     private NativeChipResultParser() {
@@ -16,7 +18,7 @@ public final class NativeChipResultParser {
         try {
             return new NativeCommissioningResult(
                     Long.parseLong(nodeIdValue.trim()),
-                    values.get("controllerState"));
+                    controllerState(values));
         } catch (NumberFormatException e) {
             throw new IllegalStateException("Native CHIP commissioning result has invalid nodeId", e);
         }
@@ -28,7 +30,20 @@ public final class NativeChipResultParser {
         if (temporaryCode == null || temporaryCode.trim().isEmpty()) {
             throw new IllegalStateException("Native CHIP OpenCommissioningWindow result is missing temporaryCode");
         }
-        return new NativeOpenCommissioningWindowResult(temporaryCode, values.get("controllerState"));
+        return new NativeOpenCommissioningWindowResult(temporaryCode, controllerState(values));
+    }
+
+    private static String controllerState(Map<String, String> values) {
+        String encoded = values.get("controllerStateBase64");
+        if (encoded == null || encoded.trim().isEmpty()) {
+            throw new IllegalStateException("Native CHIP result is missing controllerStateBase64");
+        }
+        try {
+            byte[] decoded = Base64.getDecoder().decode(encoded.trim());
+            return new String(decoded, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("Native CHIP result has invalid controllerStateBase64", e);
+        }
     }
 
     private static Map<String, String> parseKeyValueResult(String rawResult) {
