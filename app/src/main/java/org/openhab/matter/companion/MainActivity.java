@@ -19,6 +19,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
+import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreChecker;
+import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpMatterControllerFactory;
 import org.openhab.matter.companion.config.AppConfig;
 import org.openhab.matter.companion.config.AppConfigRepository;
@@ -162,6 +164,7 @@ public final class MainActivity extends Activity {
         Button checkInbox = button("Check openHAB Inbox");
         Button watchInboxSse = button("Watch openHAB Inbox SSE");
         Button checkChip = button(MainActivityPresentation.checkControllerButtonLabel());
+        Button checkFabricRestore = button(MainActivityPresentation.checkFabricRestoreButtonLabel());
         Button useNativeChip = button(MainActivityPresentation.useControllerButtonLabel());
         Button saveConfig = button("Save dataset, OTBR URL, and openHAB URL");
         output = label("", 15, TEXT_COLOR);
@@ -178,6 +181,7 @@ public final class MainActivity extends Activity {
         checkInbox.setOnClickListener(view -> checkOpenHabInbox());
         watchInboxSse.setOnClickListener(view -> watchOpenHabInboxSse());
         checkChip.setOnClickListener(view -> checkNativeChipController());
+        checkFabricRestore.setOnClickListener(view -> checkConnectedHomeIpFabricRestore());
         useNativeChip.setOnClickListener(view -> useNativeChipControllerIfReady());
         saveConfig.setOnClickListener(view -> saveConfiguration());
 
@@ -206,6 +210,7 @@ public final class MainActivity extends Activity {
         root.addView(checkInbox);
         root.addView(watchInboxSse);
         root.addView(checkChip);
+        root.addView(checkFabricRestore);
         root.addView(useNativeChip);
         root.addView(saveConfig);
         root.addView(section("Guide output"));
@@ -441,6 +446,54 @@ public final class MainActivity extends Activity {
                 }
             });
         }, "matter-chip-readiness").start();
+    }
+
+    private void checkConnectedHomeIpFabricRestore() {
+        MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
+        if (bootstrapState.stateUnreadable()) {
+            append(MainActivityPresentation.bootstrapStateUnreadable());
+            return;
+        }
+        long nodeId = MatterBootstrapStateResolver.resolveNodeId(state.commissionedNodeId, bootstrapState);
+        if (nodeId < 0) {
+            append(MainActivityPresentation.connectedHomeIpFabricRestore(new ConnectedHomeIpFabricRestoreStatus(
+                    false,
+                    false,
+                    -1L,
+                    "No connectedhomeip bootstrap fabric has been commissioned yet.")));
+            return;
+        }
+        state.commissionedNodeId = nodeId;
+
+        new Thread(() -> {
+            NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
+            ConnectedHomeIpFabricRestoreStatus status;
+            if (request.nativeController() instanceof ConnectedHomeIpFabricRestoreChecker) {
+                try {
+                    status = ((ConnectedHomeIpFabricRestoreChecker) request.nativeController()).checkFabricRestore(nodeId);
+                } catch (Exception ex) {
+                    status = new ConnectedHomeIpFabricRestoreStatus(
+                            true,
+                            false,
+                            nodeId,
+                            "connectedhomeip fabric restore check failed: " + ex.getMessage());
+                }
+            } else {
+                ChipMatterControllerStatus readiness = request.nativeController().readiness();
+                status = new ConnectedHomeIpFabricRestoreStatus(
+                        true,
+                        false,
+                        nodeId,
+                        readiness.message());
+            }
+
+            ConnectedHomeIpFabricRestoreStatus finalStatus = status;
+            runOnUiThread(() -> {
+                if (controllerSession.isCurrent(request)) {
+                    append(MainActivityPresentation.connectedHomeIpFabricRestore(finalStatus));
+                }
+            });
+        }, "matter-fabric-restore-check").start();
     }
 
     private void useNativeChipControllerIfReady() {

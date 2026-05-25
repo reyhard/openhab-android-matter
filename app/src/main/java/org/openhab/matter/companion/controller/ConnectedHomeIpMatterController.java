@@ -4,7 +4,7 @@ import org.openhab.matter.companion.domain.CommissioningStep;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.ThreadDataset;
 
-public final class ConnectedHomeIpMatterController implements MatterControllerCandidate {
+public final class ConnectedHomeIpMatterController implements MatterControllerCandidate, ConnectedHomeIpFabricRestoreChecker {
     private static final long ENHANCED_COMMISSIONING_WINDOW_ITERATION = 1000L;
 
     private final ConnectedHomeIpControllerArtifacts artifacts;
@@ -71,6 +71,12 @@ public final class ConnectedHomeIpMatterController implements MatterControllerCa
                         controllerState));
         emit(listener, "connectedhomeip Java commissioning window opened", true);
         return result;
+    }
+
+    @Override
+    public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) throws Exception {
+        requireArtifactsReady();
+        return gateway.checkFabricRestore(bootstrapNodeId);
     }
 
     private void requireArtifactsReady() {

@@ -116,6 +116,11 @@ public final class ConnectedHomeIpMatterControllerFactoryTest {
                         ConnectedHomeIpOpenCommissioningWindowRequest request) {
                     return new MatterOpenCommissioningWindowResult("3497-0112-332", request.controllerState());
                 }
+
+                @Override
+                public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) {
+                    return new ConnectedHomeIpFabricRestoreStatus(true, true, bootstrapNodeId, "restore-ok");
+                }
             };
         }
     }

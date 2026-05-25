@@ -100,6 +100,11 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
         }
     }
 
+    @Override
+    public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) {
+        return new ConnectedHomeIpFabricRestoreProbe(controllerProvider, devicePointerProvider).check(bootstrapNodeId);
+    }
+
     private static <T> T require(T value, String name) {
         if (value == null) {
             throw new IllegalArgumentException(name + " is required");

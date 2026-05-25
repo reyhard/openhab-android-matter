@@ -241,6 +241,7 @@ public class MainActivityPresentationTest {
         assertEquals("Run Thread commissioning", MainActivityPresentation.threadCommissioningButtonLabel());
         assertEquals("Open commissioning window", MainActivityPresentation.openCommissioningWindowButtonLabel());
         assertEquals("Check connectedhomeip controller", MainActivityPresentation.checkControllerButtonLabel());
+        assertEquals("Check connectedhomeip fabric restore", MainActivityPresentation.checkFabricRestoreButtonLabel());
         assertEquals("Use connectedhomeip controller if ready", MainActivityPresentation.useControllerButtonLabel());
         assertEquals(
                 "Developer attestation bypass for connectedhomeip commissioning",

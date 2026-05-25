@@ -28,7 +28,7 @@
 - Reflection commissioning monitor installs a fresh connectedhomeip completion listener before each BLE pairing command, preventing stale one-shot callback state across commissioning attempts.
 - Reflection-backed controller provider can initialize the connectedhomeip Android platform dependency graph, build `ControllerParams`, and construct/cache `ChipDeviceController` without compile-time CHIP dependencies.
 - Android BLE connection provider can build the Matter BLE discriminator scan filter, scan/connect through injectable Android BLE seams, register the connected `BluetoothGatt` with connectedhomeip's BLE manager, and clean up registered GATT connections.
-- connectedhomeip fabric-restore diagnostic seam can probe a persisted bootstrap node id by acquiring and immediately releasing a connected device pointer, so real artifact builds can distinguish restored fabric readiness from later OCW failures.
+- connectedhomeip fabric-restore diagnostic seam is exposed through a user-triggered app check and can probe a persisted bootstrap node id by acquiring and immediately releasing a connected device pointer, so real artifact builds can distinguish restored fabric readiness from later OCW failures.
 - Unreadable encrypted Matter bootstrap state now fails closed instead of reusing a stale saved-instance bootstrap node id for OpenCommissioningWindow.
 - Connectedhomeip artifact readiness checks use non-initializing class lookup, include reflected nested classes and BLE callback classes, and report linkage/inspection failures as not-ready fallback instead of crashing the app.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.

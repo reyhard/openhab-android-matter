@@ -66,6 +66,22 @@ public final class ConnectedHomeIpMatterControllerTest {
     }
 
     @Test
+    public void checkFabricRestoreDelegatesToGateway() throws Exception {
+        CapturingGateway gateway = new CapturingGateway();
+        ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
+                readyArtifacts(),
+                gateway,
+                false);
+
+        ConnectedHomeIpFabricRestoreStatus status = controller.checkFabricRestore(987654321L);
+
+        assertTrue(status.checked());
+        assertTrue(status.ready());
+        assertEquals(987654321L, gateway.fabricRestoreNodeId);
+        assertEquals("restore-ok", status.message());
+    }
+
+    @Test
     public void commandsRejectMissingConnectedHomeIpArtifactsBeforeCallingGateway() {
         CapturingGateway gateway = new CapturingGateway();
         ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
@@ -107,6 +123,7 @@ public final class ConnectedHomeIpMatterControllerTest {
     private static final class CapturingGateway implements ConnectedHomeIpControllerGateway {
         private ConnectedHomeIpCommissioningRequest commissioningRequest;
         private ConnectedHomeIpOpenCommissioningWindowRequest openCommissioningWindowRequest;
+        private long fabricRestoreNodeId = -1L;
         private int callCount;
 
         @Override
@@ -122,6 +139,12 @@ public final class ConnectedHomeIpMatterControllerTest {
             callCount++;
             openCommissioningWindowRequest = request;
             return new MatterOpenCommissioningWindowResult("3497-0112-332", "ocw-state");
+        }
+
+        public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) {
+            callCount++;
+            fabricRestoreNodeId = bootstrapNodeId;
+            return new ConnectedHomeIpFabricRestoreStatus(true, true, bootstrapNodeId, "restore-ok");
         }
     }
 }

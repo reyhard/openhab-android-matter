@@ -79,6 +79,10 @@ final class MainActivityPresentation {
         return "Check connectedhomeip controller";
     }
 
+    static String checkFabricRestoreButtonLabel() {
+        return "Check connectedhomeip fabric restore";
+    }
+
     static String useControllerButtonLabel() {
         return "Use connectedhomeip controller if ready";
     }

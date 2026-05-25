@@ -183,6 +183,30 @@ public final class ConnectedHomeIpReflectionGatewayTest {
     }
 
     @Test
+    public void checkFabricRestoreUsesExistingControllerAndReleasesDevicePointer() throws Exception {
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        CapturingDevicePointerProvider pointerProvider = new CapturingDevicePointerProvider(1234L);
+        ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
+                () -> controller,
+                unusedBleProvider(),
+                () -> 1L,
+                new CapturingCommissioningMonitor(),
+                unusedAttestationHandler(),
+                pointerProvider,
+                fakeCommandFactory(),
+                1000L);
+
+        ConnectedHomeIpFabricRestoreStatus status = gateway.checkFabricRestore(987654321L);
+
+        assertTrue(status.checked());
+        assertTrue(status.ready());
+        assertEquals(987654321L, status.nodeId());
+        assertSame(controller, pointerProvider.controller);
+        assertEquals(987654321L, pointerProvider.nodeId);
+        assertTrue(pointerProvider.pointer.released);
+    }
+
+    @Test
     public void openCommissioningWindowReleasesDevicePointerWhenCallbackFails() throws Exception {
         FakeChipDeviceController controller = new FakeChipDeviceController();
         controller.blankOpenCommissioningWindowSuccess = true;
