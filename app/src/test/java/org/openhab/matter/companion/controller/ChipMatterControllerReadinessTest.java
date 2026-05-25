@@ -26,7 +26,7 @@ public final class ChipMatterControllerReadinessTest {
 
     @Test
     public void reportsReadyWhenNativeLibraryLoads() {
-        ChipMatterController controller = new ChipMatterController(name -> { }, new ChipMatterControllerConfig(
+        ChipMatterController controller = new ChipMatterController(productionBridge(), new ChipMatterControllerConfig(
                 "custom_chip",
                 true));
 
@@ -38,8 +38,95 @@ public final class ChipMatterControllerReadinessTest {
     }
 
     @Test
+    public void reportsStubBridgeAsNotReadyEvenWhenLibraryLoads() {
+        NativeChipBridge bridge = new NativeChipBridge() {
+            @Override
+            public void load(String libraryName) {
+            }
+
+            @Override
+            public String metadata() {
+                return "kind=stub;version=0.1.0;production=false;message=JNI stub only";
+            }
+
+            @Override
+            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+                throw new AssertionError("stub commissioning must not be called");
+            }
+
+            @Override
+            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+                throw new AssertionError("stub OCW must not be called");
+            }
+        };
+
+        ChipMatterController controller = new ChipMatterController(bridge, ChipMatterControllerConfig.defaultConfig());
+        ChipMatterControllerStatus status = controller.readiness();
+
+        assertFalse(status.ready());
+        assertEquals("stub", status.bridgeKind());
+        assertFalse(status.productionReady());
+        assertTrue(status.message().contains("JNI stub only"));
+    }
+
+    @Test
+    public void reportsReadyOnlyForProductionConnectedhomeipBridge() {
+        NativeChipBridge bridge = new NativeChipBridge() {
+            @Override
+            public void load(String libraryName) {
+            }
+
+            @Override
+            public String metadata() {
+                return "kind=connectedhomeip;version=2026.05;production=true;message=connectedhomeip controller ready";
+            }
+
+            @Override
+            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+                return 1234L;
+            }
+
+            @Override
+            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+                return "MT:PRODUCTION";
+            }
+        };
+
+        ChipMatterController controller = new ChipMatterController(bridge, new ChipMatterControllerConfig(
+                "custom_chip",
+                true));
+
+        ChipMatterControllerStatus status = controller.readiness();
+
+        assertTrue(status.ready());
+        assertEquals("connectedhomeip", status.bridgeKind());
+        assertTrue(status.productionReady());
+        assertEquals("custom_chip", status.libraryName());
+        assertTrue(status.attestationBypassEnabled());
+    }
+
+    @Test
     public void missingNativeEntryPointIsReportedAsIllegalState() {
-        ChipMatterController controller = new ChipMatterController(name -> { }, ChipMatterControllerConfig.defaultConfig());
+        ChipMatterController controller = new ChipMatterController(new NativeChipBridge() {
+            @Override
+            public void load(String libraryName) {
+            }
+
+            @Override
+            public String metadata() {
+                return "kind=connectedhomeip;version=2026.05;production=true;message=connectedhomeip controller ready";
+            }
+
+            @Override
+            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+                throw new UnsatisfiedLinkError("missing nativeCommissionBleThread");
+            }
+
+            @Override
+            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+                return "MT:PRODUCTION";
+            }
+        }, ChipMatterControllerConfig.defaultConfig());
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> controller.commissionBleThread(
                 ThreadDataset.parse("0E080000000000010000"),
@@ -52,12 +139,65 @@ public final class ChipMatterControllerReadinessTest {
     @Test
     public void readinessLoadsNativeLibraryOnlyOnce() {
         int[] loadCount = new int[] {0};
-        ChipMatterController controller = new ChipMatterController(name -> loadCount[0]++,
-                ChipMatterControllerConfig.defaultConfig());
+        ChipMatterController controller = new ChipMatterController(new NativeChipBridge() {
+            @Override
+            public void load(String libraryName) {
+                loadCount[0]++;
+            }
+
+            @Override
+            public String metadata() {
+                return "kind=connectedhomeip;version=2026.05;production=true;message=connectedhomeip controller ready";
+            }
+
+            @Override
+            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+                return 1234L;
+            }
+
+            @Override
+            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+                return "MT:PRODUCTION";
+            }
+        }, ChipMatterControllerConfig.defaultConfig());
 
         controller.readiness();
         controller.readiness();
 
         assertEquals(1, loadCount[0]);
+    }
+
+    @Test
+    public void loaderBackedControllerRequiresNativeMetadataEntryPoint() {
+        ChipMatterController controller = new ChipMatterController(name -> { }, ChipMatterControllerConfig.defaultConfig());
+
+        ChipMatterControllerStatus status = controller.readiness();
+
+        assertFalse(status.ready());
+        assertFalse(status.productionReady());
+        assertEquals("unknown", status.bridgeKind());
+    }
+
+    private static NativeChipBridge productionBridge() {
+        return new NativeChipBridge() {
+            @Override
+            public void load(String libraryName) {
+            }
+
+            @Override
+            public String metadata() {
+                return "kind=connectedhomeip;version=2026.05;production=true;message=connectedhomeip controller ready";
+            }
+
+            @Override
+            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+                return 1234L;
+            }
+
+            @Override
+            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+                return "MT:PRODUCTION";
+            }
+        };
     }
 }

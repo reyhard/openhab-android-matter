@@ -26,7 +26,7 @@ public final class MatterControllerSelectorTest {
     @Test
     public void selectsNativeControllerWhenReadyAndRequested() {
         MatterController fallback = new FakeMatterController();
-        ChipMatterController nativeController = new ChipMatterController(name -> { },
+        ChipMatterController nativeController = new ChipMatterController(productionBridge(),
                 new ChipMatterControllerConfig("custom_chip", true));
 
         MatterControllerSelection selection = MatterControllerSelector.select(
@@ -55,5 +55,28 @@ public final class MatterControllerSelectorTest {
         assertFalse(selection.nativeSelected());
         assertTrue(selection.message().contains("Native CHIP controller not ready"));
         assertTrue(selection.message().contains("Continuing with simulated Matter controller"));
+    }
+
+    private static NativeChipBridge productionBridge() {
+        return new NativeChipBridge() {
+            @Override
+            public void load(String libraryName) {
+            }
+
+            @Override
+            public String metadata() {
+                return "kind=connectedhomeip;version=2026.05;production=true;message=connectedhomeip controller ready";
+            }
+
+            @Override
+            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+                return 1234L;
+            }
+
+            @Override
+            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+                return "MT:PRODUCTION";
+            }
+        };
     }
 }

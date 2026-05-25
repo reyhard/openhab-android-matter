@@ -5,16 +5,20 @@ import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.ThreadDataset;
 
 public final class ChipMatterController implements MatterController {
-    private final NativeLibraryLoader loader;
+    private final NativeChipBridge bridge;
     private final ChipMatterControllerConfig config;
     private ChipMatterControllerStatus status;
 
     public ChipMatterController() {
-        this(new SystemNativeLibraryLoader(), ChipMatterControllerConfig.defaultConfig());
+        this(new SystemNativeChipBridge(), ChipMatterControllerConfig.defaultConfig());
     }
 
     public ChipMatterController(NativeLibraryLoader loader, ChipMatterControllerConfig config) {
-        this.loader = loader;
+        this(new LoaderBackedNativeChipBridge(loader), config);
+    }
+
+    public ChipMatterController(NativeChipBridge bridge, ChipMatterControllerConfig config) {
+        this.bridge = bridge == null ? new SystemNativeChipBridge() : bridge;
         this.config = config == null ? ChipMatterControllerConfig.defaultConfig() : config;
     }
 
@@ -28,7 +32,7 @@ public final class ChipMatterController implements MatterController {
         emit(listener, "Starting CHIP BLE Thread commissioning", false);
         long nodeId;
         try {
-            nodeId = nativeCommissionBleThread(dataset.hex(), payload.pin(), payload.discriminator());
+            nodeId = bridge.commissionBleThread(dataset.hex(), payload.pin(), payload.discriminator());
         } catch (UnsatisfiedLinkError error) {
             throw new IllegalStateException("Native CHIP controller entry point is missing: " + error.getMessage(), error);
         }
@@ -42,7 +46,7 @@ public final class ChipMatterController implements MatterController {
         emit(listener, "Opening CHIP commissioning window", false);
         String code;
         try {
-            code = nativeOpenCommissioningWindow(nodeId, timeoutSeconds, discriminator);
+            code = bridge.openCommissioningWindow(nodeId, timeoutSeconds, discriminator);
         } catch (UnsatisfiedLinkError error) {
             throw new IllegalStateException("Native CHIP controller entry point is missing: " + error.getMessage(), error);
         }
@@ -61,17 +65,25 @@ public final class ChipMatterController implements MatterController {
         if (status == null) {
             String libraryName = config.nativeLibraryName();
             try {
-                loader.load(libraryName);
+                bridge.load(libraryName);
+                NativeChipBridgeMetadata metadata = NativeChipBridgeMetadata.parse(bridge.metadata());
+                boolean ready = metadata.productionReady();
                 status = new ChipMatterControllerStatus(
-                        true,
+                        ready,
                         libraryName,
                         config.attestationBypassEnabled(),
-                        "Native CHIP library loaded: " + libraryName);
+                        metadata.kind(),
+                        metadata.productionReady(),
+                        ready
+                                ? "Native CHIP library loaded: " + libraryName
+                                : notProductionMessage(metadata));
             } catch (UnsatisfiedLinkError | SecurityException exception) {
                 status = new ChipMatterControllerStatus(
                         false,
                         libraryName,
                         config.attestationBypassEnabled(),
+                        "unknown",
+                        false,
                         exception.getMessage());
             }
         }
@@ -84,7 +96,38 @@ public final class ChipMatterController implements MatterController {
         }
     }
 
-    private static native long nativeCommissionBleThread(String datasetHex, long pin, int discriminator);
+    private static String notProductionMessage(NativeChipBridgeMetadata metadata) {
+        String message = metadata.message();
+        String prefix = message.isEmpty() ? "" : message + ". ";
+        return prefix + "Native CHIP bridge is not a production connectedhomeip implementation";
+    }
 
-    private static native String nativeOpenCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator);
+    private static final class LoaderBackedNativeChipBridge implements NativeChipBridge {
+        private final NativeLibraryLoader loader;
+        private final SystemNativeChipBridge delegate = new SystemNativeChipBridge();
+
+        private LoaderBackedNativeChipBridge(NativeLibraryLoader loader) {
+            this.loader = loader == null ? new SystemNativeLibraryLoader() : loader;
+        }
+
+        @Override
+        public void load(String libraryName) {
+            loader.load(libraryName);
+        }
+
+        @Override
+        public String metadata() {
+            return delegate.metadata();
+        }
+
+        @Override
+        public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+            return delegate.commissionBleThread(datasetHex, pin, discriminator);
+        }
+
+        @Override
+        public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+            return delegate.openCommissioningWindow(nodeId, timeoutSeconds, discriminator);
+        }
+    }
 }
