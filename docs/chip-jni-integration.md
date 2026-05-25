@@ -116,6 +116,9 @@ The concrete Android runtime providers are still the next production step. They 
 - `invokePairDeviceThroughBle(...)` invokes the reflected BLE Thread commissioning entry point once the gateway has a `BluetoothGatt`, connection id, generated node id, setup PIN, and commission parameters.
 - `ConnectedHomeIpOpenCommissioningWindowCallback` creates a dynamic `OpenCommissioningCallback` proxy and converts `onSuccess(deviceId, manualPairingCode, qrCode)` into `MatterOpenCommissioningWindowResult`; `onError(status, deviceId)` becomes an exception.
 - `invokeOpenPairingWindowWithPinCallback(...)` invokes the reflected OCW entry point and returns whether connectedhomeip accepted the command start.
+- `ConnectedHomeIpCommissioningCompletionListener` creates a dynamic `ChipDeviceController.CompletionListener` proxy and converts successful `onCommissioningComplete(nodeId, 0)` into `MatterCommissioningResult`; pairing or commissioning errors become exceptions.
+- `ConnectedHomeIpReflectionAttestationHandler` registers a dynamic `DeviceAttestationDelegate` proxy and calls `continueCommissioning(devicePtr, attestationBypassEnabled)` when connectedhomeip reports attestation completion.
+- `ConnectedHomeIpReflectionDevicePointerProvider` creates a dynamic `GetConnectedDeviceCallback` proxy, waits for `onDeviceConnected(devicePtr)`, and returns a `ConnectedHomeIpDevicePointer` whose release action calls `releaseConnectedDevicePointer(devicePtr)`.
 
 `ConnectedHomeIpReflectionGateway` wires those reflected invokers into `ConnectedHomeIpControllerGateway` through injectable runtime seams:
 
@@ -128,7 +131,7 @@ The concrete Android runtime providers are still the next production step. They 
 
 `ConnectedHomeIpBleConnection` and `ConnectedHomeIpDevicePointer` require explicit close/release actions, so real providers cannot accidentally return no-op cleanup handles.
 
-The remaining production work is implementing those seams against Android and connectedhomeip: BLE scan/connect, GATT connection id registration through `AndroidBleManager`, async pairing completion callbacks, attestation delegate continuation, connected device pointer acquisition/release, and replacing the current UI selection path with the reflection-backed gateway once it is backed by real providers.
+The remaining production work is implementing the Android runtime providers: `AndroidChipPlatform` initialization, `ChipDeviceController` construction/restore, BLE scan/connect, GATT connection id registration through `AndroidBleManager`, and replacing the current UI selection path with the reflection-backed gateway once it is backed by real providers.
 
 ## CHIPTool Java API Targets
 

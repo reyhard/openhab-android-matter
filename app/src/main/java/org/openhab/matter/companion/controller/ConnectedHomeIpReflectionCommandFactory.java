@@ -13,12 +13,20 @@ public final class ConnectedHomeIpReflectionCommandFactory {
     private static final String COMMISSION_PARAMETERS_BUILDER_CLASS = "chip.devicecontroller.CommissionParameters$Builder";
     private static final String CHIP_DEVICE_CONTROLLER_CLASS = "chip.devicecontroller.ChipDeviceController";
     private static final String OPEN_COMMISSIONING_CALLBACK_CLASS = "chip.devicecontroller.OpenCommissioningCallback";
+    private static final String COMPLETION_LISTENER_CLASS =
+            "chip.devicecontroller.ChipDeviceController$CompletionListener";
+    private static final String DEVICE_ATTESTATION_DELEGATE_CLASS = "chip.devicecontroller.DeviceAttestationDelegate";
+    private static final String GET_CONNECTED_DEVICE_CALLBACK_CLASS =
+            "chip.devicecontroller.GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback";
 
     private final Class<?> networkCredentialsClass;
     private final Class<?> threadCredentialsClass;
     private final Class<?> commissionParametersBuilderClass;
     private final Class<?> chipDeviceControllerClass;
     private final Class<?> openCommissioningCallbackClass;
+    private final Class<?> completionListenerClass;
+    private final Class<?> deviceAttestationDelegateClass;
+    private final Class<?> getConnectedDeviceCallbackClass;
 
     public ConnectedHomeIpReflectionCommandFactory(
             Class<?> networkCredentialsClass,
@@ -26,6 +34,26 @@ public final class ConnectedHomeIpReflectionCommandFactory {
             Class<?> commissionParametersBuilderClass,
             Class<?> chipDeviceControllerClass,
             Class<?> openCommissioningCallbackClass) {
+        this(
+                networkCredentialsClass,
+                threadCredentialsClass,
+                commissionParametersBuilderClass,
+                chipDeviceControllerClass,
+                openCommissioningCallbackClass,
+                nestedClass(chipDeviceControllerClass, "CompletionListener"),
+                null,
+                null);
+    }
+
+    public ConnectedHomeIpReflectionCommandFactory(
+            Class<?> networkCredentialsClass,
+            Class<?> threadCredentialsClass,
+            Class<?> commissionParametersBuilderClass,
+            Class<?> chipDeviceControllerClass,
+            Class<?> openCommissioningCallbackClass,
+            Class<?> completionListenerClass,
+            Class<?> deviceAttestationDelegateClass,
+            Class<?> getConnectedDeviceCallbackClass) {
         this.networkCredentialsClass = requireClass(networkCredentialsClass, "networkCredentialsClass");
         this.threadCredentialsClass = requireClass(threadCredentialsClass, "threadCredentialsClass");
         this.commissionParametersBuilderClass = requireClass(
@@ -35,6 +63,9 @@ public final class ConnectedHomeIpReflectionCommandFactory {
         this.openCommissioningCallbackClass = requireClass(
                 openCommissioningCallbackClass,
                 "openCommissioningCallbackClass");
+        this.completionListenerClass = completionListenerClass;
+        this.deviceAttestationDelegateClass = deviceAttestationDelegateClass;
+        this.getConnectedDeviceCallbackClass = getConnectedDeviceCallbackClass;
     }
 
     public static ConnectedHomeIpReflectionCommandFactory fromDefaultClassLoader() throws ClassNotFoundException {
@@ -44,7 +75,10 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 Class.forName(THREAD_CREDENTIALS_CLASS, false, classLoader),
                 Class.forName(COMMISSION_PARAMETERS_BUILDER_CLASS, false, classLoader),
                 Class.forName(CHIP_DEVICE_CONTROLLER_CLASS, false, classLoader),
-                Class.forName(OPEN_COMMISSIONING_CALLBACK_CLASS, false, classLoader));
+                Class.forName(OPEN_COMMISSIONING_CALLBACK_CLASS, false, classLoader),
+                Class.forName(COMPLETION_LISTENER_CLASS, false, classLoader),
+                Class.forName(DEVICE_ATTESTATION_DELEGATE_CLASS, false, classLoader),
+                Class.forName(GET_CONNECTED_DEVICE_CALLBACK_CLASS, false, classLoader));
     }
 
     public Object newThreadCommissionParameters(ThreadDataset dataset) throws ReflectiveOperationException {
@@ -118,6 +152,69 @@ public final class ConnectedHomeIpReflectionCommandFactory {
         return Boolean.TRUE.equals(result);
     }
 
+    public ConnectedHomeIpCommissioningCompletionListener newCommissioningCompletionListener() {
+        return new ConnectedHomeIpCommissioningCompletionListener(
+                requireAvailable(completionListenerClass, "completionListenerClass"));
+    }
+
+    public Object newDeviceAttestationDelegate(Object controller, boolean attestationBypassEnabled) {
+        return new ConnectedHomeIpDeviceAttestationDelegate(
+                requireAvailable(deviceAttestationDelegateClass, "deviceAttestationDelegateClass"),
+                this,
+                controller,
+                attestationBypassEnabled)
+                .proxy();
+    }
+
+    public Object newGetConnectedDeviceCallback(ConnectedHomeIpConnectedDeviceCallback callback) {
+        return callback.proxy(requireAvailable(getConnectedDeviceCallbackClass, "getConnectedDeviceCallbackClass"));
+    }
+
+    public void invokeSetCompletionListener(Object controller, Object listenerProxy)
+            throws ReflectiveOperationException {
+        chipDeviceControllerClass
+                .getMethod("setCompletionListener", requireAvailable(completionListenerClass, "completionListenerClass"))
+                .invoke(controller, listenerProxy);
+    }
+
+    public void invokeSetDeviceAttestationDelegate(
+            Object controller,
+            int failSafeExpiryTimeoutSeconds,
+            Object delegateProxy) throws ReflectiveOperationException {
+        chipDeviceControllerClass
+                .getMethod(
+                        "setDeviceAttestationDelegate",
+                        int.class,
+                        requireAvailable(deviceAttestationDelegateClass, "deviceAttestationDelegateClass"))
+                .invoke(controller, failSafeExpiryTimeoutSeconds, delegateProxy);
+    }
+
+    public void invokeContinueCommissioning(
+            Object controller,
+            long devicePtr,
+            boolean ignoreAttestationFailure) throws ReflectiveOperationException {
+        chipDeviceControllerClass
+                .getMethod("continueCommissioning", long.class, boolean.class)
+                .invoke(controller, devicePtr, ignoreAttestationFailure);
+    }
+
+    public void invokeGetConnectedDevicePointer(Object controller, long nodeId, Object callbackProxy)
+            throws ReflectiveOperationException {
+        chipDeviceControllerClass
+                .getMethod(
+                        "getConnectedDevicePointer",
+                        long.class,
+                        requireAvailable(getConnectedDeviceCallbackClass, "getConnectedDeviceCallbackClass"))
+                .invoke(controller, nodeId, callbackProxy);
+    }
+
+    public void invokeReleaseConnectedDevicePointer(Object controller, long devicePtr)
+            throws ReflectiveOperationException {
+        chipDeviceControllerClass
+                .getMethod("releaseConnectedDevicePointer", long.class)
+                .invoke(controller, devicePtr);
+    }
+
     private static Method findSingleParameterMethod(Class<?> targetClass, String name) throws NoSuchMethodException {
         for (Method method : targetClass.getMethods()) {
             if (method.getName().equals(name) && method.getParameterTypes().length == 1) {
@@ -141,6 +238,25 @@ public final class ConnectedHomeIpReflectionCommandFactory {
             throw new IllegalArgumentException(name + " is required");
         }
         return type;
+    }
+
+    private static Class<?> requireAvailable(Class<?> type, String name) {
+        if (type == null) {
+            throw new IllegalStateException(name + " is not configured");
+        }
+        return type;
+    }
+
+    private static Class<?> nestedClass(Class<?> targetClass, String simpleName) {
+        if (targetClass == null) {
+            return null;
+        }
+        for (Class<?> nested : targetClass.getClasses()) {
+            if (simpleName.equals(nested.getSimpleName())) {
+                return nested;
+            }
+        }
+        return null;
     }
 
     private Class<?> commissionParametersClass() {

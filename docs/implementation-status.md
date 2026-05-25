@@ -23,6 +23,7 @@
 - Reflection command factory can construct connectedhomeip Thread `NetworkCredentials`, `CommissionParameters`, and locate the `pairDeviceThroughBLE(...)` and `openPairingWindowWithPINCallback(...)` controller methods without compile-time CHIP dependencies.
 - Reflection command factory can invoke `pairDeviceThroughBLE(...)` and bridge `OpenCommissioningCallback` success/error responses into the app's OCW result model.
 - Reflection-backed `ConnectedHomeIpControllerGateway` orchestration invokes the connectedhomeip BLE Thread and OCW commands through injectable controller, BLE connection, node-id, attestation-handler, commissioning-monitor, and connected-device-pointer seams.
+- Reflection bridges cover connectedhomeip `CompletionListener`, `DeviceAttestationDelegate`, `continueCommissioning(...)`, `getConnectedDevicePointer(...)`, and `releaseConnectedDevicePointer(...)`.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
@@ -36,7 +37,7 @@
 
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
-- Concrete Android implementations for `AndroidChipPlatform`, BLE scan/connect, Android BLE connection id registration, pairing completion listener, attestation continuation, connected-device pointer lookup/release, and wiring `MainActivity` selection to the reflection-backed gateway.
+- Concrete Android implementations for `AndroidChipPlatform`, `ChipDeviceController` construction/restore, BLE scan/connect, Android BLE connection id registration, and wiring `MainActivity` selection to the reflection-backed gateway.
 - Real connectedhomeip Matter fabric key persistence and restore; the Java bridge and encrypted repository can carry opaque state, but the packaged native stub does not emit or consume real fabric material.
 
 ## Production Replacement Seam
