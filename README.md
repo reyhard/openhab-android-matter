@@ -17,6 +17,7 @@ This branch builds an installable Android APK with:
 - Encrypted app-private storage for the OTBR Thread dataset using Android Keystore-backed AES-GCM.
 - App-private persistence for the openHAB base URL.
 - App-private persistence for the OTBR base URL.
+- Persisted developer attestation bypass setting for the future native CHIP controller path; it defaults off and is passed to the JNI command contract only when explicitly enabled.
 - Encrypted app-private bootstrap controller state repository for future native Matter fabric/controller state.
 - Stateful native CHIP command contract carries attestation-bypass intent and opaque controller state through commissioning and OpenCommissioningWindow results.
 - Native in-app Matter QR scanning using CameraX and ML Kit barcode scanning.

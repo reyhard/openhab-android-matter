@@ -15,6 +15,7 @@
 - Android Keystore-backed AES-GCM encrypted app-private storage stores the OTBR Thread dataset.
 - App-private configuration persistence stores the openHAB base URL.
 - App-private configuration persistence stores the OTBR base URL.
+- Persisted developer attestation bypass setting is exposed in the UI and passed into native CHIP commissioning requests.
 - Encrypted app-private bootstrap controller state repository stores the bootstrap node id and reserves an encrypted opaque controller-state slot.
 - Stateful native CHIP command contract passes attestation-bypass intent plus opaque controller state into and out of commissioning and OCW calls.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.

@@ -19,6 +19,8 @@ private static native String nativeOpenCommissioningWindow(
         String controllerState);
 ```
 
+`attestationBypassEnabled` is controlled by the app's persisted developer setting. It defaults to `false`; production native implementations should only treat `true` as a lab/development equivalent of `chip-tool --bypass-attestation-verifier true`.
+
 `nativeControllerMetadata()` must return semicolon-separated key/value metadata:
 
 ```text
