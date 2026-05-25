@@ -113,8 +113,11 @@ The concrete Android gateway is still the next production step. It must initiali
 - `newThreadCommissionParameters(...)` constructs `NetworkCredentials.ThreadCredentials`, calls `NetworkCredentials.forThread(...)`, and builds `CommissionParameters` with `csrNonce=null` and `icdRegistrationInfo=null`.
 - `pairDeviceThroughBleMethod()` locates `ChipDeviceController.pairDeviceThroughBLE(...)`.
 - `openPairingWindowWithPinCallbackMethod()` locates `ChipDeviceController.openPairingWindowWithPINCallback(...)`.
+- `invokePairDeviceThroughBle(...)` invokes the reflected BLE Thread commissioning entry point once the gateway has a `BluetoothGatt`, connection id, generated node id, setup PIN, and commission parameters.
+- `ConnectedHomeIpOpenCommissioningWindowCallback` creates a dynamic `OpenCommissioningCallback` proxy and converts `onSuccess(deviceId, manualPairingCode, qrCode)` into `MatterOpenCommissioningWindowResult`; `onError(status, deviceId)` becomes an exception.
+- `invokeOpenPairingWindowWithPinCallback(...)` invokes the reflected OCW entry point and returns whether connectedhomeip accepted the command start.
 
-The remaining gateway work is Android runtime orchestration: BLE scan/connect, GATT connection id registration through `AndroidBleManager`, async pairing completion callbacks, attestation delegate continuation, connected device pointer acquisition/release, and OCW callback-to-result bridging.
+The remaining gateway work is Android runtime orchestration: BLE scan/connect, GATT connection id registration through `AndroidBleManager`, async pairing completion callbacks, attestation delegate continuation, connected device pointer acquisition/release, and wiring these reflected invokers into `ConnectedHomeIpControllerGateway`.
 
 ## CHIPTool Java API Targets
 

@@ -9,8 +9,10 @@ import java.lang.reflect.Method;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 public final class ConnectedHomeIpReflectionCommandFactoryTest {
     @Test
@@ -42,20 +44,105 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
 
     @Test
     public void locatesConnectedHomeIpControllerCommandMethods() throws Exception {
-        ConnectedHomeIpReflectionCommandFactory factory = new ConnectedHomeIpReflectionCommandFactory(
-                FakeNetworkCredentials.class,
-                FakeNetworkCredentials.ThreadCredentials.class,
-                FakeCommissionParameters.Builder.class,
-                FakeChipDeviceController.class,
-                FakeOpenCommissioningCallback.class);
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
 
         Method pair = factory.pairDeviceThroughBleMethod();
         Method ocw = factory.openPairingWindowWithPinCallbackMethod();
 
         assertEquals("pairDeviceThroughBLE", pair.getName());
         assertEquals(BluetoothGatt.class, pair.getParameterTypes()[0]);
+        assertEquals(FakeCommissionParameters.class, pair.getParameterTypes()[4]);
         assertEquals("openPairingWindowWithPINCallback", ocw.getName());
         assertEquals(FakeOpenCommissioningCallback.class, ocw.getParameterTypes()[5]);
+    }
+
+    @Test
+    public void invokesPairDeviceThroughBle() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        Object params = FakeCommissionParameters.BUILT;
+
+        factory.invokePairDeviceThroughBle(controller, null, 42, 987654321L, 20202021L, params);
+
+        assertEquals(42, controller.connId);
+        assertEquals(987654321L, controller.deviceId);
+        assertEquals(20202021L, controller.setupPin);
+        assertSame(params, controller.params);
+    }
+
+    @Test
+    public void invokesOpenPairingWindowAndReturnsManualCodeFromCallback() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        ConnectedHomeIpOpenCommissioningWindowCallback callback =
+                factory.newOpenCommissioningWindowCallback("controller-state");
+
+        boolean started = factory.invokeOpenPairingWindowWithPinCallback(
+                controller,
+                1234L,
+                new ConnectedHomeIpOpenCommissioningWindowRequest(987654321L, 300, 1000L, 3840, "controller-state"),
+                null,
+                callback.proxy());
+
+        MatterOpenCommissioningWindowResult result = callback.awaitResult(1000);
+
+        assertTrue(started);
+        assertEquals(1234L, controller.devicePtr);
+        assertEquals(300, controller.duration);
+        assertEquals(1000L, controller.iteration);
+        assertEquals(3840, controller.discriminator);
+        assertEquals("3497-0112-332", result.temporaryCode());
+        assertEquals("controller-state", result.controllerState());
+    }
+
+    @Test
+    public void openCommissioningWindowCallbackReportsError() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        controller.openCommissioningWindowError = true;
+        ConnectedHomeIpOpenCommissioningWindowCallback callback =
+                factory.newOpenCommissioningWindowCallback("controller-state");
+
+        factory.invokeOpenPairingWindowWithPinCallback(
+                controller,
+                1234L,
+                new ConnectedHomeIpOpenCommissioningWindowRequest(987654321L, 300, 1000L, 3840, "controller-state"),
+                null,
+                callback.proxy());
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> callback.awaitResult(1000));
+
+        assertTrue(exception.getMessage().contains("55"));
+        assertTrue(exception.getMessage().contains("987654321"));
+    }
+
+    @Test
+    public void openCommissioningWindowCallbackReportsBlankSuccessCodesAsError() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        controller.blankOpenCommissioningWindowSuccess = true;
+        ConnectedHomeIpOpenCommissioningWindowCallback callback =
+                factory.newOpenCommissioningWindowCallback("controller-state");
+
+        factory.invokeOpenPairingWindowWithPinCallback(
+                controller,
+                1234L,
+                new ConnectedHomeIpOpenCommissioningWindowRequest(987654321L, 300, 1000L, 3840, "controller-state"),
+                null,
+                callback.proxy());
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> callback.awaitResult(1000));
+
+        assertTrue(exception.getMessage().contains("blank"));
+    }
+
+    private static ConnectedHomeIpReflectionCommandFactory fakeFactory() {
+        return new ConnectedHomeIpReflectionCommandFactory(
+                FakeNetworkCredentials.class,
+                FakeNetworkCredentials.ThreadCredentials.class,
+                FakeCommissionParameters.Builder.class,
+                FakeChipDeviceController.class,
+                FakeOpenCommissioningCallback.class);
     }
 
     public static final class FakeNetworkCredentials {
@@ -76,7 +163,7 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
     }
 
     public static final class FakeCommissionParameters {
-        private static final Object BUILT = new Object();
+        private static final FakeCommissionParameters BUILT = new FakeCommissionParameters();
         private static Builder lastBuilder;
 
         public static final class Builder {
@@ -103,19 +190,34 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
                 return this;
             }
 
-            public Object build() {
+            public FakeCommissionParameters build() {
                 return BUILT;
             }
         }
     }
 
     public static final class FakeChipDeviceController {
+        private int connId;
+        private long deviceId;
+        private long setupPin;
+        private Object params;
+        private long devicePtr;
+        private int duration;
+        private long iteration;
+        private int discriminator;
+        private boolean openCommissioningWindowError;
+        private boolean blankOpenCommissioningWindowSuccess;
+
         public void pairDeviceThroughBLE(
                 BluetoothGatt bleServer,
                 int connId,
                 long deviceId,
                 long setupPincode,
-                Object params) {
+                FakeCommissionParameters params) {
+            this.connId = connId;
+            this.deviceId = deviceId;
+            this.setupPin = setupPincode;
+            this.params = params;
         }
 
         public boolean openPairingWindowWithPINCallback(
@@ -125,10 +227,24 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
                 int discriminator,
                 Long setupPinCode,
                 FakeOpenCommissioningCallback callback) {
+            this.devicePtr = devicePtr;
+            this.duration = duration;
+            this.iteration = iteration;
+            this.discriminator = discriminator;
+            if (openCommissioningWindowError) {
+                callback.onError(55, 987654321L);
+            } else if (blankOpenCommissioningWindowSuccess) {
+                callback.onSuccess(987654321L, "", "");
+            } else {
+                callback.onSuccess(987654321L, "3497-0112-332", "MT:TEST");
+            }
             return true;
         }
     }
 
     public interface FakeOpenCommissioningCallback {
+        void onError(int status, long deviceId);
+
+        void onSuccess(long deviceId, String manualPairingCode, String qrCode);
     }
 }

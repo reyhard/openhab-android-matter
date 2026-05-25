@@ -67,11 +67,22 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                     && BluetoothGatt.class.equals(parameterTypes[0])
                     && int.class.equals(parameterTypes[1])
                     && long.class.equals(parameterTypes[2])
-                    && long.class.equals(parameterTypes[3])) {
+                    && long.class.equals(parameterTypes[3])
+                    && commissionParametersClass().equals(parameterTypes[4])) {
                 return method;
             }
         }
         throw new NoSuchMethodException("pairDeviceThroughBLE");
+    }
+
+    public void invokePairDeviceThroughBle(
+            Object controller,
+            BluetoothGatt bleServer,
+            int connId,
+            long deviceId,
+            long setupPin,
+            Object commissionParameters) throws ReflectiveOperationException {
+        pairDeviceThroughBleMethod().invoke(controller, bleServer, connId, deviceId, setupPin, commissionParameters);
     }
 
     public Method openPairingWindowWithPinCallbackMethod() throws NoSuchMethodException {
@@ -83,6 +94,28 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 int.class,
                 Long.class,
                 openCommissioningCallbackClass);
+    }
+
+    public ConnectedHomeIpOpenCommissioningWindowCallback newOpenCommissioningWindowCallback(
+            String controllerState) {
+        return new ConnectedHomeIpOpenCommissioningWindowCallback(openCommissioningCallbackClass, controllerState);
+    }
+
+    public boolean invokeOpenPairingWindowWithPinCallback(
+            Object controller,
+            long devicePtr,
+            ConnectedHomeIpOpenCommissioningWindowRequest request,
+            Long setupPinCode,
+            Object callbackProxy) throws ReflectiveOperationException {
+        Object result = openPairingWindowWithPinCallbackMethod().invoke(
+                controller,
+                devicePtr,
+                request.timeoutSeconds(),
+                request.iteration(),
+                request.discriminator(),
+                setupPinCode,
+                callbackProxy);
+        return Boolean.TRUE.equals(result);
     }
 
     private static Method findSingleParameterMethod(Class<?> targetClass, String name) throws NoSuchMethodException {
@@ -108,5 +141,13 @@ public final class ConnectedHomeIpReflectionCommandFactory {
             throw new IllegalArgumentException(name + " is required");
         }
         return type;
+    }
+
+    private Class<?> commissionParametersClass() {
+        Class<?> declaringClass = commissionParametersBuilderClass.getDeclaringClass();
+        if (declaringClass == null) {
+            throw new IllegalStateException("CommissionParameters.Builder must be a nested class");
+        }
+        return declaringClass;
     }
 }
