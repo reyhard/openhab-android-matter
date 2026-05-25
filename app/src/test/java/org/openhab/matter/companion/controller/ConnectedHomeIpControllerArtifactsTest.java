@@ -42,11 +42,20 @@ public class ConnectedHomeIpControllerArtifactsTest {
                 "chip.devicecontroller.ChipDeviceController",
                 "chip.devicecontroller.ControllerParams",
                 "chip.devicecontroller.NetworkCredentials",
+                "chip.devicecontroller.NetworkCredentials$ThreadCredentials",
                 "chip.devicecontroller.CommissionParameters",
+                "chip.devicecontroller.DeviceAttestationDelegate",
                 "chip.devicecontroller.OpenCommissioningCallback",
+                "chip.devicecontroller.GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback",
                 "chip.platform.AndroidChipPlatform",
                 "chip.platform.AndroidBleManager",
-                "chip.platform.NsdManagerServiceResolver"), checkedClassNames);
+                "chip.platform.AndroidNfcCommissioningManager",
+                "chip.platform.PreferencesKeyValueStoreManager",
+                "chip.platform.PreferencesConfigurationManager",
+                "chip.platform.NsdManagerServiceResolver",
+                "chip.platform.NsdManagerServiceBrowser",
+                "chip.platform.ChipMdnsCallbackImpl",
+                "chip.platform.DiagnosticDataProviderImpl"), checkedClassNames);
     }
     @Test
     public void reportsMissingClass() {

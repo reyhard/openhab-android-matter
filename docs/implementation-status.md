@@ -18,6 +18,7 @@
 - Persisted developer attestation bypass setting is exposed in the UI and passed into native CHIP commissioning requests.
 - Encrypted app-private bootstrap controller state repository stores the bootstrap node id and reserves an encrypted opaque controller-state slot.
 - Stateful native CHIP command contract passes attestation-bypass intent plus opaque controller state into and out of commissioning and OCW calls.
+- Java-side connectedhomeip controller command seam maps this app's `MatterController` commands to a future `ChipDeviceController` gateway, including Thread dataset, PIN, discriminator, attestation bypass, controller state, and OCW iteration inputs.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
@@ -31,7 +32,7 @@
 
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
-- Java-side controller orchestration for `AndroidChipPlatform`, `ChipDeviceController.pairDeviceThroughBLE(...)`, and `openPairingWindowWithPINCallback(...)`.
+- Concrete Java-side controller gateway for `AndroidChipPlatform`, BLE scan/connect, `ChipDeviceController.pairDeviceThroughBLE(...)`, attestation continuation, and `openPairingWindowWithPINCallback(...)`.
 - Real connectedhomeip Matter fabric key persistence and restore; the Java bridge and encrypted repository can carry opaque state, but the packaged native stub does not emit or consume real fabric material.
 
 ## Production Replacement Seam

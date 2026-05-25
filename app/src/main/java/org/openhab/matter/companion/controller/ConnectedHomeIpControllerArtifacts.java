@@ -6,11 +6,20 @@ public final class ConnectedHomeIpControllerArtifacts {
             "chip.devicecontroller.ChipDeviceController",
             "chip.devicecontroller.ControllerParams",
             "chip.devicecontroller.NetworkCredentials",
+            "chip.devicecontroller.NetworkCredentials$ThreadCredentials",
             "chip.devicecontroller.CommissionParameters",
+            "chip.devicecontroller.DeviceAttestationDelegate",
             "chip.devicecontroller.OpenCommissioningCallback",
+            "chip.devicecontroller.GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback",
             "chip.platform.AndroidChipPlatform",
             "chip.platform.AndroidBleManager",
-            "chip.platform.NsdManagerServiceResolver"
+            "chip.platform.AndroidNfcCommissioningManager",
+            "chip.platform.PreferencesKeyValueStoreManager",
+            "chip.platform.PreferencesConfigurationManager",
+            "chip.platform.NsdManagerServiceResolver",
+            "chip.platform.NsdManagerServiceBrowser",
+            "chip.platform.ChipMdnsCallbackImpl",
+            "chip.platform.DiagnosticDataProviderImpl"
     };
 
     private final ClassLookup classLookup;

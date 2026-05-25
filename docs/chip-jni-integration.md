@@ -95,7 +95,31 @@ The local connectedhomeip checkout shows the expected prebuilt packaging seam, b
 - `src/controller/java/BUILD.gn` builds the Android JNI shared library with `output_name = "libCHIPController"`.
 - `scripts/build/builders/android.py` copies `libCHIPController.so`, `libc++_shared.so`, `CHIPController.jar`, `CHIPInteractionModel.jar`, `CHIPClusterID.jar`, `CHIPClusters.jar`, `AndroidPlatform.jar`, `OnboardingPayload.jar`, `libMatterTlv.jar`, and `libMatterJson.jar` for CHIPTool Android prebuilts.
 
-Runtime diagnostics should require the Java classes used by CHIPTool (`chip.devicecontroller.ChipDeviceController`, `chip.devicecontroller.NetworkCredentials`, `chip.devicecontroller.CommissionParameters`, `chip.devicecontroller.OpenCommissioningCallback`, and `chip.platform.AndroidChipPlatform`) and successful loading of `libCHIPController.so`.
+Runtime diagnostics require the Java classes used by CHIPTool for platform initialization, Thread credentials, attestation continuation, connected-device lookup, OCW callbacks, and successful loading of `libCHIPController.so`.
+
+## Java Controller Seam
+
+`ConnectedHomeIpMatterController` is the Java-side sibling of `ChipMatterController`. It implements this app's `MatterController` interface and maps commands into a `ConnectedHomeIpControllerGateway`:
+
+- `commissionBleThread(...)` maps Thread dataset hex, setup PIN, discriminator, developer attestation-bypass setting, and opaque controller state into `ConnectedHomeIpCommissioningRequest`.
+- `openCommissioningWindow(...)` maps node ID, timeout, discriminator, opaque controller state, and the CHIPTool-equivalent enhanced commissioning-window iteration `1000` into `ConnectedHomeIpOpenCommissioningWindowRequest`.
+- Before each command, it checks `ConnectedHomeIpControllerArtifacts` so missing `CHIPController.jar` classes or `libCHIPController.so` fail before gateway calls.
+
+The concrete Android gateway is still the next production step. It must initialize `AndroidChipPlatform`, create or restore `ChipDeviceController`, scan/connect BLE for the setup discriminator, call `NetworkCredentials.forThread(...)`, call `pairDeviceThroughBLE(...)`, handle attestation continuation according to the persisted bypass flag, then use `openPairingWindowWithPINCallback(...)` to return the manual or QR setup code for openHAB.
+
+## CHIPTool Java API Targets
+
+Local connectedhomeip evidence from `D:\Source\connectedhomeip` shows the concrete APIs the gateway should call:
+
+- `ChipDeviceController.loadJni()` before constructing `AndroidChipPlatform`.
+- `new AndroidChipPlatform(AndroidBleManager, AndroidNfcCommissioningManager, PreferencesKeyValueStoreManager, PreferencesConfigurationManager, NsdManagerServiceResolver, NsdManagerServiceBrowser, ChipMdnsCallbackImpl, DiagnosticDataProviderImpl)`.
+- `new ChipDeviceController(ControllerParams.newBuilder().setControllerVendorId(0xFFF4).setEnableServerInteractions(true).build())`.
+- BLE scan/connect should follow CHIPTool's `BluetoothManager.connect(...)`: after `BluetoothDevice.connectGatt(...)`, call `AndroidBleManager.addConnection(bleGatt)` to obtain the connection id and `setBleCallback(...)`.
+- Thread credentials should be created with `NetworkCredentials.forThread(new NetworkCredentials.ThreadCredentials(operationalDatasetBytes))`.
+- Commissioning parameters should be created with `new CommissionParameters.Builder().setCsrNonce(null).setNetworkCredentials(networkCredentials).setICDRegistrationInfo(null).build()`.
+- BLE Thread commissioning should call `ChipDeviceController.pairDeviceThroughBLE(BluetoothGatt bleServer, int connId, long deviceId, long setupPincode, CommissionParameters params)`.
+- Attestation bypass should use `setDeviceAttestationDelegate(int failSafeExpiryTimeoutSecs, DeviceAttestationDelegate delegate)` and call `continueCommissioning(devicePtr, true)` only when the persisted developer bypass flag is enabled.
+- OCW should first acquire a connected device pointer, then call `openPairingWindowWithPINCallback(long devicePtr, int duration, long iteration, int discriminator, Long setupPinCode, OpenCommissioningCallback callback)` and use `OpenCommissioningCallback.onSuccess(long deviceId, String manualPairingCode, String qrCode)`.
 
 The local connectedhomeip Android APIs that the production bridge should mirror are:
 
