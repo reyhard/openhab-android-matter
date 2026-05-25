@@ -40,6 +40,17 @@ public class QrScanIntentFactoryTest {
     }
 
     @Test
+    public void validatesManualMatterHandoffScanResult() {
+        assertEquals("34970112332",
+                QrScanIntentFactory.extractMatterSetupPayloadText("  3497-0112-332  "));
+    }
+
+    @Test
+    public void rejectsInvalidManualMatterHandoffScanResult() {
+        assertEquals("", QrScanIntentFactory.extractMatterSetupPayloadText("34970112333"));
+    }
+
+    @Test
     public void createsInAppScanResultIntent() {
         Intent data = QrScanIntentFactory.createScanResultIntent("  MT:Y.K9042C00KA0648G00  ");
 

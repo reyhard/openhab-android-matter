@@ -8,6 +8,7 @@ This branch builds an installable Android APK with:
 
 - Thread dataset validation.
 - Matter setup payload validation for explicit `pin=...;disc=...` input.
+- Wi-Fi/multi-admin openHAB handoff validation for Matter QR payloads and Verhoeff-validated 11- or 21-digit manual setup codes.
 - Local Matter `MT:` QR setup payload decoding for PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.
 - openHAB REST readiness checking via the configured base URL.
 - openHAB Inbox observation via `/rest/inbox` to report whether a Matter Inbox entry is visible.

@@ -36,6 +36,7 @@ import org.openhab.matter.companion.controller.MatterControllerSelector;
 import org.openhab.matter.companion.controller.MatterOpenCommissioningWindowResult;
 import org.openhab.matter.companion.controller.NativeChipControllerSession;
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository;
+import org.openhab.matter.companion.domain.MatterHandoffCodeParser;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
 import org.openhab.matter.companion.domain.OpenHabInstructions;
@@ -397,9 +398,12 @@ public final class MainActivity extends Activity {
     }
 
     private void showWifiInstructions() {
-        state.setupPayload = payloadInput.getText().toString();
-        if (state.setupPayload == null || state.setupPayload.trim().isEmpty()) {
-            append("Paste or enter a Matter setup or multi-admin code first.");
+        String candidate = payloadInput.getText().toString();
+        try {
+            state.setupPayload = MatterHandoffCodeParser.parseForOpenHabScanInput(candidate);
+            payloadInput.setText(state.setupPayload);
+        } catch (IllegalArgumentException ex) {
+            append("Enter a Matter QR payload or 11- or 21-digit manual setup/multi-admin code for openHAB Scan Input.");
             return;
         }
 

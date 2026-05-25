@@ -44,7 +44,7 @@ public class MatterQrPayloadParserTest {
         assertThrows(IllegalArgumentException.class, () -> MatterSetupPayloadParser.parse(qrPayloadWithPin(100000000)));
     }
 
-    private static String qrPayloadWithPin(long pin) {
+    static String qrPayloadWithPin(long pin) {
         byte[] bytes = new byte[11];
         writeBits(bytes, 0, 3, 0);
         writeBits(bytes, 3, 16, 65521);

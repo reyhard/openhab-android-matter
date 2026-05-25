@@ -2,7 +2,7 @@ package org.openhab.matter.companion.qr;
 
 import android.content.Intent;
 
-import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
+import org.openhab.matter.companion.domain.MatterHandoffCodeParser;
 
 public final class QrScanIntentFactory {
     private QrScanIntentFactory() {
@@ -59,8 +59,7 @@ public final class QrScanIntentFactory {
             return "";
         }
         try {
-            MatterSetupPayloadParser.parse(scanResult);
-            return scanResult;
+            return MatterHandoffCodeParser.parseForOpenHabScanInput(scanResult);
         } catch (IllegalArgumentException ex) {
             return "";
         }
