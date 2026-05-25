@@ -50,12 +50,12 @@ public final class ChipMatterControllerReadinessTest {
             }
 
             @Override
-            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+            public NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request) {
                 throw new AssertionError("stub commissioning must not be called");
             }
 
             @Override
-            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+            public NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request) {
                 throw new AssertionError("stub OCW must not be called");
             }
         };
@@ -82,13 +82,13 @@ public final class ChipMatterControllerReadinessTest {
             }
 
             @Override
-            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
-                return 1234L;
+            public NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request) {
+                return new NativeCommissioningResult(1234L, request.controllerState());
             }
 
             @Override
-            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
-                return "MT:PRODUCTION";
+            public NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request) {
+                return new NativeOpenCommissioningWindowResult("MT:PRODUCTION", request.controllerState());
             }
         };
 
@@ -118,19 +118,20 @@ public final class ChipMatterControllerReadinessTest {
             }
 
             @Override
-            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+            public NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request) {
                 throw new UnsatisfiedLinkError("missing nativeCommissionBleThread");
             }
 
             @Override
-            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
-                return "MT:PRODUCTION";
+            public NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request) {
+                return new NativeOpenCommissioningWindowResult("MT:PRODUCTION", request.controllerState());
             }
         }, ChipMatterControllerConfig.defaultConfig());
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> controller.commissionBleThread(
                 ThreadDataset.parse("0E080000000000010000"),
                 new MatterSetupPayload("pin=20202021;disc=3840", 20202021L, 3840, "Aqara", "U200", false),
+                "incoming-controller-state",
                 ignored -> { }));
 
         assertTrue(exception.getMessage().contains("Native CHIP controller entry point is missing"));
@@ -151,13 +152,13 @@ public final class ChipMatterControllerReadinessTest {
             }
 
             @Override
-            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
-                return 1234L;
+            public NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request) {
+                return new NativeCommissioningResult(1234L, request.controllerState());
             }
 
             @Override
-            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
-                return "MT:PRODUCTION";
+            public NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request) {
+                return new NativeOpenCommissioningWindowResult("MT:PRODUCTION", request.controllerState());
             }
         }, ChipMatterControllerConfig.defaultConfig());
 
@@ -190,13 +191,13 @@ public final class ChipMatterControllerReadinessTest {
             }
 
             @Override
-            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
-                return 1234L;
+            public NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request) {
+                return new NativeCommissioningResult(1234L, request.controllerState());
             }
 
             @Override
-            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
-                return "MT:PRODUCTION";
+            public NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request) {
+                return new NativeOpenCommissioningWindowResult("MT:PRODUCTION", request.controllerState());
             }
         };
     }

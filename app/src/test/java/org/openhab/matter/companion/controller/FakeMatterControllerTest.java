@@ -16,12 +16,14 @@ public class FakeMatterControllerTest {
     public void commissionsThreadDeviceAndReturnsNodeId() throws Exception {
         MatterController controller = new FakeMatterController();
         List<CommissioningStep> steps = new ArrayList<>();
-        long nodeId = controller.commissionBleThread(
+        MatterCommissioningResult result = controller.commissionBleThread(
                 ThreadDataset.parse("0E080000000000010000"),
                 new MatterSetupPayload("pin=20202021;disc=3840", 20202021L, 3840, "Aqara", "U200", false),
+                "incoming-controller-state",
                 steps::add);
 
-        assertEquals(1L, nodeId);
+        assertEquals(1L, result.nodeId());
+        assertEquals("fake-controller-state:1", result.controllerState());
         assertEquals("Simulated: Thread network join completed", steps.get(steps.size() - 1).message());
     }
 
@@ -32,6 +34,7 @@ public class FakeMatterControllerTest {
         controller.commissionBleThread(
                 ThreadDataset.parse("0E080000000000010000"),
                 new MatterSetupPayload("pin=20202021;disc=3840", 20202021L, 3840, "Aqara", "U200", false),
+                "incoming-controller-state",
                 steps::add);
 
         for (CommissioningStep step : steps) {
@@ -44,7 +47,13 @@ public class FakeMatterControllerTest {
     @Test
     public void opensCommissioningWindowWithTemporaryCode() throws Exception {
         MatterController controller = new FakeMatterController();
-        String code = controller.openCommissioningWindow(1L, 300, 3840, ignored -> { });
-        assertTrue(code.matches("\\d{4}-\\d{4}-\\d{3}"));
+        MatterOpenCommissioningWindowResult result = controller.openCommissioningWindow(
+                1L,
+                300,
+                3840,
+                "incoming-controller-state",
+                ignored -> { });
+        assertTrue(result.temporaryCode().matches("\\d{4}-\\d{4}-\\d{3}"));
+        assertEquals("fake-controller-state:1", result.controllerState());
     }
 }

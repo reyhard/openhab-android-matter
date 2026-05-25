@@ -27,8 +27,10 @@ import org.openhab.matter.companion.controller.MatterController;
 import org.openhab.matter.companion.controller.MatterBootstrapState;
 import org.openhab.matter.companion.controller.MatterBootstrapStateRepository;
 import org.openhab.matter.companion.controller.MatterBootstrapStateResolver;
+import org.openhab.matter.companion.controller.MatterCommissioningResult;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.controller.MatterControllerSelector;
+import org.openhab.matter.companion.controller.MatterOpenCommissioningWindowResult;
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
@@ -309,6 +311,8 @@ public final class MainActivity extends Activity {
         }
 
         MatterController selectedController = controller;
+        MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
+        String controllerState = bootstrapState.controllerState();
         append(nativeMatterControllerSelected
                 ? "Starting native CHIP Thread commissioning."
                 : "Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
@@ -316,10 +320,14 @@ public final class MainActivity extends Activity {
         append(payloadSummary(payload));
         new Thread(() -> {
             try {
-                long nodeId = selectedController.commissionBleThread(dataset, payload, step -> appendFromWorker(step.message()));
+                MatterCommissioningResult result = selectedController.commissionBleThread(
+                        dataset,
+                        payload,
+                        controllerState,
+                        step -> appendFromWorker(step.message()));
                 runOnUiThread(() -> {
-                    state.commissionedNodeId = nodeId;
-                    saveBootstrapState(nodeId);
+                    state.commissionedNodeId = result.nodeId();
+                    saveBootstrapState(result.nodeId(), result.controllerState());
                     append("Bootstrap node id: " + state.commissionedNodeId);
                 });
             } catch (Exception ex) {
@@ -337,15 +345,19 @@ public final class MainActivity extends Activity {
 
         MatterController selectedController = controller;
         long nodeId = state.commissionedNodeId;
+        MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
+        String controllerState = bootstrapState.controllerState();
         append(nativeMatterControllerSelected
                 ? "Opening native CHIP commissioning window."
                 : "Opening a simulated commissioning window. This does not call a real Matter controller.");
         new Thread(() -> {
             try {
-                String temporaryCode = selectedController.openCommissioningWindow(nodeId, 300, 3840,
+                MatterOpenCommissioningWindowResult result = selectedController.openCommissioningWindow(nodeId, 300, 3840,
+                        controllerState,
                         step -> appendFromWorker(step.message()));
                 runOnUiThread(() -> {
-                    state.temporaryCode = temporaryCode;
+                    state.temporaryCode = result.temporaryCode();
+                    saveBootstrapState(nodeId, result.controllerState());
                     append(OpenHabInstructions.scanInputInstructions(state.temporaryCode));
                     append(OpenHabInstructions.troubleshooting());
                 });
@@ -670,9 +682,10 @@ public final class MainActivity extends Activity {
         persistedBootstrapStateUnreadable = persistedBootstrapState.stateUnreadable();
     }
 
-    private void saveBootstrapState(long nodeId) {
+    private void saveBootstrapState(long nodeId, String controllerState) {
         try {
-            bootstrapStateRepository.save(new MatterBootstrapState(nodeId, "", false));
+            persistedBootstrapState = new MatterBootstrapState(nodeId, controllerState, false);
+            bootstrapStateRepository.save(persistedBootstrapState);
         } catch (IllegalStateException ex) {
             append("Matter bootstrap controller state could not be saved. Re-run Thread commissioning if the app restarts before opening a commissioning window.");
         }

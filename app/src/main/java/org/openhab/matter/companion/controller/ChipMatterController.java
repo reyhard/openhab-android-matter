@@ -27,31 +27,51 @@ public final class ChipMatterController implements MatterController {
     }
 
     @Override
-    public long commissionBleThread(ThreadDataset dataset, MatterSetupPayload payload, ProgressListener listener) {
+    public MatterCommissioningResult commissionBleThread(
+            ThreadDataset dataset,
+            MatterSetupPayload payload,
+            String controllerState,
+            ProgressListener listener) {
         requireReady();
         emit(listener, "Starting CHIP BLE Thread commissioning", false);
-        long nodeId;
+        NativeCommissioningResult result;
         try {
-            nodeId = bridge.commissionBleThread(dataset.hex(), payload.pin(), payload.discriminator());
+            NativeCommissioningRequest request = new NativeCommissioningRequest(
+                    dataset.hex(),
+                    payload.pin(),
+                    payload.discriminator(),
+                    config.attestationBypassEnabled(),
+                    controllerState);
+            result = bridge.commissionBleThread(request);
         } catch (UnsatisfiedLinkError error) {
             throw new IllegalStateException("Native CHIP controller entry point is missing: " + error.getMessage(), error);
         }
-        emit(listener, "CHIP BLE Thread commissioning complete for node " + nodeId, true);
-        return nodeId;
+        emit(listener, "CHIP BLE Thread commissioning complete for node " + result.nodeId(), true);
+        return new MatterCommissioningResult(result.nodeId(), result.controllerState());
     }
 
     @Override
-    public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator, ProgressListener listener) {
+    public MatterOpenCommissioningWindowResult openCommissioningWindow(
+            long nodeId,
+            int timeoutSeconds,
+            int discriminator,
+            String controllerState,
+            ProgressListener listener) {
         requireReady();
         emit(listener, "Opening CHIP commissioning window", false);
-        String code;
+        NativeOpenCommissioningWindowResult result;
         try {
-            code = bridge.openCommissioningWindow(nodeId, timeoutSeconds, discriminator);
+            NativeOpenCommissioningWindowRequest request = new NativeOpenCommissioningWindowRequest(
+                    nodeId,
+                    timeoutSeconds,
+                    discriminator,
+                    controllerState);
+            result = bridge.openCommissioningWindow(request);
         } catch (UnsatisfiedLinkError error) {
             throw new IllegalStateException("Native CHIP controller entry point is missing: " + error.getMessage(), error);
         }
         emit(listener, "CHIP commissioning window opened", true);
-        return code;
+        return new MatterOpenCommissioningWindowResult(result.temporaryCode(), result.controllerState());
     }
 
     private synchronized void requireReady() {
@@ -121,13 +141,13 @@ public final class ChipMatterController implements MatterController {
         }
 
         @Override
-        public long commissionBleThread(String datasetHex, long pin, int discriminator) {
-            return delegate.commissionBleThread(datasetHex, pin, discriminator);
+        public NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request) {
+            return delegate.commissionBleThread(request);
         }
 
         @Override
-        public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
-            return delegate.openCommissioningWindow(nodeId, timeoutSeconds, discriminator);
+        public NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request) {
+            return delegate.openCommissioningWindow(request);
         }
     }
 }

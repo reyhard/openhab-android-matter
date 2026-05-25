@@ -86,13 +86,13 @@ public final class MatterControllerSelectorTest {
             }
 
             @Override
-            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
-                return 1234L;
+            public NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request) {
+                return new NativeCommissioningResult(1234L, request.controllerState());
             }
 
             @Override
-            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
-                return "MT:PRODUCTION";
+            public NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request) {
+                return new NativeOpenCommissioningWindowResult("MT:PRODUCTION", request.controllerState());
             }
         };
     }
@@ -109,12 +109,12 @@ public final class MatterControllerSelectorTest {
             }
 
             @Override
-            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+            public NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request) {
                 throw new AssertionError("selector must not call commissioning");
             }
 
             @Override
-            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+            public NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request) {
                 throw new AssertionError("selector must not call OCW");
             }
         };

@@ -5,7 +5,7 @@ public interface NativeChipBridge {
 
     String metadata();
 
-    long commissionBleThread(String datasetHex, long pin, int discriminator);
+    NativeCommissioningResult commissionBleThread(NativeCommissioningRequest request);
 
-    String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator);
+    NativeOpenCommissioningWindowResult openCommissioningWindow(NativeOpenCommissioningWindowRequest request);
 }

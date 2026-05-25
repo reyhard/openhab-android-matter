@@ -9,7 +9,16 @@ public interface MatterController {
         void onProgress(CommissioningStep step);
     }
 
-    long commissionBleThread(ThreadDataset dataset, MatterSetupPayload payload, ProgressListener listener) throws Exception;
+    MatterCommissioningResult commissionBleThread(
+            ThreadDataset dataset,
+            MatterSetupPayload payload,
+            String controllerState,
+            ProgressListener listener) throws Exception;
 
-    String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator, ProgressListener listener) throws Exception;
+    MatterOpenCommissioningWindowResult openCommissioningWindow(
+            long nodeId,
+            int timeoutSeconds,
+            int discriminator,
+            String controllerState,
+            ProgressListener listener) throws Exception;
 }

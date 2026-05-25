@@ -19,15 +19,17 @@ Java_org_openhab_matter_companion_controller_SystemNativeChipBridge_nativeContro
             "kind=stub;version=0.1.0;production=false;message=JNI bridge stub packaged without connectedhomeip controller");
 }
 
-extern "C" JNIEXPORT jlong JNICALL
+extern "C" JNIEXPORT jstring JNICALL
 Java_org_openhab_matter_companion_controller_SystemNativeChipBridge_nativeCommissionBleThread(
         JNIEnv *env,
         jclass,
         jstring,
         jlong,
-        jint) {
+        jint,
+        jboolean,
+        jstring) {
     ThrowUnsupportedOperation(env, "connectedhomeip commissioning is not implemented in the packaged JNI stub");
-    return 0;
+    return nullptr;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -36,7 +38,8 @@ Java_org_openhab_matter_companion_controller_SystemNativeChipBridge_nativeOpenCo
         jclass,
         jlong,
         jint,
-        jint) {
+        jint,
+        jstring) {
     ThrowUnsupportedOperation(env, "connectedhomeip OpenCommissioningWindow is not implemented in the packaged JNI stub");
     return nullptr;
 }
