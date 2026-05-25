@@ -101,6 +101,19 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1
 
 The helper runs the offline unit tests and debug APK build, verifies `app\build\outputs\apk\debug\app-debug.apk`, lists ready ADB devices, and installs only when exactly one device/emulator is attached. If multiple devices are attached, pass `-Serial <device-id>`. If the APK is already built and you only want the ADB check/install step, pass `-SkipBuild`.
 
+To verify package readiness without an attached device, stop before ADB with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1 -PreflightOnly
+```
+
+The same helper can build artifact-specific variants by forwarding Gradle properties:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1 -PreflightOnly -ChipControllerArtifactsDir <artifact-dir>
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1 -PreflightOnly -ChipNativeMode prebuilt -ChipPrebuiltDir <prebuilt-dir>
+```
+
 ## Real connectedhomeip Controller Work
 
 The selectable connectedhomeip Java controller path now wires the app to reflection-backed equivalents of:

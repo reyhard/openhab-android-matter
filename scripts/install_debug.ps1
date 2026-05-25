@@ -4,7 +4,12 @@ param(
     [string] $AdbPath = "",
     [string] $ApkPath = "",
     [string] $Serial = "",
-    [switch] $SkipBuild
+    [string] $ChipControllerArtifactsDir = "",
+    [string] $ChipControllerAbis = "",
+    [string] $ChipNativeMode = "",
+    [string] $ChipPrebuiltDir = "",
+    [switch] $SkipBuild,
+    [switch] $PreflightOnly
 )
 
 Set-StrictMode -Version Latest
@@ -71,11 +76,24 @@ if (-not $SkipBuild) {
     if (-not (Test-Path -LiteralPath $GradlePath -PathType Leaf)) {
         Exit-With 10 "Gradle wrapper not found: $GradlePath"
     }
+    $gradleArgs = @(":app:testDebugUnitTest", ":app:assembleDebug", "--offline")
+    if (-not [string]::IsNullOrWhiteSpace($ChipControllerArtifactsDir)) {
+        $gradleArgs += "-PopenhabMatterChipControllerArtifactsDir=$ChipControllerArtifactsDir"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ChipControllerAbis)) {
+        $gradleArgs += "-PopenhabMatterChipControllerAbis=$ChipControllerAbis"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ChipNativeMode)) {
+        $gradleArgs += "-PopenhabMatterChipNativeMode=$ChipNativeMode"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ChipPrebuiltDir)) {
+        $gradleArgs += "-PopenhabMatterChipPrebuiltDir=$ChipPrebuiltDir"
+    }
     Push-Location $resolvedProjectRoot
     try {
         Invoke-Checked `
             -Command $GradlePath `
-            -Arguments @(":app:testDebugUnitTest", ":app:assembleDebug", "--offline") `
+            -Arguments $gradleArgs `
             -FailureCode 10 `
             -FailureMessage "Gradle build or tests failed."
     } finally {
@@ -92,6 +110,11 @@ if ($apk.Length -le 0) {
     Exit-With 11 "Debug APK is empty: $ApkPath"
 }
 Write-Output ("Debug APK ready: {0} ({1} bytes)" -f $apk.FullName, $apk.Length)
+
+if ($PreflightOnly) {
+    Write-Output "Preflight complete. Debug APK is ready; install step was skipped."
+    exit 0
+}
 
 $deviceOutput = & $AdbPath devices 2>&1
 if ($LASTEXITCODE -ne 0) {
