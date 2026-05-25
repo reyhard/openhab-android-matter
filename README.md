@@ -22,6 +22,7 @@ This branch builds an installable Android APK with:
 - Legacy native bridge command contract carries attestation-bypass intent and opaque controller state through commissioning and OpenCommissioningWindow results.
 - Native in-app Matter QR scanning using CameraX and ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
+- Camera and location hardware features are marked optional so manual-entry and non-camera flows can install on headless emulators or devices without those features.
 - Native Matter controller readiness diagnostics check the selectable connectedhomeip Java controller path and keep the simulated controller selected when artifacts or initialization are not ready.
 - A packaged JNI stub verifies Android native-library packaging, but it reports `production=false` and is never selected for real commissioning.
 - Runtime controller selection can switch from the simulated controller to the reflection-backed connectedhomeip Java controller when official connectedhomeip Android artifacts are bundled and readiness passes.
@@ -83,6 +84,12 @@ Run the synthetic artifact validation smoke test with:
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\test_connectedhomeip_artifacts.ps1
+```
+
+Run the APK badging smoke test with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\test_apk_badging.ps1
 ```
 
 The APK is written to:

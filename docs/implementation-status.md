@@ -33,6 +33,7 @@
 - Connectedhomeip artifact readiness checks use non-initializing class lookup, include reflected nested classes and BLE callback classes, and report linkage/inspection failures as not-ready fallback instead of crashing the app.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
+- Camera and location hardware features are declared optional in the APK manifest and checked by an offline `aapt dump badging` smoke test.
 - Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
 - Debug APK packages a JNI stub `libopenhab_matter_chip.so` for native loading and metadata verification.
 - Gradle can package ABI-specific prebuilt `libopenhab_matter_chip.so` replacements instead of the bundled JNI stub.
