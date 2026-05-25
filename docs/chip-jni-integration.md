@@ -59,6 +59,44 @@ Then build with:
 
 The prebuilt library must return `kind=connectedhomeip;production=true` from `nativeControllerMetadata()` or the Java selector will keep using the simulated controller.
 
+## Official connectedhomeip Android Controller Artifacts
+
+The connectedhomeip Android Java stack uses CHIPTool-style jar and native artifacts in addition to any app-specific bridge library. To package those artifacts for the future Java-side controller integration, build with:
+
+```powershell
+.\gradlew.bat :app:assembleDebug --offline "-PopenhabMatterChipControllerArtifactsDir=<artifact-dir>"
+```
+
+The artifact directory must use this layout:
+
+```text
+<artifact-dir>/CHIPController.jar
+<artifact-dir>/CHIPInteractionModel.jar
+<artifact-dir>/CHIPClusterID.jar
+<artifact-dir>/CHIPClusters.jar
+<artifact-dir>/AndroidPlatform.jar
+<artifact-dir>/OnboardingPayload.jar
+<artifact-dir>/libMatterTlv.jar
+<artifact-dir>/libMatterJson.jar
+<artifact-dir>/jniLibs/arm64-v8a/libCHIPController.so
+<artifact-dir>/jniLibs/arm64-v8a/libc++_shared.so
+<artifact-dir>/jniLibs/armeabi-v7a/libCHIPController.so
+<artifact-dir>/jniLibs/armeabi-v7a/libc++_shared.so
+<artifact-dir>/jniLibs/x86/libCHIPController.so
+<artifact-dir>/jniLibs/x86/libc++_shared.so
+<artifact-dir>/jniLibs/x86_64/libCHIPController.so
+<artifact-dir>/jniLibs/x86_64/libc++_shared.so
+```
+
+The local connectedhomeip checkout shows the expected prebuilt packaging seam, but does not contain binaries in `D:\Source\connectedhomeip\examples\android\CHIPTool\app\libs` in this workspace:
+
+- `examples/android/CHIPTool/app/build.gradle` uses `implementation fileTree(dir: "libs", include: ["*.jar", "*.so"])` for prebuilt mode.
+- `examples/android/CHIPTool/app/build.gradle` uses `jniLibs.srcDirs = ['libs/jniLibs']` for prebuilt native libraries.
+- `src/controller/java/BUILD.gn` builds the Android JNI shared library with `output_name = "libCHIPController"`.
+- `scripts/build/builders/android.py` copies `libCHIPController.so`, `libc++_shared.so`, `CHIPController.jar`, `CHIPInteractionModel.jar`, `CHIPClusterID.jar`, `CHIPClusters.jar`, `AndroidPlatform.jar`, `OnboardingPayload.jar`, `libMatterTlv.jar`, and `libMatterJson.jar` for CHIPTool Android prebuilts.
+
+Runtime diagnostics should require the Java classes used by CHIPTool (`chip.devicecontroller.ChipDeviceController`, `chip.devicecontroller.NetworkCredentials`, `chip.devicecontroller.CommissionParameters`, `chip.devicecontroller.OpenCommissioningCallback`, and `chip.platform.AndroidChipPlatform`) and successful loading of `libCHIPController.so`.
+
 The local connectedhomeip Android APIs that the production bridge should mirror are:
 
 - `ChipDeviceController.pairDeviceThroughBLE(...)` with `NetworkCredentials.forThread(...)` for BLE Thread commissioning.

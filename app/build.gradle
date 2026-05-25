@@ -5,6 +5,27 @@ plugins {
 def chipNativeMode = (findProperty("openhabMatterChipNativeMode") ?: "stub").toString().trim()
 def chipPrebuiltDir = (findProperty("openhabMatterChipPrebuiltDir") ?: "").toString().trim()
 def chipSupportedAbis = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
+def chipControllerArtifactsDir = (findProperty("openhabMatterChipControllerArtifactsDir") ?: "").toString().trim()
+def chipControllerSupportedAbis = (findProperty("openhabMatterChipControllerAbis")
+        ?: "arm64-v8a;armeabi-v7a;x86;x86_64")
+        .toString()
+        .split(";")
+        .collect { it.trim() }
+        .findAll { !it.isEmpty() }
+def chipControllerRequiredJars = [
+        "CHIPController.jar",
+        "CHIPInteractionModel.jar",
+        "CHIPClusterID.jar",
+        "CHIPClusters.jar",
+        "AndroidPlatform.jar",
+        "OnboardingPayload.jar",
+        "libMatterTlv.jar",
+        "libMatterJson.jar"
+]
+def chipControllerRequiredNativeLibraries = [
+        "libCHIPController.so",
+        "libc++_shared.so"
+]
 
 if (!["stub", "prebuilt"].contains(chipNativeMode)) {
     throw new GradleException("openhabMatterChipNativeMode must be 'stub' or 'prebuilt'.")
@@ -43,6 +64,14 @@ android {
             }
         }
     }
+
+    if (!chipControllerArtifactsDir.isEmpty()) {
+        sourceSets {
+            main {
+                jniLibs.srcDir file(new File(file(chipControllerArtifactsDir), "jniLibs"))
+            }
+        }
+    }
 }
 
 tasks.register("verifyOpenhabMatterChipNativeInputs") {
@@ -69,7 +98,37 @@ tasks.register("verifyOpenhabMatterChipNativeInputs") {
     }
 }
 
+tasks.register("verifyConnectedHomeIpControllerArtifacts") {
+    doLast {
+        if (chipControllerArtifactsDir.isEmpty()) {
+            return
+        }
+        if (chipControllerSupportedAbis.isEmpty()) {
+            throw new GradleException("openhabMatterChipControllerAbis must list at least one ABI.")
+        }
+        File root = file(chipControllerArtifactsDir)
+        if (!root.isDirectory()) {
+            throw new GradleException("connectedhomeip controller artifact directory does not exist: " + root)
+        }
+        chipControllerRequiredJars.each { jarName ->
+            File jar = new File(root, jarName)
+            if (!jar.isFile()) {
+                throw new GradleException("Missing connectedhomeip controller jar: " + jar)
+            }
+        }
+        chipControllerSupportedAbis.each { abi ->
+            chipControllerRequiredNativeLibraries.each { libName ->
+                File lib = new File(new File(new File(root, "jniLibs"), abi), libName)
+                if (!lib.isFile()) {
+                    throw new GradleException("Missing connectedhomeip controller native library: " + lib)
+                }
+            }
+        }
+    }
+}
+
 preBuild.dependsOn("verifyOpenhabMatterChipNativeInputs")
+preBuild.dependsOn("verifyConnectedHomeIpControllerArtifacts")
 
 dependencies {
     def camerax_version = "1.6.1"
@@ -83,4 +142,8 @@ dependencies {
 
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.robolectric:robolectric:4.16.1"
+
+    if (!chipControllerArtifactsDir.isEmpty()) {
+        implementation fileTree(dir: chipControllerArtifactsDir, include: ["*.jar"])
+    }
 }

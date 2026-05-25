@@ -23,6 +23,7 @@
 - Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
 - Debug APK packages a JNI stub `libopenhab_matter_chip.so` for native loading and metadata verification.
 - Gradle can package ABI-specific prebuilt `libopenhab_matter_chip.so` replacements instead of the bundled JNI stub.
+- Gradle can validate and package official CHIPTool-style connectedhomeip Android controller artifacts supplied as required jars plus ABI-specific `libCHIPController.so` and `libc++_shared.so` files.
 - Runtime controller selection can switch from the simulated controller to `ChipMatterController` only when a production native JNI library is bundled and readiness passes.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 
@@ -30,6 +31,7 @@
 
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
+- Java-side controller orchestration for `AndroidChipPlatform`, `ChipDeviceController.pairDeviceThroughBLE(...)`, and `openPairingWindowWithPINCallback(...)`.
 - Real connectedhomeip Matter fabric key persistence and restore; the Java bridge and encrypted repository can carry opaque state, but the packaged native stub does not emit or consume real fabric material.
 
 ## Production Replacement Seam

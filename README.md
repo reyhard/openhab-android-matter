@@ -55,6 +55,29 @@ Build and test the debug APK:
 
 By default, the APK packages the non-production JNI stub. To package a prebuilt production bridge, pass `-PopenhabMatterChipNativeMode=prebuilt "-PopenhabMatterChipPrebuiltDir=<dir>"` where `<dir>` contains ABI subdirectories with `libopenhab_matter_chip.so`.
 
+To also package the official connectedhomeip Android controller artifacts for the future Java-side controller integration, pass `"-PopenhabMatterChipControllerArtifactsDir=<dir>"` where `<dir>` contains the CHIPTool-style jars and native libraries:
+
+```text
+CHIPController.jar
+CHIPInteractionModel.jar
+CHIPClusterID.jar
+CHIPClusters.jar
+AndroidPlatform.jar
+OnboardingPayload.jar
+libMatterTlv.jar
+libMatterJson.jar
+jniLibs\arm64-v8a\libCHIPController.so
+jniLibs\arm64-v8a\libc++_shared.so
+jniLibs\armeabi-v7a\libCHIPController.so
+jniLibs\armeabi-v7a\libc++_shared.so
+jniLibs\x86\libCHIPController.so
+jniLibs\x86\libc++_shared.so
+jniLibs\x86_64\libCHIPController.so
+jniLibs\x86_64\libc++_shared.so
+```
+
+This local connectedhomeip checkout does not include those prebuilt binaries under `D:\Source\connectedhomeip\examples\android\CHIPTool\app\libs`; it contains README placeholders only. Build the artifacts from connectedhomeip or supply them from a trusted connectedhomeip Android build output.
+
 The APK is written to:
 
 ```text
@@ -77,5 +100,6 @@ The remaining production work is to replace `FakeMatterController` with a connec
 - `openCommissioningWindow(nodeId, timeout, discriminator)`
 
 The bundled `libopenhab_matter_chip.so` is currently a JNI packaging stub. A production replacement must return metadata like `kind=connectedhomeip;production=true;...` and implement real BLE Thread commissioning plus OpenCommissioningWindow before the selector will use it.
+The official connectedhomeip Android controller artifacts can now be validated and packaged separately, but the app still needs the actual Java controller orchestration that initializes `AndroidChipPlatform`, performs BLE Thread commissioning, and opens the commissioning window.
 Until that production connectedhomeip library is bundled, the app is installable and validates the openHAB user flow, but it does not actually provision Matter devices.
 When that native library is added, its persistent controller/fabric material flows through the encrypted bootstrap state repository instead of logs or plaintext app config.
