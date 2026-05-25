@@ -44,6 +44,8 @@ public class ConnectedHomeIpControllerArtifactsTest {
                 "chip.devicecontroller.NetworkCredentials",
                 "chip.devicecontroller.NetworkCredentials$ThreadCredentials",
                 "chip.devicecontroller.CommissionParameters",
+                "chip.devicecontroller.CommissionParameters$Builder",
+                "chip.devicecontroller.ChipDeviceController$CompletionListener",
                 "chip.devicecontroller.DeviceAttestationDelegate",
                 "chip.devicecontroller.OpenCommissioningCallback",
                 "chip.devicecontroller.GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback",
@@ -55,7 +57,8 @@ public class ConnectedHomeIpControllerArtifactsTest {
                 "chip.platform.NsdManagerServiceResolver",
                 "chip.platform.NsdManagerServiceBrowser",
                 "chip.platform.ChipMdnsCallbackImpl",
-                "chip.platform.DiagnosticDataProviderImpl"), checkedClassNames);
+                "chip.platform.DiagnosticDataProviderImpl",
+                "chip.platform.BleCallback"), checkedClassNames);
     }
     @Test
     public void reportsMissingClass() {
@@ -82,6 +85,22 @@ public class ConnectedHomeIpControllerArtifactsTest {
 
         assertFalse(status.ready());
         assertTrue(status.message().contains("libCHIPController"));
+    }
+
+    @Test
+    public void reportsClassLookupLinkageFailureAsNotReady() {
+        ConnectedHomeIpControllerArtifacts artifacts = new ConnectedHomeIpControllerArtifacts(
+                name -> {
+                    throw new NoClassDefFoundError("missing dependency");
+                },
+                name -> {
+                });
+
+        ConnectedHomeIpControllerArtifactsStatus status = artifacts.check();
+
+        assertFalse(status.ready());
+        assertTrue(status.message().contains("Failed to inspect connectedhomeip controller class"));
+        assertTrue(status.message().contains("missing dependency"));
     }
 
     private static final class RecordingLoader implements NativeLibraryLoader {

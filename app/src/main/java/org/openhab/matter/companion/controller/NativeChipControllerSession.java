@@ -3,11 +3,12 @@ package org.openhab.matter.companion.controller;
 public final class NativeChipControllerSession {
     private final MatterController fallbackController;
     private final NativeControllerFactory nativeControllerFactory;
-    private ChipMatterController nativeController;
+    private MatterControllerCandidate nativeController;
     private MatterController controller;
     private boolean nativeSelected;
     private boolean attestationBypassEnabled;
     private int generation;
+    private int requestSequence;
 
     public NativeChipControllerSession(
             MatterController fallbackController,
@@ -22,7 +23,6 @@ public final class NativeChipControllerSession {
         this.fallbackController = fallbackController;
         this.nativeControllerFactory = nativeControllerFactory;
         this.attestationBypassEnabled = attestationBypassEnabled;
-        this.nativeController = nativeControllerFactory.create(attestationBypassEnabled);
         this.controller = fallbackController;
     }
 
@@ -43,7 +43,7 @@ public final class NativeChipControllerSession {
             return false;
         }
         attestationBypassEnabled = enabled;
-        nativeController = nativeControllerFactory.create(enabled);
+        nativeController = null;
         controller = fallbackController;
         nativeSelected = false;
         generation++;
@@ -51,11 +51,16 @@ public final class NativeChipControllerSession {
     }
 
     public synchronized SelectionRequest selectionRequest() {
-        return new SelectionRequest(generation, nativeController);
+        if (nativeController == null) {
+            nativeController = nativeControllerFactory.create(attestationBypassEnabled);
+        }
+        requestSequence++;
+        return new SelectionRequest(generation, requestSequence, nativeController);
     }
 
     public synchronized boolean applySelection(SelectionRequest request, MatterControllerSelection selection) {
         if (request == null || selection == null || request.generation != generation
+                || request.requestSequence != requestSequence
                 || request.nativeController != nativeController) {
             return false;
         }
@@ -65,23 +70,28 @@ public final class NativeChipControllerSession {
     }
 
     public synchronized boolean isCurrent(SelectionRequest request) {
-        return request != null && request.generation == generation && request.nativeController == nativeController;
+        return request != null
+                && request.generation == generation
+                && request.requestSequence == requestSequence
+                && request.nativeController == nativeController;
     }
 
     public interface NativeControllerFactory {
-        ChipMatterController create(boolean attestationBypassEnabled);
+        MatterControllerCandidate create(boolean attestationBypassEnabled);
     }
 
     public static final class SelectionRequest {
         private final int generation;
-        private final ChipMatterController nativeController;
+        private final int requestSequence;
+        private final MatterControllerCandidate nativeController;
 
-        private SelectionRequest(int generation, ChipMatterController nativeController) {
+        private SelectionRequest(int generation, int requestSequence, MatterControllerCandidate nativeController) {
             this.generation = generation;
+            this.requestSequence = requestSequence;
             this.nativeController = nativeController;
         }
 
-        public ChipMatterController nativeController() {
+        public MatterControllerCandidate nativeController() {
             return nativeController;
         }
     }

@@ -134,7 +134,11 @@ The concrete Android runtime providers are still the next production step. They 
 
 `ConnectedHomeIpBleConnection` and `ConnectedHomeIpDevicePointer` require explicit close/release actions, so real providers cannot accidentally return no-op cleanup handles.
 
-The remaining production work is runtime wiring and hardware verification: real-device BLE scan/connect validation, real fabric restore/persistence, and replacing the current UI selection path with the reflection-backed gateway once it is backed by bundled connectedhomeip artifacts.
+`ConnectedHomeIpMatterControllerFactory` now wires that gateway into the app's selectable native-controller path. It checks connectedhomeip artifacts before constructing the gateway, treats missing classes, linkage failures, native-load failures, and gateway initialization failures as unavailable candidates, and lets the UI keep the simulated controller fallback in those cases.
+
+`NativeChipControllerSession` creates selectable native candidates lazily on the worker thread and sequences selection requests so older asynchronous readiness results cannot overwrite a newer request.
+
+The remaining production work is hardware verification and persistence: real-device BLE scan/connect validation, real fabric restore/persistence, and confirmation that bundled connectedhomeip artifacts can commission a physical Matter-over-Thread device into the target openHAB Inbox flow.
 
 ## CHIPTool Java API Targets
 

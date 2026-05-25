@@ -1,6 +1,8 @@
 package org.openhab.matter.companion.controller;
 
 import org.junit.Test;
+import org.openhab.matter.companion.domain.MatterSetupPayload;
+import org.openhab.matter.companion.domain.ThreadDataset;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
@@ -37,6 +39,21 @@ public final class MatterControllerSelectorTest {
         assertSame(nativeController, selection.controller());
         assertTrue(selection.nativeSelected());
         assertTrue(selection.message().contains("Using native CHIP controller: custom_chip"));
+    }
+
+    @Test
+    public void selectsGenericReadyControllerCandidateWhenRequested() {
+        MatterController fallback = new FakeMatterController();
+        MatterControllerCandidate nativeController = new ReadyCandidate("connectedhomeip-java");
+
+        MatterControllerSelection selection = MatterControllerSelector.select(
+                fallback,
+                nativeController,
+                true);
+
+        assertSame(nativeController, selection.controller());
+        assertTrue(selection.nativeSelected());
+        assertTrue(selection.message().contains("Using native CHIP controller: connectedhomeip-java"));
     }
 
     @Test
@@ -118,5 +135,43 @@ public final class MatterControllerSelectorTest {
                 throw new AssertionError("selector must not call OCW");
             }
         };
+    }
+
+    private static final class ReadyCandidate implements MatterControllerCandidate {
+        private final String libraryName;
+
+        private ReadyCandidate(String libraryName) {
+            this.libraryName = libraryName;
+        }
+
+        @Override
+        public ChipMatterControllerStatus readiness() {
+            return new ChipMatterControllerStatus(
+                    true,
+                    libraryName,
+                    false,
+                    "connectedhomeip-java",
+                    true,
+                    "ready");
+        }
+
+        @Override
+        public MatterCommissioningResult commissionBleThread(
+                ThreadDataset dataset,
+                MatterSetupPayload payload,
+                String controllerState,
+                ProgressListener listener) {
+            return new MatterCommissioningResult(1L, controllerState);
+        }
+
+        @Override
+        public MatterOpenCommissioningWindowResult openCommissioningWindow(
+                long nodeId,
+                int timeoutSeconds,
+                int discriminator,
+                String controllerState,
+                ProgressListener listener) {
+            return new MatterOpenCommissioningWindowResult("3497-0112-332", controllerState);
+        }
     }
 }

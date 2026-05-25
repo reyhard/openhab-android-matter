@@ -27,20 +27,21 @@
 - Reflection commissioning monitor installs a fresh connectedhomeip completion listener before each BLE pairing command, preventing stale one-shot callback state across commissioning attempts.
 - Reflection-backed controller provider can initialize the connectedhomeip Android platform dependency graph, build `ControllerParams`, and construct/cache `ChipDeviceController` without compile-time CHIP dependencies.
 - Android BLE connection provider can build the Matter BLE discriminator scan filter, scan/connect through injectable Android BLE seams, register the connected `BluetoothGatt` with connectedhomeip's BLE manager, and clean up registered GATT connections.
+- Connectedhomeip artifact readiness checks use non-initializing class lookup, include reflected nested classes and BLE callback classes, and report linkage/inspection failures as not-ready fallback instead of crashing the app.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
 - Debug APK packages a JNI stub `libopenhab_matter_chip.so` for native loading and metadata verification.
 - Gradle can package ABI-specific prebuilt `libopenhab_matter_chip.so` replacements instead of the bundled JNI stub.
 - Gradle can validate and package official CHIPTool-style connectedhomeip Android controller artifacts supplied as required jars plus ABI-specific `libCHIPController.so` and `libc++_shared.so` files.
-- Runtime controller selection can switch from the simulated controller to `ChipMatterController` only when a production native JNI library is bundled and readiness passes.
+- Runtime controller selection can switch from the simulated controller to the reflection-backed connectedhomeip Java controller only when connectedhomeip artifacts are present and readiness passes; missing or failed initialization stays on the simulated controller.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 
 ## Not Implemented Yet
 
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
-- Real-device validation of Android BLE scan/connect and GATT callback forwarding, real fabric restore/persistence, and wiring `MainActivity` selection to the reflection-backed gateway.
+- Real-device validation of Android BLE scan/connect and GATT callback forwarding, plus real fabric restore/persistence.
 - Real connectedhomeip Matter fabric key persistence and restore; the Java bridge and encrypted repository can carry opaque state, but the packaged native stub does not emit or consume real fabric material.
 
 ## Production Replacement Seam

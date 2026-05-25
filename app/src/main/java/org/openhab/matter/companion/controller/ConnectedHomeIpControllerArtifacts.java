@@ -8,6 +8,8 @@ public final class ConnectedHomeIpControllerArtifacts {
             "chip.devicecontroller.NetworkCredentials",
             "chip.devicecontroller.NetworkCredentials$ThreadCredentials",
             "chip.devicecontroller.CommissionParameters",
+            "chip.devicecontroller.CommissionParameters$Builder",
+            "chip.devicecontroller.ChipDeviceController$CompletionListener",
             "chip.devicecontroller.DeviceAttestationDelegate",
             "chip.devicecontroller.OpenCommissioningCallback",
             "chip.devicecontroller.GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback",
@@ -19,7 +21,8 @@ public final class ConnectedHomeIpControllerArtifacts {
             "chip.platform.NsdManagerServiceResolver",
             "chip.platform.NsdManagerServiceBrowser",
             "chip.platform.ChipMdnsCallbackImpl",
-            "chip.platform.DiagnosticDataProviderImpl"
+            "chip.platform.DiagnosticDataProviderImpl",
+            "chip.platform.BleCallback"
     };
 
     private final ClassLookup classLookup;
@@ -36,11 +39,20 @@ public final class ConnectedHomeIpControllerArtifacts {
 
     public ConnectedHomeIpControllerArtifactsStatus check() {
         for (String className : REQUIRED_CLASS_NAMES) {
-            if (!classLookup.exists(className)) {
+            try {
+                if (classLookup.exists(className)) {
+                    continue;
+                }
                 return new ConnectedHomeIpControllerArtifactsStatus(
                         false,
                         LIBRARY_NAME,
                         "Missing connectedhomeip controller class: " + className);
+            } catch (LinkageError | SecurityException ex) {
+                return new ConnectedHomeIpControllerArtifactsStatus(
+                        false,
+                        LIBRARY_NAME,
+                        "Failed to inspect connectedhomeip controller class "
+                                + className + ": " + safeMessage(ex));
             }
         }
 
@@ -61,10 +73,12 @@ public final class ConnectedHomeIpControllerArtifacts {
 
     private static boolean classExists(String className) {
         try {
-            Class.forName(className);
+            Class.forName(className, false, ConnectedHomeIpControllerArtifacts.class.getClassLoader());
             return true;
         } catch (ClassNotFoundException ex) {
             return false;
+        } catch (LinkageError | SecurityException ex) {
+            throw ex;
         }
     }
 

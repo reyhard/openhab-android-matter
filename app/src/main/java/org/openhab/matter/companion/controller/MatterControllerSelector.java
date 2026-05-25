@@ -6,7 +6,7 @@ public final class MatterControllerSelector {
 
     public static MatterControllerSelection select(
             MatterController fallbackController,
-            ChipMatterController nativeController,
+            MatterControllerCandidate nativeController,
             boolean preferNative) {
         if (fallbackController == null) {
             throw new IllegalArgumentException("Fallback Matter controller is required.");

@@ -18,9 +18,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import org.openhab.matter.companion.controller.ChipMatterController;
-import org.openhab.matter.companion.controller.ChipMatterControllerConfig;
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
+import org.openhab.matter.companion.controller.ConnectedHomeIpMatterControllerFactory;
 import org.openhab.matter.companion.config.AppConfig;
 import org.openhab.matter.companion.config.AppConfigRepository;
 import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository;
@@ -75,14 +74,13 @@ public final class MainActivity extends Activity {
     private static final int PAYLOAD_INPUT_ID = 1002;
     private static final int OPENHAB_INPUT_ID = 1003;
     private static final int OTBR_INPUT_ID = 1004;
-    private static final String NATIVE_CHIP_LIBRARY = "openhab_matter_chip";
     private static final int PANEL_COLOR = Color.rgb(255, 251, 240);
     private static final int TEXT_COLOR = Color.rgb(36, 50, 48);
     private static final int MUTED_COLOR = Color.rgb(74, 94, 90);
 
     private final AppState state = new AppState();
     private final MatterController fakeMatterController = new FakeMatterController();
-    private NativeChipControllerSession controllerSession = newNativeControllerSession(false);
+    private NativeChipControllerSession controllerSession;
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
     private final OpenHabInboxClient openHabInboxClient = new HttpOpenHabInboxClient();
     private final OpenHabInboxSseClient openHabInboxSseClient = new OpenHabInboxSseClient();
@@ -426,8 +424,8 @@ public final class MainActivity extends Activity {
     }
 
     private void checkNativeChipController() {
-        NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
         new Thread(() -> {
+            NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
             ChipMatterControllerStatus status = request.nativeController().readiness();
             runOnUiThread(() -> {
                 if (controllerSession.isCurrent(request)) {
@@ -738,8 +736,8 @@ public final class MainActivity extends Activity {
     }
 
     private void selectNativeChipControllerAsync(boolean appendWhenSelected) {
-        NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
         new Thread(() -> {
+            NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
             MatterControllerSelection selection = MatterControllerSelector.select(
                     fakeMatterController,
                     request.nativeController(),
@@ -764,17 +762,12 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private static ChipMatterController newChipMatterController(boolean attestationBypassEnabled) {
-        return new ChipMatterController(new ChipMatterControllerConfig(
-                NATIVE_CHIP_LIBRARY,
-                attestationBypassEnabled));
-    }
-
     private NativeChipControllerSession newNativeControllerSession(boolean attestationBypassEnabled) {
+        ConnectedHomeIpMatterControllerFactory connectedHomeIpFactory = new ConnectedHomeIpMatterControllerFactory(this);
         return new NativeChipControllerSession(
                 fakeMatterController,
                 attestationBypassEnabled,
-                MainActivity::newChipMatterController);
+                connectedHomeIpFactory::create);
     }
 
     private int dp(int value) {

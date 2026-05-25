@@ -4,7 +4,7 @@ import org.openhab.matter.companion.domain.CommissioningStep;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.ThreadDataset;
 
-public final class ConnectedHomeIpMatterController implements MatterController {
+public final class ConnectedHomeIpMatterController implements MatterControllerCandidate {
     private static final long ENHANCED_COMMISSIONING_WINDOW_ITERATION = 1000L;
 
     private final ConnectedHomeIpControllerArtifacts artifacts;
@@ -21,6 +21,18 @@ public final class ConnectedHomeIpMatterController implements MatterController {
         if (this.gateway == null) {
             throw new IllegalArgumentException("gateway is required");
         }
+    }
+
+    @Override
+    public ChipMatterControllerStatus readiness() {
+        ConnectedHomeIpControllerArtifactsStatus status = artifacts.check();
+        return new ChipMatterControllerStatus(
+                status.ready(),
+                status.libraryName(),
+                attestationBypassEnabled,
+                "connectedhomeip-java",
+                status.ready(),
+                status.message());
     }
 
     @Override

@@ -1,6 +1,10 @@
 package org.openhab.matter.companion.controller;
 
 import org.junit.Test;
+import org.openhab.matter.companion.domain.MatterSetupPayload;
+import org.openhab.matter.companion.domain.ThreadDataset;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -26,6 +30,25 @@ public class NativeChipControllerSessionTest {
 
         assertTrue(session.nativeSelected());
         assertSame(selection.controller(), session.controller());
+    }
+
+    @Test
+    public void constructorDoesNotCreateNativeCandidateUntilSelectionRequest() {
+        AtomicInteger factoryCalls = new AtomicInteger();
+
+        NativeChipControllerSession session = new NativeChipControllerSession(
+                new FakeMatterController(),
+                false,
+                attestationBypassEnabled -> {
+                    factoryCalls.incrementAndGet();
+                    return new ReadyCandidate("connectedhomeip-java", attestationBypassEnabled);
+                });
+
+        assertEquals(0, factoryCalls.get());
+
+        session.selectionRequest();
+
+        assertEquals(1, factoryCalls.get());
     }
 
     @Test
@@ -71,6 +94,29 @@ public class NativeChipControllerSessionTest {
     }
 
     @Test
+    public void newerSelectionRequestInvalidatesEarlierPendingSelection() {
+        MatterController fallback = new FakeMatterController();
+        NativeChipControllerSession session = new NativeChipControllerSession(
+                fallback,
+                false,
+                productionFactory());
+        NativeChipControllerSession.SelectionRequest staleRequest = session.selectionRequest();
+        NativeChipControllerSession.SelectionRequest currentRequest = session.selectionRequest();
+        MatterControllerSelection staleSelection = MatterControllerSelector.select(
+                fallback,
+                staleRequest.nativeController(),
+                true);
+        MatterControllerSelection currentSelection = MatterControllerSelector.select(
+                fallback,
+                currentRequest.nativeController(),
+                true);
+
+        assertFalse(session.applySelection(staleRequest, staleSelection));
+        assertTrue(session.applySelection(currentRequest, currentSelection));
+        assertTrue(session.nativeSelected());
+    }
+
+    @Test
     public void selectionRequestStopsBeingCurrentAfterAttestationBypassChanges() {
         MatterController fallback = new FakeMatterController();
         NativeChipControllerSession session = new NativeChipControllerSession(
@@ -97,6 +143,27 @@ public class NativeChipControllerSessionTest {
         ChipMatterControllerStatus status = session.selectionRequest().nativeController().readiness();
 
         assertTrue(status.attestationBypassEnabled());
+    }
+
+    @Test
+    public void selectionRequestCanUseGenericNativeCandidate() {
+        MatterController fallback = new FakeMatterController();
+        ReadyCandidate candidate = new ReadyCandidate("connectedhomeip-java", false);
+        NativeChipControllerSession session = new NativeChipControllerSession(
+                fallback,
+                false,
+                attestationBypassEnabled -> candidate);
+
+        NativeChipControllerSession.SelectionRequest request = session.selectionRequest();
+        MatterControllerSelection selection = MatterControllerSelector.select(
+                fallback,
+                request.nativeController(),
+                true);
+
+        assertSame(candidate, request.nativeController());
+        assertTrue(session.applySelection(request, selection));
+        assertSame(candidate, session.controller());
+        assertTrue(session.nativeSelected());
     }
 
     private static NativeChipControllerSession.NativeControllerFactory productionFactory() {
@@ -126,5 +193,45 @@ public class NativeChipControllerSessionTest {
                 return new NativeOpenCommissioningWindowResult("3497-0112-332", request.controllerState());
             }
         };
+    }
+
+    private static final class ReadyCandidate implements MatterControllerCandidate {
+        private final String libraryName;
+        private final boolean attestationBypassEnabled;
+
+        private ReadyCandidate(String libraryName, boolean attestationBypassEnabled) {
+            this.libraryName = libraryName;
+            this.attestationBypassEnabled = attestationBypassEnabled;
+        }
+
+        @Override
+        public ChipMatterControllerStatus readiness() {
+            return new ChipMatterControllerStatus(
+                    true,
+                    libraryName,
+                    attestationBypassEnabled,
+                    "connectedhomeip-java",
+                    true,
+                    "ready");
+        }
+
+        @Override
+        public MatterCommissioningResult commissionBleThread(
+                ThreadDataset dataset,
+                MatterSetupPayload payload,
+                String controllerState,
+                ProgressListener listener) {
+            return new MatterCommissioningResult(1L, controllerState);
+        }
+
+        @Override
+        public MatterOpenCommissioningWindowResult openCommissioningWindow(
+                long nodeId,
+                int timeoutSeconds,
+                int discriminator,
+                String controllerState,
+                ProgressListener listener) {
+            return new MatterOpenCommissioningWindowResult("3497-0112-332", controllerState);
+        }
     }
 }

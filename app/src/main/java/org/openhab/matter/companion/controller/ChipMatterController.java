@@ -4,7 +4,7 @@ import org.openhab.matter.companion.domain.CommissioningStep;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.ThreadDataset;
 
-public final class ChipMatterController implements MatterController {
+public final class ChipMatterController implements MatterControllerCandidate {
     private final NativeChipBridge bridge;
     private final ChipMatterControllerConfig config;
     private ChipMatterControllerStatus status;
