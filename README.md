@@ -89,8 +89,10 @@ app\build\outputs\apk\debug\app-debug.apk
 Connect an Android device with USB debugging enabled, then run:
 
 ```powershell
-D:\Tools\Android\SDK\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1
 ```
+
+The helper runs the offline unit tests and debug APK build, verifies `app\build\outputs\apk\debug\app-debug.apk`, lists ready ADB devices, and installs only when exactly one device/emulator is attached. If multiple devices are attached, pass `-Serial <device-id>`. If the APK is already built and you only want the ADB check/install step, pass `-SkipBuild`.
 
 ## Real connectedhomeip Controller Work
 

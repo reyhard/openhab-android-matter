@@ -3,6 +3,7 @@
 ## Implemented
 
 - Android Gradle project builds a debug APK.
+- PowerShell install-readiness helper builds/tests the debug APK, verifies the APK artifact, checks ADB devices, and installs only when a target device/emulator is unambiguous.
 - Native Android UI covers Thread, Wi-Fi, and multi-admin handoff flows.
 - Thread dataset validation accepts `hex:` and raw hex input.
 - Explicit setup payload parser accepts `pin=...;disc=...;vendor=...;product=...`.
