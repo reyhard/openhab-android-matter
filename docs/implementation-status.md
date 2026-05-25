@@ -16,6 +16,7 @@
 - App-private configuration persistence stores the openHAB base URL.
 - App-private configuration persistence stores the OTBR base URL.
 - Encrypted app-private bootstrap controller state repository stores the bootstrap node id and reserves an encrypted opaque controller-state slot.
+- Stateful native CHIP command contract passes attestation-bypass intent plus opaque controller state into and out of commissioning and OCW calls.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
@@ -27,7 +28,7 @@
 
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
-- Real connectedhomeip Matter fabric key persistence and restore; the encrypted bootstrap state repository is present, but the native layer does not yet emit or consume fabric material.
+- Real connectedhomeip Matter fabric key persistence and restore; the Java bridge and encrypted repository can carry opaque state, but the packaged native stub does not emit or consume real fabric material.
 
 ## Production Replacement Seam
 

@@ -18,6 +18,7 @@ This branch builds an installable Android APK with:
 - App-private persistence for the openHAB base URL.
 - App-private persistence for the OTBR base URL.
 - Encrypted app-private bootstrap controller state repository for future native Matter fabric/controller state.
+- Stateful native CHIP command contract carries attestation-bypass intent and opaque controller state through commissioning and OpenCommissioningWindow results.
 - Native in-app Matter QR scanning using CameraX and ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP controller readiness diagnostics load `libopenhab_matter_chip.so` and require bridge metadata that declares a production connectedhomeip implementation.
@@ -30,7 +31,7 @@ The real connectedhomeip/CHIP JNI controller is intentionally isolated behind `M
 
 This MVP does not perform real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
 Setup payloads, setup PINs, QR payloads, and device credentials are not persisted.
-The bootstrap controller state repository currently persists the bootstrap node id and provides an encrypted opaque state slot; real connectedhomeip fabric key material is not persisted or restored yet because the native CHIP layer does not emit it.
+The bootstrap controller state repository persists the bootstrap node id and provides an encrypted opaque state slot; the Java/native command contract can carry updated controller state, but the packaged JNI stub does not emit real connectedhomeip fabric material.
 
 ## Build Configuration
 
@@ -74,4 +75,4 @@ The remaining production work is to replace `FakeMatterController` with a connec
 
 The bundled `libopenhab_matter_chip.so` is currently a JNI packaging stub. A production replacement must return metadata like `kind=connectedhomeip;production=true;...` and implement real BLE Thread commissioning plus OpenCommissioningWindow before the selector will use it.
 Until that production connectedhomeip library is bundled, the app is installable and validates the openHAB user flow, but it does not actually provision Matter devices.
-When that native library is added, its persistent controller/fabric material should be written through the encrypted bootstrap state repository instead of logs or plaintext app config.
+When that native library is added, its persistent controller/fabric material flows through the encrypted bootstrap state repository instead of logs or plaintext app config.

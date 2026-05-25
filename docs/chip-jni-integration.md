@@ -6,8 +6,17 @@
 
 ```java
 private static native String nativeControllerMetadata();
-private static native long nativeCommissionBleThread(String datasetHex, long pin, int discriminator);
-private static native String nativeOpenCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator);
+private static native String nativeCommissionBleThread(
+        String datasetHex,
+        long pin,
+        int discriminator,
+        boolean attestationBypassEnabled,
+        String controllerState);
+private static native String nativeOpenCommissioningWindow(
+        long nodeId,
+        int timeoutSeconds,
+        int discriminator,
+        String controllerState);
 ```
 
 `nativeControllerMetadata()` must return semicolon-separated key/value metadata:
@@ -17,6 +26,15 @@ kind=connectedhomeip;version=<build-or-sdk-version>;production=true;message=<ope
 ```
 
 The Android app treats any bridge that is missing metadata, has `production=false`, or has `kind` other than `connectedhomeip` as not ready and continues with the simulated controller.
+
+`controllerState` is opaque connectedhomeip controller/fabric material loaded from the encrypted bootstrap repository. The native bridge must not log it. It must return updated state in semicolon-separated result metadata:
+
+```text
+nodeId=<decimal-node-id>;controllerState=<opaque-updated-state>
+temporaryCode=<manual-or-qr-code>;controllerState=<opaque-updated-state>
+```
+
+The Java layer rejects missing node IDs and missing or blank temporary setup codes instead of treating them as successful commissioning.
 
 The debug APK currently packages a JNI stub that returns `kind=stub;production=false`; this proves native packaging and loading only. It does not perform Matter commissioning.
 
