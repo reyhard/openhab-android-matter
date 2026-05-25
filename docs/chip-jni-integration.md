@@ -88,6 +88,12 @@ The artifact directory must use this layout:
 <artifact-dir>/jniLibs/x86_64/libc++_shared.so
 ```
 
+All required jar and native library files must be non-empty. `verifyConnectedHomeIpControllerArtifacts` fails on missing files and on empty placeholder files. To smoke-test the validation contract without real connectedhomeip binaries, run:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\test_connectedhomeip_artifacts.ps1
+```
+
 The local connectedhomeip checkout shows the expected prebuilt packaging seam, but does not contain binaries in `D:\Source\connectedhomeip\examples\android\CHIPTool\app\libs` in this workspace:
 
 - `examples/android/CHIPTool/app/build.gradle` uses `implementation fileTree(dir: "libs", include: ["*.jar", "*.so"])` for prebuilt mode.

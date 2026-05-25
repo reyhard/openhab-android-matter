@@ -77,6 +77,13 @@ jniLibs\x86_64\libc++_shared.so
 ```
 
 This local connectedhomeip checkout does not include those prebuilt binaries under `D:\Source\connectedhomeip\examples\android\CHIPTool\app\libs`; it contains README placeholders only. Build the artifacts from connectedhomeip or supply them from a trusted connectedhomeip Android build output.
+The Gradle verifier rejects missing or empty artifact files so placeholder jars or native libraries cannot pass the packaging gate.
+
+Run the synthetic artifact validation smoke test with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\test_connectedhomeip_artifacts.ps1
+```
 
 The APK is written to:
 

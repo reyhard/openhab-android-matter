@@ -115,12 +115,18 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
             if (!jar.isFile()) {
                 throw new GradleException("Missing connectedhomeip controller jar: " + jar)
             }
+            if (jar.length() <= 0) {
+                throw new GradleException("Empty connectedhomeip controller jar: " + jar)
+            }
         }
         chipControllerSupportedAbis.each { abi ->
             chipControllerRequiredNativeLibraries.each { libName ->
                 File lib = new File(new File(new File(root, "jniLibs"), abi), libName)
                 if (!lib.isFile()) {
                     throw new GradleException("Missing connectedhomeip controller native library: " + lib)
+                }
+                if (lib.length() <= 0) {
+                    throw new GradleException("Empty connectedhomeip controller native library: " + lib)
                 }
             }
         }
