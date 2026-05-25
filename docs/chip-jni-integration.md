@@ -105,7 +105,7 @@ Runtime diagnostics require the Java classes used by CHIPTool for platform initi
 - `openCommissioningWindow(...)` maps node ID, timeout, discriminator, opaque controller state, and the CHIPTool-equivalent enhanced commissioning-window iteration `1000` into `ConnectedHomeIpOpenCommissioningWindowRequest`.
 - Before each command, it checks `ConnectedHomeIpControllerArtifacts` so missing `CHIPController.jar` classes or `libCHIPController.so` fail before gateway calls.
 
-The concrete Android gateway is still the next production step. It must initialize `AndroidChipPlatform`, create or restore `ChipDeviceController`, scan/connect BLE for the setup discriminator, call `NetworkCredentials.forThread(...)`, call `pairDeviceThroughBLE(...)`, handle attestation continuation according to the persisted bypass flag, then use `openPairingWindowWithPINCallback(...)` to return the manual or QR setup code for openHAB.
+The concrete Android runtime providers are still the next production step. They must initialize `AndroidChipPlatform`, create or restore `ChipDeviceController`, scan/connect BLE for the setup discriminator, register the GATT connection id, handle async pairing completion, handle attestation continuation according to the persisted bypass flag, and acquire/release connected-device pointers for OCW.
 
 `ConnectedHomeIpReflectionCommandFactory` now covers the reflection-only part of that gateway:
 
@@ -117,7 +117,18 @@ The concrete Android gateway is still the next production step. It must initiali
 - `ConnectedHomeIpOpenCommissioningWindowCallback` creates a dynamic `OpenCommissioningCallback` proxy and converts `onSuccess(deviceId, manualPairingCode, qrCode)` into `MatterOpenCommissioningWindowResult`; `onError(status, deviceId)` becomes an exception.
 - `invokeOpenPairingWindowWithPinCallback(...)` invokes the reflected OCW entry point and returns whether connectedhomeip accepted the command start.
 
-The remaining gateway work is Android runtime orchestration: BLE scan/connect, GATT connection id registration through `AndroidBleManager`, async pairing completion callbacks, attestation delegate continuation, connected device pointer acquisition/release, and wiring these reflected invokers into `ConnectedHomeIpControllerGateway`.
+`ConnectedHomeIpReflectionGateway` wires those reflected invokers into `ConnectedHomeIpControllerGateway` through injectable runtime seams:
+
+- `ConnectedHomeIpControllerProvider` supplies the `ChipDeviceController` instance.
+- `ConnectedHomeIpBleConnectionProvider` supplies the connected `BluetoothGatt` and connectedhomeip BLE connection id for the setup discriminator.
+- `ConnectedHomeIpNodeIdAllocator` supplies the temporary Matter node id for first-fabric commissioning.
+- `ConnectedHomeIpAttestationHandler` prepares the controller's attestation delegate and receives the persisted developer bypass flag before BLE Thread pairing starts.
+- `ConnectedHomeIpCommissioningMonitor` waits for the asynchronous pairing result and returns the updated controller state.
+- `ConnectedHomeIpDevicePointerProvider` acquires and releases the connected-device pointer used by `openPairingWindowWithPINCallback(...)`.
+
+`ConnectedHomeIpBleConnection` and `ConnectedHomeIpDevicePointer` require explicit close/release actions, so real providers cannot accidentally return no-op cleanup handles.
+
+The remaining production work is implementing those seams against Android and connectedhomeip: BLE scan/connect, GATT connection id registration through `AndroidBleManager`, async pairing completion callbacks, attestation delegate continuation, connected device pointer acquisition/release, and replacing the current UI selection path with the reflection-backed gateway once it is backed by real providers.
 
 ## CHIPTool Java API Targets
 
