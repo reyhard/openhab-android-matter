@@ -2,6 +2,7 @@ package org.openhab.matter.companion;
 
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpControllerArtifactsStatus;
+import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreStatus;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 import org.openhab.matter.companion.otbr.OtbrStatus;
@@ -143,6 +144,17 @@ final class MainActivityPresentation {
         }
         return "connectedhomeip Android controller artifacts not ready: " + status.message();
     }
+
+    static String connectedHomeIpFabricRestore(ConnectedHomeIpFabricRestoreStatus status) {
+        if (!status.checked()) {
+            return "connectedhomeip fabric restore: no bootstrap fabric has been commissioned yet.";
+        }
+        if (status.ready()) {
+            return "connectedhomeip fabric restore ready for node " + status.nodeId() + ".";
+        }
+        return "connectedhomeip fabric restore not ready: " + safeTextForLog(status.message());
+    }
+
     static String matterControllerSelection(MatterControllerSelection selection) {
         return "Matter controller selection: " + selection.message();
     }

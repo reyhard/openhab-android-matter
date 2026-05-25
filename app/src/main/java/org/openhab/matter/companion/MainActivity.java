@@ -351,16 +351,25 @@ public final class MainActivity extends Activity {
     }
 
     private void runOpenCommissioningWindow() {
-        if (state.commissionedNodeId < 0) {
+        MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
+        if (bootstrapState.stateUnreadable()) {
+            state.commissionedNodeId = -1L;
+            persistedBootstrapState = bootstrapState;
+            persistedBootstrapStateUnreadable = true;
+            append(MainActivityPresentation.bootstrapStateUnreadable());
+            return;
+        }
+
+        long nodeId = MatterBootstrapStateResolver.resolveNodeId(state.commissionedNodeId, bootstrapState);
+        if (nodeId < 0) {
             clearBootstrapState();
             append("Run Thread commissioning first so the app has a bootstrap node id.");
             return;
         }
+        state.commissionedNodeId = nodeId;
 
         MatterController selectedController = controllerSession.controller();
         boolean nativeControllerSelected = controllerSession.nativeSelected();
-        long nodeId = state.commissionedNodeId;
-        MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
         String controllerState = bootstrapState.controllerState();
         append(nativeControllerSelected
                 ? "Opening connectedhomeip commissioning window."

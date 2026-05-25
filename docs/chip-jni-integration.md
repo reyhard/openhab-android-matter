@@ -138,7 +138,9 @@ The concrete Android runtime providers now cover the offline-verifiable controll
 
 `NativeChipControllerSession` creates selectable native candidates lazily on the worker thread and sequences selection requests so older asynchronous readiness results cannot overwrite a newer request.
 
-The remaining production work is hardware verification and persistence: real-device BLE scan/connect validation, real fabric restore/persistence, and confirmation that bundled connectedhomeip artifacts can commission a physical Matter-over-Thread device into the target openHAB Inbox flow.
+`ConnectedHomeIpFabricRestoreProbe` provides a side-effect-light diagnostic for real connectedhomeip artifact builds: given a persisted bootstrap node id, it asks the connectedhomeip controller for a connected device pointer and immediately releases it. A successful probe means connectedhomeip could restore the fabric well enough to locate that node; a failed probe should be treated as a restore diagnostic and not as proof that the bootstrap state should be deleted.
+
+The remaining production work is hardware verification and persistence: real-device BLE scan/connect validation, real fabric restore/persistence using the probe above, and confirmation that bundled connectedhomeip artifacts can commission a physical Matter-over-Thread device into the target openHAB Inbox flow.
 
 ## CHIPTool Java API Targets
 

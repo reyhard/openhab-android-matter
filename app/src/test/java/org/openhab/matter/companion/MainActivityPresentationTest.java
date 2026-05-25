@@ -3,6 +3,7 @@ package org.openhab.matter.companion;
 import org.junit.Test;
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpControllerArtifactsStatus;
+import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreStatus;
 import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
@@ -390,6 +391,43 @@ public class MainActivityPresentationTest {
                 "connectedhomeip Android controller artifacts not ready: Missing connectedhomeip controller class: chip.platform.AndroidChipPlatform",
                 MainActivityPresentation.connectedHomeIpArtifacts(status));
     }
+
+    @Test
+    public void describesSkippedConnectedHomeIpFabricRestore() {
+        assertEquals(
+                "connectedhomeip fabric restore: no bootstrap fabric has been commissioned yet.",
+                MainActivityPresentation.connectedHomeIpFabricRestore(
+                        new ConnectedHomeIpFabricRestoreStatus(
+                                false,
+                                false,
+                                -1L,
+                                "No connectedhomeip bootstrap fabric has been commissioned yet.")));
+    }
+
+    @Test
+    public void describesReadyConnectedHomeIpFabricRestore() {
+        assertEquals(
+                "connectedhomeip fabric restore ready for node 987654321.",
+                MainActivityPresentation.connectedHomeIpFabricRestore(
+                        new ConnectedHomeIpFabricRestoreStatus(
+                                true,
+                                true,
+                                987654321L,
+                                "connectedhomeip fabric restore ready for node 987654321.")));
+    }
+
+    @Test
+    public void describesFailedConnectedHomeIpFabricRestoreWithoutLeakingSecrets() {
+        assertEquals(
+                "connectedhomeip fabric restore not ready: failed for pin=<redacted> and <redacted-matter-code>",
+                MainActivityPresentation.connectedHomeIpFabricRestore(
+                        new ConnectedHomeIpFabricRestoreStatus(
+                                true,
+                                false,
+                                987654321L,
+                                "failed for pin=20202021 and 3497-0112-332")));
+    }
+
     @Test
     public void describesMatterControllerSelection() {
         MatterControllerSelection selection = new MatterControllerSelection(

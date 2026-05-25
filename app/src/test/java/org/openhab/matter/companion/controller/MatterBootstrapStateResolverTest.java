@@ -24,11 +24,11 @@ public class MatterBootstrapStateResolverTest {
     }
 
     @Test
-    public void savedInstanceNodeIdIsUsedWhenPersistedStateIsUnreadable() {
+    public void unreadablePersistedStateClearsSavedInstanceNodeId() {
         long nodeId = MatterBootstrapStateResolver.resolveNodeId(
                 42L,
                 new MatterBootstrapState(-1L, "", true));
 
-        assertEquals(42L, nodeId);
+        assertEquals(-1L, nodeId);
     }
 }
