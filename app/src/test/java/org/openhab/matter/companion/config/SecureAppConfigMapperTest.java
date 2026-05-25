@@ -35,6 +35,33 @@ public class SecureAppConfigMapperTest {
     }
 
     @Test
+    public void preservesAttestationBypassWhenDecodingStoredConfig() throws Exception {
+        SecretCodec codec = new FixedSecretCodec();
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
+
+        AppConfig config = mapper.fromStoredValues(
+                "enc:v1:encoded(hex:001122)",
+                "http://openhab.local:8080",
+                "http://otbr.local",
+                true);
+
+        assertEquals(true, config.attestationBypassEnabled());
+    }
+
+    @Test
+    public void legacyMapperCallsDefaultAttestationBypassToFalse() throws Exception {
+        SecretCodec codec = new FixedSecretCodec();
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
+
+        AppConfig config = mapper.fromStoredValues(
+                "enc:v1:encoded(hex:001122)",
+                "http://openhab.local:8080",
+                "http://otbr.local");
+
+        assertEquals(false, config.attestationBypassEnabled());
+    }
+
+    @Test
     public void readsLegacyPlaintextThreadDatasetForMigration() throws Exception {
         SecretCodec codec = new FixedSecretCodec();
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
@@ -44,6 +71,27 @@ public class SecureAppConfigMapperTest {
         assertEquals("hex:legacy", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
         assertEquals("http://otbr.local", config.otbrBaseUrl());
+    }
+
+    @Test
+    public void preservesAttestationBypassForLegacyPlaintextThreadDataset() throws Exception {
+        SecretCodec codec = new FixedSecretCodec();
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
+
+        AppConfig config = mapper.fromStoredValues("hex:legacy", "http://openhab.local:8080", "http://otbr.local",
+                true);
+
+        assertEquals(true, config.attestationBypassEnabled());
+    }
+
+    @Test
+    public void preservesAttestationBypassForEmptyThreadDataset() throws Exception {
+        SecretCodec codec = new FixedSecretCodec();
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
+
+        AppConfig config = mapper.fromStoredValues("", "http://openhab.local:8080", "http://otbr.local", true);
+
+        assertEquals(true, config.attestationBypassEnabled());
     }
 
     @Test
@@ -59,6 +107,20 @@ public class SecureAppConfigMapperTest {
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
         assertEquals("http://otbr.local", config.otbrBaseUrl());
         assertEquals(true, config.threadDatasetUnreadable());
+    }
+
+    @Test
+    public void preservesAttestationBypassWhenDecodeFails() throws Exception {
+        SecretCodec codec = new FixedSecretCodec();
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
+
+        AppConfig config = mapper.fromStoredValues(
+                SecretCodec.ENCRYPTED_PREFIX + "broken",
+                "http://openhab.local:8080",
+                "http://otbr.local",
+                true);
+
+        assertEquals(true, config.attestationBypassEnabled());
     }
 
     @Test

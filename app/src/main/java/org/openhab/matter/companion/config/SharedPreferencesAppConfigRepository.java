@@ -8,6 +8,7 @@ public final class SharedPreferencesAppConfigRepository implements AppConfigRepo
     private static final String KEY_THREAD_DATASET = "thread_dataset";
     private static final String KEY_OPENHAB_BASE_URL = "openhab_base_url";
     private static final String KEY_OTBR_BASE_URL = "otbr_base_url";
+    private static final String KEY_ATTESTATION_BYPASS_ENABLED = "attestation_bypass_enabled";
 
     private final SharedPreferences preferences;
     private final SecureAppConfigMapper mapper;
@@ -27,7 +28,12 @@ public final class SharedPreferencesAppConfigRepository implements AppConfigRepo
         String storedThreadDataset = preferences.getString(KEY_THREAD_DATASET, "");
         String storedOpenHabBaseUrl = preferences.getString(KEY_OPENHAB_BASE_URL, "");
         String storedOtbrBaseUrl = preferences.getString(KEY_OTBR_BASE_URL, "");
-        AppConfig config = mapper.fromStoredValues(storedThreadDataset, storedOpenHabBaseUrl, storedOtbrBaseUrl);
+        boolean storedAttestationBypassEnabled = preferences.getBoolean(KEY_ATTESTATION_BYPASS_ENABLED, false);
+        AppConfig config = mapper.fromStoredValues(
+                storedThreadDataset,
+                storedOpenHabBaseUrl,
+                storedOtbrBaseUrl,
+                storedAttestationBypassEnabled);
         if (mapper.isLegacyPlaintextThreadDataset(storedThreadDataset)) {
             try {
                 save(config);
@@ -46,6 +52,7 @@ public final class SharedPreferencesAppConfigRepository implements AppConfigRepo
                     .putString(KEY_THREAD_DATASET, storedConfig.threadDataset())
                     .putString(KEY_OPENHAB_BASE_URL, storedConfig.openHabBaseUrl())
                     .putString(KEY_OTBR_BASE_URL, storedConfig.otbrBaseUrl())
+                    .putBoolean(KEY_ATTESTATION_BYPASS_ENABLED, config.attestationBypassEnabled())
                     .apply();
         } catch (Exception e) {
             throw new IllegalStateException("Unable to save app config", e);

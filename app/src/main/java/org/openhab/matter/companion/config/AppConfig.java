@@ -5,6 +5,7 @@ public final class AppConfig {
     private final String openHabBaseUrl;
     private final String otbrBaseUrl;
     private final boolean threadDatasetUnreadable;
+    private final boolean attestationBypassEnabled;
 
     public AppConfig(String threadDataset, String openHabBaseUrl) {
         this(threadDataset, openHabBaseUrl, "", false);
@@ -19,10 +20,20 @@ public final class AppConfig {
     }
 
     public AppConfig(String threadDataset, String openHabBaseUrl, String otbrBaseUrl, boolean threadDatasetUnreadable) {
+        this(threadDataset, openHabBaseUrl, otbrBaseUrl, threadDatasetUnreadable, false);
+    }
+
+    public AppConfig(
+            String threadDataset,
+            String openHabBaseUrl,
+            String otbrBaseUrl,
+            boolean threadDatasetUnreadable,
+            boolean attestationBypassEnabled) {
         this.threadDataset = threadDataset == null ? "" : threadDataset;
         this.openHabBaseUrl = openHabBaseUrl == null ? "" : openHabBaseUrl;
         this.otbrBaseUrl = otbrBaseUrl == null ? "" : otbrBaseUrl;
         this.threadDatasetUnreadable = threadDatasetUnreadable;
+        this.attestationBypassEnabled = attestationBypassEnabled;
     }
 
     public String threadDataset() {
@@ -39,5 +50,9 @@ public final class AppConfig {
 
     public boolean threadDatasetUnreadable() {
         return threadDatasetUnreadable;
+    }
+
+    public boolean attestationBypassEnabled() {
+        return attestationBypassEnabled;
     }
 }
