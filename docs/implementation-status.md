@@ -15,10 +15,10 @@
 - Android Keystore-backed AES-GCM encrypted app-private storage stores the OTBR Thread dataset.
 - App-private configuration persistence stores the openHAB base URL.
 - App-private configuration persistence stores the OTBR base URL.
-- Persisted developer attestation bypass setting is exposed in the UI and passed into native CHIP commissioning requests.
+- Persisted developer attestation bypass setting is exposed in the UI and passed into connectedhomeip/native Matter commissioning requests.
 - Encrypted app-private bootstrap controller state repository stores the bootstrap node id and reserves an encrypted opaque controller-state slot.
-- Stateful native CHIP command contract passes attestation-bypass intent plus opaque controller state into and out of commissioning and OCW calls.
-- Java-side connectedhomeip controller command seam maps this app's `MatterController` commands to a future `ChipDeviceController` gateway, including Thread dataset, PIN, discriminator, attestation bypass, controller state, and OCW iteration inputs.
+- Legacy native bridge command contract passes attestation-bypass intent plus opaque controller state into and out of commissioning and OCW calls.
+- Java-side connectedhomeip controller command seam maps this app's `MatterController` commands to the reflection-backed `ChipDeviceController` gateway, including Thread dataset, PIN, discriminator, attestation bypass, controller state, and OCW iteration inputs.
 - Thread datasets can be converted from normalized hex to `byte[]` for connectedhomeip `NetworkCredentials.ThreadCredentials`.
 - Reflection command factory can construct connectedhomeip Thread `NetworkCredentials`, `CommissionParameters`, and locate the `pairDeviceThroughBLE(...)` and `openPairingWindowWithPINCallback(...)` controller methods without compile-time CHIP dependencies.
 - Reflection command factory can invoke `pairDeviceThroughBLE(...)` and bridge `OpenCommissioningCallback` success/error responses into the app's OCW result model.
@@ -39,11 +39,13 @@
 
 ## Not Implemented Yet
 
-- Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
-- Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
+- Real-device validation of BLE scanning, PASE, attestation handling, Thread dataset provisioning, and OpenCommissioningWindow.
+- Real Matter/Thread commissioning through packaged connectedhomeip Android controller artifacts and their Java/JNI stack.
 - Real-device validation of Android BLE scan/connect and GATT callback forwarding, plus real fabric restore/persistence.
 - Real connectedhomeip Matter fabric key persistence and restore; the Java bridge and encrypted repository can carry opaque state, but the packaged native stub does not emit or consume real fabric material.
 
-## Production Replacement Seam
+## Production Controller Seam
 
-Replace `FakeMatterController` construction in `MainActivity` with `ChipMatterController` after the connectedhomeip Android JNI library is available and reports `kind=connectedhomeip;production=true`.
+`MainActivity` keeps `FakeMatterController` as the safe fallback and uses `ConnectedHomeIpMatterControllerFactory` as the selectable native Matter candidate. The factory only selects the reflection-backed connectedhomeip Java controller when official connectedhomeip Android controller artifacts are present, linkage-safe readiness passes, and gateway initialization succeeds.
+
+The packaged `libopenhab_matter_chip.so` remains a non-production JNI stub for the legacy bridge seam. Real commissioning now depends on packaging and validating the official connectedhomeip Android controller jars/native libraries, then verifying BLE Thread commissioning and OpenCommissioningWindow on hardware.

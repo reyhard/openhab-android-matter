@@ -17,18 +17,18 @@ This branch builds an installable Android APK with:
 - Encrypted app-private storage for the OTBR Thread dataset using Android Keystore-backed AES-GCM.
 - App-private persistence for the openHAB base URL.
 - App-private persistence for the OTBR base URL.
-- Persisted developer attestation bypass setting for the future native CHIP controller path; it defaults off and is passed to the JNI command contract only when explicitly enabled.
+- Persisted developer attestation bypass setting for connectedhomeip commissioning; it defaults off and is passed to the selectable native Matter controller only when explicitly enabled.
 - Encrypted app-private bootstrap controller state repository for future native Matter fabric/controller state.
-- Stateful native CHIP command contract carries attestation-bypass intent and opaque controller state through commissioning and OpenCommissioningWindow results.
+- Legacy native bridge command contract carries attestation-bypass intent and opaque controller state through commissioning and OpenCommissioningWindow results.
 - Native in-app Matter QR scanning using CameraX and ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
-- Native CHIP controller readiness diagnostics load `libopenhab_matter_chip.so` and require bridge metadata that declares a production connectedhomeip implementation.
+- Native Matter controller readiness diagnostics check the selectable connectedhomeip Java controller path and keep the simulated controller selected when artifacts or initialization are not ready.
 - A packaged JNI stub verifies Android native-library packaging, but it reports `production=false` and is never selected for real commissioning.
-- Runtime controller selection can switch from the simulated controller to `ChipMatterController` only when a production native JNI library is bundled and readiness passes.
+- Runtime controller selection can switch from the simulated controller to the reflection-backed connectedhomeip Java controller when official connectedhomeip Android artifacts are bundled and readiness passes.
 - A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
 - A native Android UI that displays the temporary code and openHAB Matter Scan Input instructions.
 
-The real connectedhomeip/CHIP JNI controller is intentionally isolated behind `MatterController`. `ChipMatterController` is present as the replacement point for the native implementation.
+The real connectedhomeip controller path is isolated behind `MatterController`. The debug APK keeps a deterministic simulated controller as the safe fallback and exposes a connectedhomeip controller selection path for builds that include the official Android controller artifacts.
 
 This MVP does not perform real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
 Setup payloads, setup PINs, QR payloads, and device credentials are not persisted.
@@ -55,7 +55,7 @@ Build and test the debug APK:
 
 By default, the APK packages the non-production JNI stub. To package a prebuilt production bridge, pass `-PopenhabMatterChipNativeMode=prebuilt "-PopenhabMatterChipPrebuiltDir=<dir>"` where `<dir>` contains ABI subdirectories with `libopenhab_matter_chip.so`.
 
-To also package the official connectedhomeip Android controller artifacts for the future Java-side controller integration, pass `"-PopenhabMatterChipControllerArtifactsDir=<dir>"` where `<dir>` contains the CHIPTool-style jars and native libraries:
+To package the official connectedhomeip Android controller artifacts used by the selectable Java controller path, pass `"-PopenhabMatterChipControllerArtifactsDir=<dir>"` where `<dir>` contains the CHIPTool-style jars and native libraries:
 
 ```text
 CHIPController.jar
@@ -92,14 +92,13 @@ Connect an Android device with USB debugging enabled, then run:
 D:\Tools\Android\SDK\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
-## Real CHIP Controller Work
+## Real connectedhomeip Controller Work
 
-The remaining production work is to replace `FakeMatterController` with a connectedhomeip-backed `ChipMatterController` that implements:
+The selectable connectedhomeip Java controller path now wires the app to reflection-backed equivalents of:
 
 - `commissionBleThread(datasetHex, pin, discriminator)`
 - `openCommissioningWindow(nodeId, timeout, discriminator)`
 
-The bundled `libopenhab_matter_chip.so` is currently a JNI packaging stub. A production replacement must return metadata like `kind=connectedhomeip;production=true;...` and implement real BLE Thread commissioning plus OpenCommissioningWindow before the selector will use it.
-The official connectedhomeip Android controller artifacts can now be validated and packaged separately, but the app still needs the actual Java controller orchestration that initializes `AndroidChipPlatform`, performs BLE Thread commissioning, and opens the commissioning window.
-Until that production connectedhomeip library is bundled, the app is installable and validates the openHAB user flow, but it does not actually provision Matter devices.
-When that native library is added, its persistent controller/fabric material flows through the encrypted bootstrap state repository instead of logs or plaintext app config.
+The bundled `libopenhab_matter_chip.so` is still a JNI packaging stub for the legacy native bridge seam. Real commissioning through the current selectable path requires official connectedhomeip Android controller jars plus ABI-specific `libCHIPController.so` and `libc++_shared.so` to be packaged with the APK.
+Until those connectedhomeip artifacts are bundled and verified on hardware, the app is installable and validates the openHAB user flow, but it falls back to simulation and does not actually provision Matter devices.
+Real-device validation still needs a Matter-over-Thread device, OTBR dataset, Android BLE commissioning, OpenCommissioningWindow, and openHAB Inbox confirmation.

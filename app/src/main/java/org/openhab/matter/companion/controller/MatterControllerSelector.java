@@ -15,25 +15,25 @@ public final class MatterControllerSelector {
             return new MatterControllerSelection(
                     fallbackController,
                     false,
-                    "Using simulated Matter controller. Native CHIP controller was not requested.");
+                    "Using simulated Matter controller. Native Matter controller was not requested.");
         }
         if (nativeController == null) {
             return new MatterControllerSelection(
                     fallbackController,
                     false,
-                    "Native CHIP controller not configured. Continuing with simulated Matter controller.");
+                    "Native Matter controller not configured. Continuing with simulated Matter controller.");
         }
         ChipMatterControllerStatus status = nativeController.readiness();
         if (status.ready()) {
             return new MatterControllerSelection(
                     nativeController,
                     true,
-                    "Using native CHIP controller: " + status.libraryName());
+                    "Using native Matter controller: " + status.libraryName());
         }
         return new MatterControllerSelection(
                 fallbackController,
                 false,
-                "Native CHIP controller not ready: " + status.message()
+                "Native Matter controller not ready: " + status.message()
                         + ". Continuing with simulated Matter controller.");
     }
 }

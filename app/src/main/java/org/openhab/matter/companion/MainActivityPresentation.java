@@ -62,6 +62,30 @@ final class MainActivityPresentation {
         return "Developer attestation bypass skips device attestation verification for lab devices only. Leave it off for production pairing.";
     }
 
+    static String controllerModeNotice() {
+        return "Controller mode: simulated fallback is used by default. If connectedhomeip Android controller artifacts are bundled and readiness passes, the app can attempt real BLE Thread commissioning and OpenCommissioningWindow; Matter-over-Thread hardware, OTBR, and openHAB validation are still required.";
+    }
+
+    static String threadCommissioningButtonLabel() {
+        return "Run Thread commissioning";
+    }
+
+    static String openCommissioningWindowButtonLabel() {
+        return "Open commissioning window";
+    }
+
+    static String checkControllerButtonLabel() {
+        return "Check connectedhomeip controller";
+    }
+
+    static String useControllerButtonLabel() {
+        return "Use connectedhomeip controller if ready";
+    }
+
+    static String attestationBypassLabel() {
+        return "Developer attestation bypass for connectedhomeip commissioning";
+    }
+
     static String threadDatasetUnreadable() {
         return "Stored Thread dataset could not be decrypted. Paste and save the dataset again to continue.";
     }
@@ -106,10 +130,10 @@ final class MainActivityPresentation {
 
     static String nativeChipReadiness(ChipMatterControllerStatus status) {
         if (status.ready()) {
-            return "Native CHIP controller ready: " + status.libraryName()
+            return "Native Matter controller ready: " + status.libraryName()
                     + ". Developer attestation bypass: " + onOff(status.attestationBypassEnabled()) + ".";
         }
-        return "Native CHIP controller not ready: " + status.message()
+        return "Native Matter controller not ready: " + status.message()
                 + ". Developer attestation bypass: " + onOff(status.attestationBypassEnabled()) + ".";
     }
 

@@ -229,6 +229,24 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void describesSelectableControllerModeNotice() {
+        assertEquals(
+                "Controller mode: simulated fallback is used by default. If connectedhomeip Android controller artifacts are bundled and readiness passes, the app can attempt real BLE Thread commissioning and OpenCommissioningWindow; Matter-over-Thread hardware, OTBR, and openHAB validation are still required.",
+                MainActivityPresentation.controllerModeNotice());
+    }
+
+    @Test
+    public void describesControllerActionLabelsWithoutFakeOnlyWording() {
+        assertEquals("Run Thread commissioning", MainActivityPresentation.threadCommissioningButtonLabel());
+        assertEquals("Open commissioning window", MainActivityPresentation.openCommissioningWindowButtonLabel());
+        assertEquals("Check connectedhomeip controller", MainActivityPresentation.checkControllerButtonLabel());
+        assertEquals("Use connectedhomeip controller if ready", MainActivityPresentation.useControllerButtonLabel());
+        assertEquals(
+                "Developer attestation bypass for connectedhomeip commissioning",
+                MainActivityPresentation.attestationBypassLabel());
+    }
+
+    @Test
     public void describesConfigSaveWithAttestationBypassDisabled() {
         assertEquals(
                 "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: off. Setup payloads and PINs are not saved.",
@@ -330,7 +348,7 @@ public class MainActivityPresentationTest {
         ChipMatterControllerStatus status = new ChipMatterControllerStatus(false, "openhab_matter_chip", false, "missing");
 
         assertEquals(
-                "Native CHIP controller not ready: missing. Developer attestation bypass: off.",
+                "Native Matter controller not ready: missing. Developer attestation bypass: off.",
                 MainActivityPresentation.nativeChipReadiness(status));
     }
 
@@ -345,7 +363,7 @@ public class MainActivityPresentationTest {
                 "Native CHIP library loaded: openhab_matter_chip");
 
         assertEquals(
-                "Native CHIP controller ready: openhab_matter_chip. Developer attestation bypass: on.",
+                "Native Matter controller ready: openhab_matter_chip. Developer attestation bypass: on.",
                 MainActivityPresentation.nativeChipReadiness(status));
     }
 
@@ -377,10 +395,10 @@ public class MainActivityPresentationTest {
         MatterControllerSelection selection = new MatterControllerSelection(
                 new FakeMatterController(),
                 true,
-                "Using native CHIP controller: custom_chip");
+                "Using native Matter controller: custom_chip");
 
         assertEquals(
-                "Matter controller selection: Using native CHIP controller: custom_chip",
+                "Matter controller selection: Using native Matter controller: custom_chip",
                 MainActivityPresentation.matterControllerSelection(selection));
     }
 

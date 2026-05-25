@@ -38,7 +38,7 @@ public final class MatterControllerSelectorTest {
 
         assertSame(nativeController, selection.controller());
         assertTrue(selection.nativeSelected());
-        assertTrue(selection.message().contains("Using native CHIP controller: custom_chip"));
+        assertTrue(selection.message().contains("Using native Matter controller: custom_chip"));
     }
 
     @Test
@@ -53,7 +53,7 @@ public final class MatterControllerSelectorTest {
 
         assertSame(nativeController, selection.controller());
         assertTrue(selection.nativeSelected());
-        assertTrue(selection.message().contains("Using native CHIP controller: connectedhomeip-java"));
+        assertTrue(selection.message().contains("Using native Matter controller: connectedhomeip-java"));
     }
 
     @Test
@@ -70,7 +70,7 @@ public final class MatterControllerSelectorTest {
 
         assertSame(fallback, selection.controller());
         assertFalse(selection.nativeSelected());
-        assertTrue(selection.message().contains("Native CHIP controller not ready"));
+        assertTrue(selection.message().contains("Native Matter controller not ready"));
         assertTrue(selection.message().contains("Continuing with simulated Matter controller"));
     }
 
@@ -87,7 +87,7 @@ public final class MatterControllerSelectorTest {
 
         assertSame(fallback, selection.controller());
         assertFalse(selection.nativeSelected());
-        assertTrue(selection.message().contains("Native CHIP controller not ready"));
+        assertTrue(selection.message().contains("Native Matter controller not ready"));
         assertTrue(selection.message().contains("stub"));
     }
 

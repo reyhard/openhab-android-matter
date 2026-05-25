@@ -130,8 +130,7 @@ public final class MainActivity extends Activity {
                 "Native commissioning guide for Matter-over-Thread and Wi-Fi/multi-admin handoff.",
                 16,
                 MUTED_COLOR);
-        TextView demoNotice = panel(
-                "Demo mode: this installable MVP uses FakeMatterController. It simulates the flow only; it does not perform real BLE scanning, Thread provisioning, PASE, attestation, or Matter commissioning.");
+        TextView controllerModeNotice = panel(MainActivityPresentation.controllerModeNotice());
 
         datasetInput = input("Thread Active Operational Dataset hex", true);
         datasetInput.setId(DATASET_INPUT_ID);
@@ -146,14 +145,14 @@ public final class MainActivity extends Activity {
         openHabInput.setId(OPENHAB_INPUT_ID);
         openHabInput.setText(state.openHabBaseUrl);
         attestationBypassInput = new CheckBox(this);
-        attestationBypassInput.setText("Developer attestation bypass for native CHIP commissioning");
+        attestationBypassInput.setText(MainActivityPresentation.attestationBypassLabel());
         attestationBypassInput.setTextColor(TEXT_COLOR);
         attestationBypassInput.setChecked(state.attestationBypassEnabled);
         attestationBypassInput.setLayoutParams(blockParams());
         attestationBypassInput.setOnCheckedChangeListener((buttonView, isChecked) -> syncAttestationBypassFromInput());
 
-        Button commissionThread = button("Simulate Thread commissioning");
-        Button openWindow = button("Simulate open commissioning window");
+        Button commissionThread = button(MainActivityPresentation.threadCommissioningButtonLabel());
+        Button openWindow = button(MainActivityPresentation.openCommissioningWindowButtonLabel());
         Button wifiHandoff = button("Wi-Fi / multi-admin openHAB handoff");
         Button scanQrInApp = button("Scan Matter QR in app");
         Button scanQr = button("Scan Matter QR with installed scanner");
@@ -162,8 +161,8 @@ public final class MainActivity extends Activity {
         Button checkPermissions = button("Check commissioning permissions");
         Button checkInbox = button("Check openHAB Inbox");
         Button watchInboxSse = button("Watch openHAB Inbox SSE");
-        Button checkChip = button("Check native CHIP controller");
-        Button useNativeChip = button("Use native CHIP controller if ready");
+        Button checkChip = button(MainActivityPresentation.checkControllerButtonLabel());
+        Button useNativeChip = button(MainActivityPresentation.useControllerButtonLabel());
         Button saveConfig = button("Save dataset, OTBR URL, and openHAB URL");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
@@ -184,7 +183,7 @@ public final class MainActivity extends Activity {
 
         root.addView(title);
         root.addView(subtitle);
-        root.addView(demoNotice);
+        root.addView(controllerModeNotice);
         root.addView(section("Thread dataset"));
         root.addView(datasetInput);
         root.addView(section("OTBR connectivity"));
@@ -193,7 +192,7 @@ public final class MainActivity extends Activity {
         root.addView(payloadInput);
         root.addView(section("openHAB readiness"));
         root.addView(openHabInput);
-        root.addView(section("Native CHIP attestation"));
+        root.addView(section("connectedhomeip attestation"));
         root.addView(panel(MainActivityPresentation.attestationBypassWarning()));
         root.addView(attestationBypassInput);
         root.addView(commissionThread);
@@ -329,7 +328,7 @@ public final class MainActivity extends Activity {
         MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
         String controllerState = bootstrapState.controllerState();
         append(nativeControllerSelected
-                ? "Starting native CHIP Thread commissioning."
+                ? "Starting connectedhomeip Thread commissioning."
                 : "Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
         append("Validated Thread dataset without displaying it.");
         append(payloadSummary(payload));
@@ -354,7 +353,7 @@ public final class MainActivity extends Activity {
     private void runOpenCommissioningWindow() {
         if (state.commissionedNodeId < 0) {
             clearBootstrapState();
-            append("Run simulated Thread commissioning first so the demo has a bootstrap node id.");
+            append("Run Thread commissioning first so the app has a bootstrap node id.");
             return;
         }
 
@@ -364,7 +363,7 @@ public final class MainActivity extends Activity {
         MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
         String controllerState = bootstrapState.controllerState();
         append(nativeControllerSelected
-                ? "Opening native CHIP commissioning window."
+                ? "Opening connectedhomeip commissioning window."
                 : "Opening a simulated commissioning window. This does not call a real Matter controller.");
         new Thread(() -> {
             try {

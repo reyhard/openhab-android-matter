@@ -61,7 +61,7 @@ The prebuilt library must return `kind=connectedhomeip;production=true` from `na
 
 ## Official connectedhomeip Android Controller Artifacts
 
-The connectedhomeip Android Java stack uses CHIPTool-style jar and native artifacts in addition to any app-specific bridge library. To package those artifacts for the future Java-side controller integration, build with:
+The selectable connectedhomeip Java controller path uses CHIPTool-style jar and native artifacts in addition to any app-specific bridge library. To package those artifacts for the current Java-side controller integration, build with:
 
 ```powershell
 .\gradlew.bat :app:assembleDebug --offline "-PopenhabMatterChipControllerArtifactsDir=<artifact-dir>"
@@ -105,7 +105,7 @@ Runtime diagnostics require the Java classes used by CHIPTool for platform initi
 - `openCommissioningWindow(...)` maps node ID, timeout, discriminator, opaque controller state, and the CHIPTool-equivalent enhanced commissioning-window iteration `1000` into `ConnectedHomeIpOpenCommissioningWindowRequest`.
 - Before each command, it checks `ConnectedHomeIpControllerArtifacts` so missing `CHIPController.jar` classes or `libCHIPController.so` fail before gateway calls.
 
-The concrete Android runtime providers are still the next production step. They must initialize `AndroidChipPlatform`, create or restore `ChipDeviceController`, scan/connect BLE for the setup discriminator, register the GATT connection id, handle async pairing completion, handle attestation continuation according to the persisted bypass flag, and acquire/release connected-device pointers for OCW.
+The concrete Android runtime providers now cover the offline-verifiable controller construction, BLE connection, async pairing completion, attestation continuation, and connected-device pointer seams. The remaining production step is to package real connectedhomeip artifacts and verify those providers against hardware: a Matter-over-Thread device in pairing mode, the target OTBR dataset, Android BLE scan/connect, OpenCommissioningWindow, and openHAB Inbox detection.
 
 `ConnectedHomeIpReflectionCommandFactory` now covers the reflection-only part of that gateway:
 
