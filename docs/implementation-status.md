@@ -18,8 +18,9 @@
 - Encrypted app-private bootstrap controller state repository stores the bootstrap node id and reserves an encrypted opaque controller-state slot.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
-- Native CHIP controller readiness diagnostics report whether the JNI library is available.
-- Runtime controller selection can switch from the simulated controller to `ChipMatterController` when the native JNI library is bundled and readiness passes.
+- Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
+- Debug APK packages a JNI stub `libopenhab_matter_chip.so` for native loading and metadata verification.
+- Runtime controller selection can switch from the simulated controller to `ChipMatterController` only when a production native JNI library is bundled and readiness passes.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 
 ## Not Implemented Yet
@@ -30,4 +31,4 @@
 
 ## Production Replacement Seam
 
-Replace `FakeMatterController` construction in `MainActivity` with `ChipMatterController` after the connectedhomeip Android JNI library is available.
+Replace `FakeMatterController` construction in `MainActivity` with `ChipMatterController` after the connectedhomeip Android JNI library is available and reports `kind=connectedhomeip;production=true`.
