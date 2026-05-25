@@ -51,6 +51,80 @@ public final class ConnectedHomeIpReflectionGatewayTest {
     }
 
     @Test
+    public void commissionBleThreadPreparesMonitorBeforePairingCommand() throws Exception {
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        CapturingCommissioningMonitor monitor = new CapturingCommissioningMonitor();
+        ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
+                () -> controller,
+                new CapturingBleConnectionProvider(),
+                () -> 987654321L,
+                monitor,
+                unusedAttestationHandler(),
+                unusedPointerProvider(),
+                fakeCommandFactory(),
+                1000L);
+
+        gateway.commissionBleThread(new ConnectedHomeIpCommissioningRequest(
+                "0E080000000000010000",
+                20202021L,
+                3840,
+                false,
+                "controller-state"));
+
+        assertSame(controller, monitor.preparedController);
+        assertTrue(controller.pairedAfterMonitorPrepared);
+    }
+
+    @Test
+    public void commissionBleThreadCanUseReflectionMonitorToInstallCompletionListenerBeforePairing() throws Exception {
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        controller.requireCompletionListenerBeforePairing = true;
+        ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
+                () -> controller,
+                new CapturingBleConnectionProvider(),
+                () -> 987654321L,
+                new ConnectedHomeIpReflectionCommissioningMonitor(fakeCommandFactory(), 1000L),
+                unusedAttestationHandler(),
+                unusedPointerProvider(),
+                fakeCommandFactory(),
+                1000L);
+
+        MatterCommissioningResult result = gateway.commissionBleThread(new ConnectedHomeIpCommissioningRequest(
+                "0E080000000000010000",
+                20202021L,
+                3840,
+                false,
+                "controller-state"));
+
+        assertEquals(987654321L, result.nodeId());
+        assertSame(controller.completionListenerAtPairing, controller.completionListener);
+    }
+
+    @Test
+    public void commissionBleThreadDoesNotConnectBleWhenMonitorPreparationFails() throws Exception {
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
+                () -> controller,
+                unusedBleProvider(),
+                () -> 987654321L,
+                new ThrowingCommissioningMonitor(),
+                unusedAttestationHandler(),
+                unusedPointerProvider(),
+                fakeCommandFactory(),
+                1000L);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> gateway.commissionBleThread(
+                new ConnectedHomeIpCommissioningRequest(
+                        "0E080000000000010000",
+                        20202021L,
+                        3840,
+                        false,
+                        "controller-state")));
+
+        assertTrue(exception.getMessage().contains("prepare failed"));
+    }
+
+    @Test
     public void commissionBleThreadClosesBleConnectionWhenPairingCommandFails() throws Exception {
         FakeChipDeviceController controller = new FakeChipDeviceController();
         controller.failPairing = true;
@@ -264,6 +338,15 @@ public final class ConnectedHomeIpReflectionGatewayTest {
         private boolean blankOpenCommissioningWindowSuccess;
         private boolean openPairingWindowStarted = true;
         private boolean failOpenPairingWindowInvocation;
+        private boolean monitorPrepared;
+        private boolean pairedAfterMonitorPrepared;
+        private boolean requireCompletionListenerBeforePairing;
+        private CompletionListener completionListener;
+        private CompletionListener completionListenerAtPairing;
+
+        public void setCompletionListener(CompletionListener listener) {
+            completionListener = listener;
+        }
 
         public void pairDeviceThroughBLE(
                 BluetoothGatt bleServer,
@@ -271,6 +354,10 @@ public final class ConnectedHomeIpReflectionGatewayTest {
                 long deviceId,
                 long setupPincode,
                 FakeCommissionParameters params) {
+            completionListenerAtPairing = completionListener;
+            if (requireCompletionListenerBeforePairing && completionListener == null) {
+                throw new IllegalStateException("completion listener missing before pairing");
+            }
             if (failPairing) {
                 throw new IllegalStateException("pair failed");
             }
@@ -278,6 +365,10 @@ public final class ConnectedHomeIpReflectionGatewayTest {
             this.deviceId = deviceId;
             this.setupPin = setupPincode;
             this.params = params;
+            pairedAfterMonitorPrepared = monitorPrepared;
+            if (completionListener != null) {
+                completionListener.onCommissioningComplete(deviceId, 0L);
+            }
         }
 
         public boolean openPairingWindowWithPINCallback(
@@ -303,6 +394,10 @@ public final class ConnectedHomeIpReflectionGatewayTest {
                 callback.onSuccess(987654321L, "3497-0112-332", "MT:TEST");
             }
             return true;
+        }
+
+        public interface CompletionListener {
+            void onCommissioningComplete(long nodeId, long errorCode);
         }
     }
 
@@ -350,14 +445,33 @@ public final class ConnectedHomeIpReflectionGatewayTest {
     }
 
     private static final class CapturingCommissioningMonitor implements ConnectedHomeIpCommissioningMonitor {
+        private Object preparedController;
         private long nodeId;
         private String controllerState;
+
+        @Override
+        public void prepare(Object controller) {
+            preparedController = controller;
+            ((FakeChipDeviceController) controller).monitorPrepared = true;
+        }
 
         @Override
         public MatterCommissioningResult awaitCommissioned(long nodeId, String controllerState) {
             this.nodeId = nodeId;
             this.controllerState = controllerState;
             return new MatterCommissioningResult(nodeId, "commissioned-state");
+        }
+    }
+
+    private static final class ThrowingCommissioningMonitor implements ConnectedHomeIpCommissioningMonitor {
+        @Override
+        public void prepare(Object controller) {
+            throw new IllegalStateException("prepare failed");
+        }
+
+        @Override
+        public MatterCommissioningResult awaitCommissioned(long nodeId, String controllerState) {
+            throw new AssertionError("await should not be called");
         }
     }
 

@@ -119,6 +119,7 @@ The concrete Android runtime providers are still the next production step. They 
 - `ConnectedHomeIpOpenCommissioningWindowCallback` creates a dynamic `OpenCommissioningCallback` proxy and converts `onSuccess(deviceId, manualPairingCode, qrCode)` into `MatterOpenCommissioningWindowResult`; `onError(status, deviceId)` becomes an exception.
 - `invokeOpenPairingWindowWithPinCallback(...)` invokes the reflected OCW entry point and returns whether connectedhomeip accepted the command start.
 - `ConnectedHomeIpCommissioningCompletionListener` creates a dynamic `ChipDeviceController.CompletionListener` proxy and converts successful `onCommissioningComplete(nodeId, 0)` into `MatterCommissioningResult`; pairing or commissioning errors become exceptions.
+- `ConnectedHomeIpReflectionCommissioningMonitor` creates a fresh completion listener for each commissioning attempt, registers it through `ChipDeviceController.setCompletionListener(...)`, and then waits on that listener so stale callback state cannot leak between attempts.
 - `ConnectedHomeIpReflectionAttestationHandler` registers a dynamic `DeviceAttestationDelegate` proxy and calls `continueCommissioning(devicePtr, attestationBypassEnabled)` when connectedhomeip reports attestation completion.
 - `ConnectedHomeIpReflectionDevicePointerProvider` creates a dynamic `GetConnectedDeviceCallback` proxy, waits for `onDeviceConnected(devicePtr)`, and returns a `ConnectedHomeIpDevicePointer` whose release action calls `releaseConnectedDevicePointer(devicePtr)`.
 
@@ -128,7 +129,7 @@ The concrete Android runtime providers are still the next production step. They 
 - `ConnectedHomeIpBleConnectionProvider` supplies the connected `BluetoothGatt` and connectedhomeip BLE connection id for the setup discriminator.
 - `ConnectedHomeIpNodeIdAllocator` supplies the temporary Matter node id for first-fabric commissioning.
 - `ConnectedHomeIpAttestationHandler` prepares the controller's attestation delegate and receives the persisted developer bypass flag before BLE Thread pairing starts.
-- `ConnectedHomeIpCommissioningMonitor` waits for the asynchronous pairing result and returns the updated controller state.
+- `ConnectedHomeIpCommissioningMonitor` prepares the controller before BLE pairing, waits for the asynchronous pairing result, and returns the updated controller state.
 - `ConnectedHomeIpDevicePointerProvider` acquires and releases the connected-device pointer used by `openPairingWindowWithPINCallback(...)`.
 
 `ConnectedHomeIpBleConnection` and `ConnectedHomeIpDevicePointer` require explicit close/release actions, so real providers cannot accidentally return no-op cleanup handles.

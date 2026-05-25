@@ -6,8 +6,8 @@ import java.lang.reflect.Proxy;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-public final class ConnectedHomeIpCommissioningCompletionListener implements ConnectedHomeIpCommissioningMonitor {
-    private static final long DEFAULT_TIMEOUT_MILLIS = 300_000L;
+public final class ConnectedHomeIpCommissioningCompletionListener {
+    static final long DEFAULT_TIMEOUT_MILLIS = 300_000L;
 
     private final Object proxy;
     private final long timeoutMillis;
@@ -37,7 +37,6 @@ public final class ConnectedHomeIpCommissioningCompletionListener implements Con
         return proxy;
     }
 
-    @Override
     public MatterCommissioningResult awaitCommissioned(long nodeId, String controllerState) throws Exception {
         if (!latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
             throw new IllegalStateException("Commissioning completion callback timed out for node " + nodeId);

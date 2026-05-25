@@ -157,6 +157,12 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 requireAvailable(completionListenerClass, "completionListenerClass"));
     }
 
+    public ConnectedHomeIpCommissioningCompletionListener newCommissioningCompletionListener(long timeoutMillis) {
+        return new ConnectedHomeIpCommissioningCompletionListener(
+                requireAvailable(completionListenerClass, "completionListenerClass"),
+                timeoutMillis);
+    }
+
     public Object newDeviceAttestationDelegate(Object controller, boolean attestationBypassEnabled) {
         return new ConnectedHomeIpDeviceAttestationDelegate(
                 requireAvailable(deviceAttestationDelegateClass, "deviceAttestationDelegateClass"),

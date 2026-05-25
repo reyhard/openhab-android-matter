@@ -24,6 +24,7 @@
 - Reflection command factory can invoke `pairDeviceThroughBLE(...)` and bridge `OpenCommissioningCallback` success/error responses into the app's OCW result model.
 - Reflection-backed `ConnectedHomeIpControllerGateway` orchestration invokes the connectedhomeip BLE Thread and OCW commands through injectable controller, BLE connection, node-id, attestation-handler, commissioning-monitor, and connected-device-pointer seams.
 - Reflection bridges cover connectedhomeip `CompletionListener`, `DeviceAttestationDelegate`, `continueCommissioning(...)`, `getConnectedDevicePointer(...)`, and `releaseConnectedDevicePointer(...)`.
+- Reflection commissioning monitor installs a fresh connectedhomeip completion listener before each BLE pairing command, preventing stale one-shot callback state across commissioning attempts.
 - Reflection-backed controller provider can initialize the connectedhomeip Android platform dependency graph, build `ControllerParams`, and construct/cache `ChipDeviceController` without compile-time CHIP dependencies.
 - Android BLE connection provider can build the Matter BLE discriminator scan filter, scan/connect through injectable Android BLE seams, register the connected `BluetoothGatt` with connectedhomeip's BLE manager, and clean up registered GATT connections.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.

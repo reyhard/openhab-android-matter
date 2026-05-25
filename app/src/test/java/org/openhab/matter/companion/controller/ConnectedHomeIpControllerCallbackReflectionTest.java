@@ -24,6 +24,46 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
     }
 
     @Test
+    public void reflectionCommissioningMonitorRegistersListenerAndAwaitsCompletion() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        ConnectedHomeIpReflectionCommissioningMonitor monitor = new ConnectedHomeIpReflectionCommissioningMonitor(
+                factory,
+                1000L);
+
+        monitor.prepare(controller);
+        controller.completionListener.onCommissioningComplete(987654321L, 0L);
+
+        MatterCommissioningResult result = monitor.awaitCommissioned(987654321L, "controller-state");
+
+        assertEquals(987654321L, result.nodeId());
+        assertEquals("controller-state", result.controllerState());
+    }
+
+    @Test
+    public void reflectionCommissioningMonitorInstallsFreshListenerForEachPrepare() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        ConnectedHomeIpReflectionCommissioningMonitor monitor = new ConnectedHomeIpReflectionCommissioningMonitor(
+                factory,
+                1000L);
+
+        monitor.prepare(controller);
+        FakeCompletionListener firstListener = controller.completionListener;
+        firstListener.onPairingComplete(55L);
+        assertThrows(IllegalStateException.class, () -> monitor.awaitCommissioned(111L, "first-state"));
+
+        monitor.prepare(controller);
+        FakeCompletionListener secondListener = controller.completionListener;
+        secondListener.onCommissioningComplete(222L, 0L);
+        MatterCommissioningResult result = monitor.awaitCommissioned(222L, "second-state");
+
+        assertTrue(firstListener != secondListener);
+        assertEquals(222L, result.nodeId());
+        assertEquals("second-state", result.controllerState());
+    }
+
+    @Test
     public void commissioningCompletionListenerReportsCommissioningError() throws Exception {
         ConnectedHomeIpCommissioningCompletionListener listener = fakeFactory().newCommissioningCompletionListener();
 

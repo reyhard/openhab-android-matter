@@ -64,6 +64,7 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
         long nodeId = nodeIdAllocator.nextNodeId();
         Object commissionParameters = commandFactory.newThreadCommissionParameters(ThreadDataset.parse(request.datasetHex()));
         attestationHandler.prepareForCommissioning(controller, nodeId, request.attestationBypassEnabled());
+        commissioningMonitor.prepare(controller);
         try (ConnectedHomeIpBleConnection connection = bleConnectionProvider.connect(request.discriminator())) {
             commandFactory.invokePairDeviceThroughBle(
                     controller,
