@@ -25,6 +25,7 @@
 - Reflection-backed `ConnectedHomeIpControllerGateway` orchestration invokes the connectedhomeip BLE Thread and OCW commands through injectable controller, BLE connection, node-id, attestation-handler, commissioning-monitor, and connected-device-pointer seams.
 - Reflection bridges cover connectedhomeip `CompletionListener`, `DeviceAttestationDelegate`, `continueCommissioning(...)`, `getConnectedDevicePointer(...)`, and `releaseConnectedDevicePointer(...)`.
 - Reflection-backed controller provider can initialize the connectedhomeip Android platform dependency graph, build `ControllerParams`, and construct/cache `ChipDeviceController` without compile-time CHIP dependencies.
+- Android BLE connection provider can build the Matter BLE discriminator scan filter, scan/connect through injectable Android BLE seams, register the connected `BluetoothGatt` with connectedhomeip's BLE manager, and clean up registered GATT connections.
 - Native in-app CameraX QR scanning decodes Matter setup QR payloads with ML Kit barcode scanning.
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
@@ -38,7 +39,7 @@
 
 - Real BLE scanning, PASE, attestation, Thread dataset provisioning, and OpenCommissioningWindow.
 - Real Matter/Thread commissioning through the connectedhomeip Android JNI stack.
-- Concrete Android BLE scan/connect, Android BLE connection id registration, real fabric restore/persistence, and wiring `MainActivity` selection to the reflection-backed gateway.
+- Real-device validation of Android BLE scan/connect and GATT callback forwarding, real fabric restore/persistence, and wiring `MainActivity` selection to the reflection-backed gateway.
 - Real connectedhomeip Matter fabric key persistence and restore; the Java bridge and encrypted repository can carry opaque state, but the packaged native stub does not emit or consume real fabric material.
 
 ## Production Replacement Seam
