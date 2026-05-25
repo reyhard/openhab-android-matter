@@ -109,6 +109,7 @@ The concrete Android runtime providers are still the next production step. They 
 
 `ConnectedHomeIpReflectionCommandFactory` now covers the reflection-only part of that gateway:
 
+- `ConnectedHomeIpPlatformControllerProvider` calls `ChipDeviceController.loadJni()`, constructs `AndroidChipPlatform` dependencies, builds `ControllerParams` with vendor `0xFFF4` and server interactions enabled, then constructs and caches `ChipDeviceController`.
 - `ThreadDataset.bytes()` returns the connectedhomeip operational dataset byte array.
 - `newThreadCommissionParameters(...)` constructs `NetworkCredentials.ThreadCredentials`, calls `NetworkCredentials.forThread(...)`, and builds `CommissionParameters` with `csrNonce=null` and `icdRegistrationInfo=null`.
 - `pairDeviceThroughBleMethod()` locates `ChipDeviceController.pairDeviceThroughBLE(...)`.
@@ -131,7 +132,7 @@ The concrete Android runtime providers are still the next production step. They 
 
 `ConnectedHomeIpBleConnection` and `ConnectedHomeIpDevicePointer` require explicit close/release actions, so real providers cannot accidentally return no-op cleanup handles.
 
-The remaining production work is implementing the Android runtime providers: `AndroidChipPlatform` initialization, `ChipDeviceController` construction/restore, BLE scan/connect, GATT connection id registration through `AndroidBleManager`, and replacing the current UI selection path with the reflection-backed gateway once it is backed by real providers.
+The remaining production work is implementing the Android BLE provider and runtime wiring: BLE scan/connect, GATT connection id registration through `AndroidBleManager`, real fabric restore/persistence, and replacing the current UI selection path with the reflection-backed gateway once it is backed by real providers.
 
 ## CHIPTool Java API Targets
 
