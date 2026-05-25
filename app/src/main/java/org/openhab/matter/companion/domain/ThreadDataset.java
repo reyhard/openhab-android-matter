@@ -37,4 +37,13 @@ public final class ThreadDataset {
     public String chipToolValue() {
         return "hex:" + hex;
     }
+
+    public byte[] bytes() {
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int index = 0; index < bytes.length; index++) {
+            int start = index * 2;
+            bytes[index] = (byte) Integer.parseInt(hex.substring(start, start + 2), 16);
+        }
+        return bytes;
+    }
 }

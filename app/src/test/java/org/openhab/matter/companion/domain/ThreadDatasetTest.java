@@ -3,6 +3,7 @@ package org.openhab.matter.companion.domain;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertThrows;
 
 public class ThreadDatasetTest {
@@ -11,6 +12,21 @@ public class ThreadDatasetTest {
         ThreadDataset dataset = ThreadDataset.parse(" hex: 0E08 0000\t0000\n0001 0000 ");
         assertEquals("0E080000000000010000", dataset.hex());
         assertEquals("hex:0E080000000000010000", dataset.chipToolValue());
+    }
+
+    @Test
+    public void convertsNormalizedHexToBytes() {
+        ThreadDataset dataset = ThreadDataset.parse("hex:0E08ff1000000000");
+        assertArrayEquals(new byte[] {
+                0x0E,
+                0x08,
+                (byte) 0xFF,
+                0x10,
+                0x00,
+                0x00,
+                0x00,
+                0x00
+        }, dataset.bytes());
     }
 
     @Test

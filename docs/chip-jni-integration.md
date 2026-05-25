@@ -107,6 +107,15 @@ Runtime diagnostics require the Java classes used by CHIPTool for platform initi
 
 The concrete Android gateway is still the next production step. It must initialize `AndroidChipPlatform`, create or restore `ChipDeviceController`, scan/connect BLE for the setup discriminator, call `NetworkCredentials.forThread(...)`, call `pairDeviceThroughBLE(...)`, handle attestation continuation according to the persisted bypass flag, then use `openPairingWindowWithPINCallback(...)` to return the manual or QR setup code for openHAB.
 
+`ConnectedHomeIpReflectionCommandFactory` now covers the reflection-only part of that gateway:
+
+- `ThreadDataset.bytes()` returns the connectedhomeip operational dataset byte array.
+- `newThreadCommissionParameters(...)` constructs `NetworkCredentials.ThreadCredentials`, calls `NetworkCredentials.forThread(...)`, and builds `CommissionParameters` with `csrNonce=null` and `icdRegistrationInfo=null`.
+- `pairDeviceThroughBleMethod()` locates `ChipDeviceController.pairDeviceThroughBLE(...)`.
+- `openPairingWindowWithPinCallbackMethod()` locates `ChipDeviceController.openPairingWindowWithPINCallback(...)`.
+
+The remaining gateway work is Android runtime orchestration: BLE scan/connect, GATT connection id registration through `AndroidBleManager`, async pairing completion callbacks, attestation delegate continuation, connected device pointer acquisition/release, and OCW callback-to-result bridging.
+
 ## CHIPTool Java API Targets
 
 Local connectedhomeip evidence from `D:\Source\connectedhomeip` shows the concrete APIs the gateway should call:
