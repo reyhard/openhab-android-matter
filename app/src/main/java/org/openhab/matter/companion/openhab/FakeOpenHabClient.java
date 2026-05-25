@@ -1,7 +1,7 @@
 package org.openhab.matter.companion.openhab;
 
 public final class FakeOpenHabClient implements OpenHabClient {
-    private static final String ONLINE_MESSAGE = "openHAB REST API is reachable";
+    private static final String ONLINE_MESSAGE = "openHAB Matter controller is ready";
 
     private final boolean online;
     private final String message;

@@ -14,7 +14,9 @@ public class FakeOpenHabClientTest {
         OpenHabStatus status = client.checkReadiness("http://openhab.local:8080");
 
         assertTrue(status.online());
-        assertEquals("openHAB REST API is reachable", status.message());
+        assertTrue(status.restReachable());
+        assertTrue(status.matterControllerReady());
+        assertEquals("openHAB Matter controller is ready", status.message());
         assertEquals("Simulated readiness check for http://openhab.local:8080", status.details());
     }
 
@@ -25,6 +27,8 @@ public class FakeOpenHabClientTest {
         OpenHabStatus status = client.checkReadiness("http://openhab.local:8080");
 
         assertFalse(status.online());
+        assertFalse(status.restReachable());
+        assertFalse(status.matterControllerReady());
         assertEquals("openHAB REST API is not reachable", status.message());
         assertEquals("Simulated connection failure", status.details());
     }
