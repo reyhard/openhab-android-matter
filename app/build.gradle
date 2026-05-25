@@ -2,6 +2,14 @@ plugins {
     id "com.android.application"
 }
 
+def chipNativeMode = (findProperty("openhabMatterChipNativeMode") ?: "stub").toString().trim()
+def chipPrebuiltDir = (findProperty("openhabMatterChipPrebuiltDir") ?: "").toString().trim()
+def chipSupportedAbis = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
+
+if (!["stub", "prebuilt"].contains(chipNativeMode)) {
+    throw new GradleException("openhabMatterChipNativeMode must be 'stub' or 'prebuilt'.")
+}
+
 android {
     namespace "org.openhab.matter.companion"
     compileSdk 36
@@ -21,13 +29,47 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    externalNativeBuild {
-        cmake {
-            path file("src/main/cpp/CMakeLists.txt")
-            version "3.22.1"
+    if (chipNativeMode == "stub") {
+        externalNativeBuild {
+            cmake {
+                path file("src/main/cpp/CMakeLists.txt")
+                version "3.22.1"
+            }
+        }
+    } else {
+        sourceSets {
+            main {
+                jniLibs.srcDirs = [file(chipPrebuiltDir)]
+            }
         }
     }
 }
+
+tasks.register("verifyOpenhabMatterChipNativeInputs") {
+    doLast {
+        if (chipNativeMode == "stub") {
+            if (!file("src/main/cpp/openhab_matter_chip_stub.cpp").isFile()) {
+                throw new GradleException("Stub native mode requires src/main/cpp/openhab_matter_chip_stub.cpp.")
+            }
+            return
+        }
+        if (chipPrebuiltDir.isEmpty()) {
+            throw new GradleException("prebuilt native mode requires -PopenhabMatterChipPrebuiltDir=<dir>.")
+        }
+        File root = file(chipPrebuiltDir)
+        if (!root.isDirectory()) {
+            throw new GradleException("Prebuilt native directory does not exist: " + root)
+        }
+        chipSupportedAbis.each { abi ->
+            File lib = new File(new File(root, abi), "libopenhab_matter_chip.so")
+            if (!lib.isFile()) {
+                throw new GradleException("Missing prebuilt native library: " + lib)
+            }
+        }
+    }
+}
+
+preBuild.dependsOn("verifyOpenhabMatterChipNativeInputs")
 
 dependencies {
     def camerax_version = "1.6.1"
