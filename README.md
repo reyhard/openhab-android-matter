@@ -77,7 +77,7 @@ jniLibs\x86_64\libc++_shared.so
 ```
 
 This local connectedhomeip checkout does not include those prebuilt binaries under `D:\Source\connectedhomeip\examples\android\CHIPTool\app\libs`; it contains README placeholders only. Build the artifacts from connectedhomeip or supply them from a trusted connectedhomeip Android build output.
-The Gradle verifier rejects missing or empty artifact files so placeholder jars or native libraries cannot pass the packaging gate.
+The Gradle verifier rejects missing native libraries, empty files, corrupt controller jars, and controller jar sets that do not contain the class entries required by runtime readiness, so placeholders cannot pass the packaging gate.
 
 Run the synthetic artifact validation smoke test with:
 
@@ -121,6 +121,6 @@ The selectable connectedhomeip Java controller path now wires the app to reflect
 - `commissionBleThread(datasetHex, pin, discriminator)`
 - `openCommissioningWindow(nodeId, timeout, discriminator)`
 
-The bundled `libopenhab_matter_chip.so` is still a JNI packaging stub for the legacy native bridge seam. Real commissioning through the current selectable path requires official connectedhomeip Android controller jars plus ABI-specific `libCHIPController.so` and `libc++_shared.so` to be packaged with the APK.
+The bundled `libopenhab_matter_chip.so` is still a JNI packaging stub for the legacy native bridge seam. Real commissioning through the current selectable path requires official valid connectedhomeip Android controller jars containing the required controller/platform class entries plus ABI-specific `libCHIPController.so` and `libc++_shared.so` to be packaged with the APK.
 Until those connectedhomeip artifacts are bundled and verified on hardware, the app is installable and validates the openHAB user flow, but it falls back to simulation and does not actually provision Matter devices.
 Real-device validation still needs a Matter-over-Thread device, OTBR dataset, Android BLE commissioning, OpenCommissioningWindow, and openHAB Inbox confirmation.

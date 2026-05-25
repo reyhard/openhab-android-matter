@@ -2,6 +2,8 @@ plugins {
     id "com.android.application"
 }
 
+import java.util.zip.ZipFile
+
 def chipNativeMode = (findProperty("openhabMatterChipNativeMode") ?: "stub").toString().trim()
 def chipPrebuiltDir = (findProperty("openhabMatterChipPrebuiltDir") ?: "").toString().trim()
 def chipSupportedAbis = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
@@ -26,6 +28,36 @@ def chipControllerRequiredNativeLibraries = [
         "libCHIPController.so",
         "libc++_shared.so"
 ]
+def chipControllerRequiredClassEntries = [
+        "chip/devicecontroller/ChipDeviceController.class",
+        "chip/devicecontroller/ControllerParams.class",
+        "chip/devicecontroller/NetworkCredentials.class",
+        'chip/devicecontroller/NetworkCredentials$ThreadCredentials.class',
+        "chip/devicecontroller/CommissionParameters.class",
+        'chip/devicecontroller/CommissionParameters$Builder.class',
+        'chip/devicecontroller/ChipDeviceController$CompletionListener.class',
+        "chip/devicecontroller/DeviceAttestationDelegate.class",
+        "chip/devicecontroller/OpenCommissioningCallback.class",
+        'chip/devicecontroller/GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback.class',
+        "chip/platform/AndroidChipPlatform.class",
+        "chip/platform/AndroidBleManager.class",
+        "chip/platform/AndroidNfcCommissioningManager.class",
+        "chip/platform/PreferencesKeyValueStoreManager.class",
+        "chip/platform/PreferencesConfigurationManager.class",
+        "chip/platform/NsdManagerServiceResolver.class",
+        "chip/platform/NsdManagerServiceBrowser.class",
+        "chip/platform/ChipMdnsCallbackImpl.class",
+        "chip/platform/DiagnosticDataProviderImpl.class",
+        "chip/platform/BleCallback.class"
+]
+def verifyJarFile = { File jar ->
+    try {
+        new ZipFile(jar).withCloseable {
+        }
+    } catch (IOException e) {
+        throw new GradleException("Invalid connectedhomeip controller jar: " + jar, e)
+    }
+}
 
 if (!["stub", "prebuilt"].contains(chipNativeMode)) {
     throw new GradleException("openhabMatterChipNativeMode must be 'stub' or 'prebuilt'.")
@@ -110,6 +142,7 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
         if (!root.isDirectory()) {
             throw new GradleException("connectedhomeip controller artifact directory does not exist: " + root)
         }
+        Set<String> discoveredClassEntries = new LinkedHashSet<>()
         chipControllerRequiredJars.each { jarName ->
             File jar = new File(root, jarName)
             if (!jar.isFile()) {
@@ -117,6 +150,17 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
             }
             if (jar.length() <= 0) {
                 throw new GradleException("Empty connectedhomeip controller jar: " + jar)
+            }
+            verifyJarFile(jar)
+            new ZipFile(jar).withCloseable { zip ->
+                zip.entries().each { entry ->
+                    discoveredClassEntries.add(entry.name)
+                }
+            }
+        }
+        chipControllerRequiredClassEntries.each { classEntry ->
+            if (!discoveredClassEntries.contains(classEntry)) {
+                throw new GradleException("Missing connectedhomeip controller class entry: " + classEntry)
             }
         }
         chipControllerSupportedAbis.each { abi ->
