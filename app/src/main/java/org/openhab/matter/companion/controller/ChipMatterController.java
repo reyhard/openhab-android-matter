@@ -13,6 +13,10 @@ public final class ChipMatterController implements MatterController {
         this(new SystemNativeChipBridge(), ChipMatterControllerConfig.defaultConfig());
     }
 
+    public ChipMatterController(ChipMatterControllerConfig config) {
+        this(new SystemNativeChipBridge(), config);
+    }
+
     public ChipMatterController(NativeLibraryLoader loader, ChipMatterControllerConfig config) {
         this(new LoaderBackedNativeChipBridge(loader), config);
     }

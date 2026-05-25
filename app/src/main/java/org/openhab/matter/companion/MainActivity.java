@@ -12,12 +12,14 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.openhab.matter.companion.controller.ChipMatterController;
+import org.openhab.matter.companion.controller.ChipMatterControllerConfig;
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.config.AppConfig;
 import org.openhab.matter.companion.config.AppConfigRepository;
@@ -31,6 +33,7 @@ import org.openhab.matter.companion.controller.MatterCommissioningResult;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.controller.MatterControllerSelector;
 import org.openhab.matter.companion.controller.MatterOpenCommissioningWindowResult;
+import org.openhab.matter.companion.controller.NativeChipControllerSession;
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser;
@@ -63,6 +66,7 @@ public final class MainActivity extends Activity {
     private static final String KEY_TEMPORARY_CODE = "temporaryCode";
     private static final String KEY_COMMISSIONED_NODE_ID = "commissionedNodeId";
     private static final String KEY_NATIVE_CONTROLLER_SELECTED = "nativeControllerSelected";
+    private static final String KEY_ATTESTATION_BYPASS_ENABLED = "attestationBypassEnabled";
     private static final int COMMISSIONING_PERMISSION_REQUEST = 2001;
     private static final int QR_SCAN_REQUEST = 3001;
     private static final int IN_APP_QR_SCAN_REQUEST = 3002;
@@ -71,18 +75,18 @@ public final class MainActivity extends Activity {
     private static final int PAYLOAD_INPUT_ID = 1002;
     private static final int OPENHAB_INPUT_ID = 1003;
     private static final int OTBR_INPUT_ID = 1004;
+    private static final String NATIVE_CHIP_LIBRARY = "openhab_matter_chip";
     private static final int PANEL_COLOR = Color.rgb(255, 251, 240);
     private static final int TEXT_COLOR = Color.rgb(36, 50, 48);
     private static final int MUTED_COLOR = Color.rgb(74, 94, 90);
 
     private final AppState state = new AppState();
     private final MatterController fakeMatterController = new FakeMatterController();
-    private final ChipMatterController chipMatterController = new ChipMatterController();
+    private NativeChipControllerSession controllerSession = newNativeControllerSession(false);
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
     private final OpenHabInboxClient openHabInboxClient = new HttpOpenHabInboxClient();
     private final OpenHabInboxSseClient openHabInboxSseClient = new OpenHabInboxSseClient();
     private final OtbrClient otbrClient = new HttpOtbrClient();
-    private MatterController controller = fakeMatterController;
     private AppConfigRepository configRepository;
     private MatterBootstrapStateRepository bootstrapStateRepository;
     private TextView output;
@@ -90,7 +94,7 @@ public final class MainActivity extends Activity {
     private EditText payloadInput;
     private EditText openHabInput;
     private EditText otbrInput;
-    private boolean nativeMatterControllerSelected;
+    private CheckBox attestationBypassInput;
     private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
     private boolean persistedBootstrapStateUnreadable;
@@ -106,6 +110,7 @@ public final class MainActivity extends Activity {
         loadPersistedConfig();
         loadPersistedBootstrapState();
         restoreState(savedInstanceState);
+        controllerSession = newNativeControllerSession(state.attestationBypassEnabled);
         state.commissionedNodeId = MatterBootstrapStateResolver.resolveNodeId(
                 state.commissionedNodeId,
                 persistedBootstrapState);
@@ -142,6 +147,12 @@ public final class MainActivity extends Activity {
         openHabInput = input("openHAB base URL, for example http://openhab.local:8080", false);
         openHabInput.setId(OPENHAB_INPUT_ID);
         openHabInput.setText(state.openHabBaseUrl);
+        attestationBypassInput = new CheckBox(this);
+        attestationBypassInput.setText("Developer attestation bypass for native CHIP commissioning");
+        attestationBypassInput.setTextColor(TEXT_COLOR);
+        attestationBypassInput.setChecked(state.attestationBypassEnabled);
+        attestationBypassInput.setLayoutParams(blockParams());
+        attestationBypassInput.setOnCheckedChangeListener((buttonView, isChecked) -> syncAttestationBypassFromInput());
 
         Button commissionThread = button("Simulate Thread commissioning");
         Button openWindow = button("Simulate open commissioning window");
@@ -184,6 +195,9 @@ public final class MainActivity extends Activity {
         root.addView(payloadInput);
         root.addView(section("openHAB readiness"));
         root.addView(openHabInput);
+        root.addView(section("Native CHIP attestation"));
+        root.addView(panel(MainActivityPresentation.attestationBypassWarning()));
+        root.addView(attestationBypassInput);
         root.addView(commissionThread);
         root.addView(openWindow);
         root.addView(wifiHandoff);
@@ -286,6 +300,7 @@ public final class MainActivity extends Activity {
         state.setupPayload = payloadInput.getText().toString();
         state.openHabBaseUrl = openHabInput.getText().toString();
         state.otbrBaseUrl = otbrInput.getText().toString();
+        state.attestationBypassEnabled = attestationBypassInput.isChecked();
         outState.putString(KEY_DATASET, state.dataset);
         outState.putString(KEY_SETUP_PAYLOAD, state.setupPayload);
         outState.putString(KEY_OPENHAB_BASE_URL, state.openHabBaseUrl);
@@ -293,7 +308,8 @@ public final class MainActivity extends Activity {
         outState.putString(KEY_LOGS, state.logs);
         outState.putString(KEY_TEMPORARY_CODE, state.temporaryCode);
         outState.putLong(KEY_COMMISSIONED_NODE_ID, state.commissionedNodeId);
-        outState.putBoolean(KEY_NATIVE_CONTROLLER_SELECTED, nativeMatterControllerSelected);
+        outState.putBoolean(KEY_NATIVE_CONTROLLER_SELECTED, controllerSession.nativeSelected());
+        outState.putBoolean(KEY_ATTESTATION_BYPASS_ENABLED, state.attestationBypassEnabled);
     }
 
     private void runCommissioning() {
@@ -310,10 +326,11 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        MatterController selectedController = controller;
+        MatterController selectedController = controllerSession.controller();
+        boolean nativeControllerSelected = controllerSession.nativeSelected();
         MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
         String controllerState = bootstrapState.controllerState();
-        append(nativeMatterControllerSelected
+        append(nativeControllerSelected
                 ? "Starting native CHIP Thread commissioning."
                 : "Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
         append("Validated Thread dataset without displaying it.");
@@ -343,11 +360,12 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        MatterController selectedController = controller;
+        MatterController selectedController = controllerSession.controller();
+        boolean nativeControllerSelected = controllerSession.nativeSelected();
         long nodeId = state.commissionedNodeId;
         MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
         String controllerState = bootstrapState.controllerState();
-        append(nativeMatterControllerSelected
+        append(nativeControllerSelected
                 ? "Opening native CHIP commissioning window."
                 : "Opening a simulated commissioning window. This does not call a real Matter controller.");
         new Thread(() -> {
@@ -408,9 +426,14 @@ public final class MainActivity extends Activity {
     }
 
     private void checkNativeChipController() {
+        NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
         new Thread(() -> {
-            ChipMatterControllerStatus status = chipMatterController.readiness();
-            appendFromWorker(MainActivityPresentation.nativeChipReadiness(status));
+            ChipMatterControllerStatus status = request.nativeController().readiness();
+            runOnUiThread(() -> {
+                if (controllerSession.isCurrent(request)) {
+                    append(MainActivityPresentation.nativeChipReadiness(status));
+                }
+            });
         }, "matter-chip-readiness").start();
     }
 
@@ -422,12 +445,18 @@ public final class MainActivity extends Activity {
         state.dataset = datasetInput.getText().toString();
         state.openHabBaseUrl = openHabInput.getText().toString();
         state.otbrBaseUrl = otbrInput.getText().toString();
+        syncAttestationBypassFromInput();
         try {
             if (state.dataset != null && !state.dataset.trim().isEmpty()) {
                 ThreadDataset.parse(state.dataset);
             }
-            configRepository.save(new AppConfig(state.dataset, state.openHabBaseUrl, state.otbrBaseUrl));
-            append(MainActivityPresentation.encryptedConfigSaved());
+            configRepository.save(new AppConfig(
+                    state.dataset,
+                    state.openHabBaseUrl,
+                    state.otbrBaseUrl,
+                    false,
+                    state.attestationBypassEnabled));
+            append(MainActivityPresentation.encryptedConfigSaved(state.attestationBypassEnabled));
         } catch (Exception ex) {
             append("Configuration was not saved. Check the Thread dataset format; sensitive values are not repeated in this log.");
         }
@@ -667,6 +696,9 @@ public final class MainActivity extends Activity {
         state.temporaryCode = savedInstanceState.getString(KEY_TEMPORARY_CODE, "");
         state.commissionedNodeId = savedInstanceState.getLong(KEY_COMMISSIONED_NODE_ID, -1L);
         restoreNativeControllerSelection = savedInstanceState.getBoolean(KEY_NATIVE_CONTROLLER_SELECTED, false);
+        state.attestationBypassEnabled = savedInstanceState.getBoolean(
+                KEY_ATTESTATION_BYPASS_ENABLED,
+                state.attestationBypassEnabled);
     }
 
     private void loadPersistedConfig() {
@@ -674,6 +706,7 @@ public final class MainActivity extends Activity {
         state.dataset = config.threadDataset();
         state.openHabBaseUrl = config.openHabBaseUrl();
         state.otbrBaseUrl = config.otbrBaseUrl();
+        state.attestationBypassEnabled = config.attestationBypassEnabled();
         persistedThreadDatasetUnreadable = config.threadDatasetUnreadable();
     }
 
@@ -705,19 +738,43 @@ public final class MainActivity extends Activity {
     }
 
     private void selectNativeChipControllerAsync(boolean appendWhenSelected) {
+        NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
         new Thread(() -> {
             MatterControllerSelection selection = MatterControllerSelector.select(
                     fakeMatterController,
-                    chipMatterController,
+                    request.nativeController(),
                     true);
             runOnUiThread(() -> {
-                controller = selection.controller();
-                nativeMatterControllerSelected = selection.nativeSelected();
+                boolean applied = controllerSession.applySelection(request, selection);
+                if (!applied) {
+                    return;
+                }
                 if (appendWhenSelected || !selection.nativeSelected()) {
                     append(MainActivityPresentation.matterControllerSelection(selection));
                 }
             });
         }, "matter-controller-selection").start();
+    }
+
+    private void syncAttestationBypassFromInput() {
+        boolean checked = attestationBypassInput != null && attestationBypassInput.isChecked();
+        state.attestationBypassEnabled = checked;
+        if (controllerSession.syncAttestationBypass(checked)) {
+            restoreNativeControllerSelection = false;
+        }
+    }
+
+    private static ChipMatterController newChipMatterController(boolean attestationBypassEnabled) {
+        return new ChipMatterController(new ChipMatterControllerConfig(
+                NATIVE_CHIP_LIBRARY,
+                attestationBypassEnabled));
+    }
+
+    private NativeChipControllerSession newNativeControllerSession(boolean attestationBypassEnabled) {
+        return new NativeChipControllerSession(
+                fakeMatterController,
+                attestationBypassEnabled,
+                MainActivity::newChipMatterController);
     }
 
     private int dp(int value) {

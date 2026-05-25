@@ -8,4 +8,5 @@ public final class AppState {
     public String logs = "";
     public String temporaryCode = "";
     public long commissionedNodeId = -1L;
+    public boolean attestationBypassEnabled;
 }

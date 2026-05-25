@@ -216,8 +216,29 @@ public class MainActivityPresentationTest {
     @Test
     public void describesEncryptedConfigSave() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage, saved OTBR base URL, and saved openHAB base URL. Setup payloads and PINs are not saved.",
+                "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: off. Setup payloads and PINs are not saved.",
                 MainActivityPresentation.encryptedConfigSaved());
+    }
+
+    @Test
+    public void describesAttestationBypassWarning() {
+        assertEquals(
+                "Developer attestation bypass skips device attestation verification for lab devices only. Leave it off for production pairing.",
+                MainActivityPresentation.attestationBypassWarning());
+    }
+
+    @Test
+    public void describesConfigSaveWithAttestationBypassDisabled() {
+        assertEquals(
+                "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: off. Setup payloads and PINs are not saved.",
+                MainActivityPresentation.encryptedConfigSaved(false));
+    }
+
+    @Test
+    public void describesConfigSaveWithAttestationBypassEnabled() {
+        assertEquals(
+                "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: on. Setup payloads and PINs are not saved.",
+                MainActivityPresentation.encryptedConfigSaved(true));
     }
 
     @Test
@@ -308,7 +329,22 @@ public class MainActivityPresentationTest {
         ChipMatterControllerStatus status = new ChipMatterControllerStatus(false, "openhab_matter_chip", false, "missing");
 
         assertEquals(
-                "Native CHIP controller not ready: missing",
+                "Native CHIP controller not ready: missing. Developer attestation bypass: off.",
+                MainActivityPresentation.nativeChipReadiness(status));
+    }
+
+    @Test
+    public void describesNativeChipReadinessWithAttestationBypass() {
+        ChipMatterControllerStatus status = new ChipMatterControllerStatus(
+                true,
+                "openhab_matter_chip",
+                true,
+                "connectedhomeip",
+                true,
+                "Native CHIP library loaded: openhab_matter_chip");
+
+        assertEquals(
+                "Native CHIP controller ready: openhab_matter_chip. Developer attestation bypass: on.",
                 MainActivityPresentation.nativeChipReadiness(status));
     }
 

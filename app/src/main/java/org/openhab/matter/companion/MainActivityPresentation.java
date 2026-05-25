@@ -48,7 +48,17 @@ final class MainActivityPresentation {
     }
 
     static String encryptedConfigSaved() {
-        return "Saved Thread dataset in encrypted app storage, saved OTBR base URL, and saved openHAB base URL. Setup payloads and PINs are not saved.";
+        return encryptedConfigSaved(false);
+    }
+
+    static String encryptedConfigSaved(boolean attestationBypassEnabled) {
+        return "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: "
+                + onOff(attestationBypassEnabled)
+                + ". Setup payloads and PINs are not saved.";
+    }
+
+    static String attestationBypassWarning() {
+        return "Developer attestation bypass skips device attestation verification for lab devices only. Leave it off for production pairing.";
     }
 
     static String threadDatasetUnreadable() {
@@ -95,9 +105,11 @@ final class MainActivityPresentation {
 
     static String nativeChipReadiness(ChipMatterControllerStatus status) {
         if (status.ready()) {
-            return "Native CHIP controller ready: " + status.libraryName();
+            return "Native CHIP controller ready: " + status.libraryName()
+                    + ". Developer attestation bypass: " + onOff(status.attestationBypassEnabled()) + ".";
         }
-        return "Native CHIP controller not ready: " + status.message();
+        return "Native CHIP controller not ready: " + status.message()
+                + ". Developer attestation bypass: " + onOff(status.attestationBypassEnabled()) + ".";
     }
 
     static String matterControllerSelection(MatterControllerSelection selection) {
@@ -157,6 +169,10 @@ final class MainActivityPresentation {
 
     private static String runtimePermissionRequestDeniedOrInterrupted() {
         return "Runtime commissioning permission request completed: one or more permissions were denied or the request was interrupted.";
+    }
+
+    private static String onOff(boolean enabled) {
+        return enabled ? "on" : "off";
     }
 
     private static String redactMatterSecrets(String value) {
