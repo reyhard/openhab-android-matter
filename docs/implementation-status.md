@@ -22,6 +22,7 @@
 - External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
 - Native CHIP bridge metadata distinguishes missing, stub, and production connectedhomeip libraries.
 - Debug APK packages a JNI stub `libopenhab_matter_chip.so` for native loading and metadata verification.
+- Gradle can package ABI-specific prebuilt `libopenhab_matter_chip.so` replacements instead of the bundled JNI stub.
 - Runtime controller selection can switch from the simulated controller to `ChipMatterController` only when a production native JNI library is bundled and readiness passes.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 

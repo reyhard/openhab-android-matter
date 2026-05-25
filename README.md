@@ -53,6 +53,8 @@ Build and test the debug APK:
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --offline
 ```
 
+By default, the APK packages the non-production JNI stub. To package a prebuilt production bridge, pass `-PopenhabMatterChipNativeMode=prebuilt "-PopenhabMatterChipPrebuiltDir=<dir>"` where `<dir>` contains ABI subdirectories with `libopenhab_matter_chip.so`.
+
 The APK is written to:
 
 ```text

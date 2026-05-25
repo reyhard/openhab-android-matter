@@ -40,6 +40,32 @@ The Java layer rejects missing node IDs and missing or blank temporary setup cod
 
 The debug APK currently packages a JNI stub that returns `kind=stub;production=false`; this proves native packaging and loading only. It does not perform Matter commissioning.
 
+## Prebuilt Production Bridge Packaging
+
+The default APK builds the JNI stub from `app/src/main/cpp`. To package a production bridge instead, build a connectedhomeip-backed shared library that exports this app's `SystemNativeChipBridge` JNI symbols and place it in:
+
+```text
+<prebuilt-dir>/arm64-v8a/libopenhab_matter_chip.so
+<prebuilt-dir>/armeabi-v7a/libopenhab_matter_chip.so
+<prebuilt-dir>/x86/libopenhab_matter_chip.so
+<prebuilt-dir>/x86_64/libopenhab_matter_chip.so
+```
+
+Then build with:
+
+```powershell
+.\gradlew.bat :app:assembleDebug --offline -PopenhabMatterChipNativeMode=prebuilt "-PopenhabMatterChipPrebuiltDir=<prebuilt-dir>"
+```
+
+The prebuilt library must return `kind=connectedhomeip;production=true` from `nativeControllerMetadata()` or the Java selector will keep using the simulated controller.
+
+The local connectedhomeip Android APIs that the production bridge should mirror are:
+
+- `ChipDeviceController.pairDeviceThroughBLE(...)` with `NetworkCredentials.forThread(...)` for BLE Thread commissioning.
+- `ChipDeviceController.setDeviceAttestationDelegate(...)` and `continueCommissioning(..., ignoreAttestationFailure)` for the persisted developer bypass flag.
+- `ChipDeviceController.setAttestationTrustStoreDelegate(...)` for production PAA trust-store verification.
+- `ChipDeviceController.openPairingWindowWithPINCallback(...)` for Enhanced OpenCommissioningWindow and returned manual/QR codes.
+
 ## connectedhomeip Behavior To Mirror
 
 - `chip-tool pairing ble-thread <NODE_ID> hex:<DATASET_HEX> <PIN> <DISCRIMINATOR>`
