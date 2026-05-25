@@ -57,6 +57,23 @@ public final class MatterControllerSelectorTest {
         assertTrue(selection.message().contains("Continuing with simulated Matter controller"));
     }
 
+    @Test
+    public void fallsBackWhenNativeBridgeIsOnlyStub() {
+        MatterController fallback = new FakeMatterController();
+        ChipMatterController nativeController = new ChipMatterController(stubBridge(),
+                ChipMatterControllerConfig.defaultConfig());
+
+        MatterControllerSelection selection = MatterControllerSelector.select(
+                fallback,
+                nativeController,
+                true);
+
+        assertSame(fallback, selection.controller());
+        assertFalse(selection.nativeSelected());
+        assertTrue(selection.message().contains("Native CHIP controller not ready"));
+        assertTrue(selection.message().contains("stub"));
+    }
+
     private static NativeChipBridge productionBridge() {
         return new NativeChipBridge() {
             @Override
@@ -76,6 +93,29 @@ public final class MatterControllerSelectorTest {
             @Override
             public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
                 return "MT:PRODUCTION";
+            }
+        };
+    }
+
+    private static NativeChipBridge stubBridge() {
+        return new NativeChipBridge() {
+            @Override
+            public void load(String libraryName) {
+            }
+
+            @Override
+            public String metadata() {
+                return "kind=stub;version=0.1.0;production=false;message=packaging stub";
+            }
+
+            @Override
+            public long commissionBleThread(String datasetHex, long pin, int discriminator) {
+                throw new AssertionError("selector must not call commissioning");
+            }
+
+            @Override
+            public String openCommissioningWindow(long nodeId, int timeoutSeconds, int discriminator) {
+                throw new AssertionError("selector must not call OCW");
             }
         };
     }
