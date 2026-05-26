@@ -166,7 +166,10 @@ final class MainActivityPresentation {
         if (status.ready()) {
             return "connectedhomeip Android controller artifacts ready: " + status.libraryName() + ".";
         }
-        return "connectedhomeip Android controller artifacts not ready: " + status.message();
+        return "connectedhomeip Android controller artifacts not ready: " + status.message()
+                + ". This APK was built without the official connectedhomeip CHIPTool-style controller artifacts. "
+                + "Rebuild and install with -ChipControllerArtifactsDir <artifact-dir> containing CHIPController.jar "
+                + "and jniLibs/<abi>/libCHIPController.so.";
     }
 
     static String connectedHomeIpFabricRestore(ConnectedHomeIpFabricRestoreStatus status) {

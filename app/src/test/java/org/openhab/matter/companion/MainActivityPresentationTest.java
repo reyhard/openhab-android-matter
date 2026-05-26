@@ -431,7 +431,7 @@ public class MainActivityPresentationTest {
                 "Missing connectedhomeip controller class: chip.platform.AndroidChipPlatform");
 
         assertEquals(
-                "connectedhomeip Android controller artifacts not ready: Missing connectedhomeip controller class: chip.platform.AndroidChipPlatform",
+                "connectedhomeip Android controller artifacts not ready: Missing connectedhomeip controller class: chip.platform.AndroidChipPlatform. This APK was built without the official connectedhomeip CHIPTool-style controller artifacts. Rebuild and install with -ChipControllerArtifactsDir <artifact-dir> containing CHIPController.jar and jniLibs/<abi>/libCHIPController.so.",
                 MainActivityPresentation.connectedHomeIpArtifacts(status));
     }
 
