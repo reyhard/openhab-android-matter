@@ -28,7 +28,7 @@ This branch builds an installable Android APK with:
 - A packaged JNI stub verifies Android native-library packaging, but it reports `production=false` and is never selected for real commissioning.
 - Runtime controller selection can switch from the simulated controller to the reflection-backed connectedhomeip Java controller when official connectedhomeip Android artifacts are bundled and readiness passes.
 - A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
-- A native Android UI that displays the temporary code and openHAB Matter Scan Input instructions.
+- A native Android UI that displays the temporary manual code, renders a temporary Matter setup QR code when one is returned, and shows openHAB Matter Scan Input instructions.
 - A standalone troubleshooting guide for openHAB Matter binding readiness, REST token authentication, OTBR address expectations, IPv6 routing, mDNS/Avahi, connectedhomeip artifact packaging, and Scan Input handoff.
 
 The real connectedhomeip controller path is isolated behind `MatterController`. The debug APK keeps a deterministic simulated controller as the safe fallback and exposes a connectedhomeip controller selection path for builds that include the official Android controller artifacts.

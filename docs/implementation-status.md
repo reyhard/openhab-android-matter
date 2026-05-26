@@ -24,7 +24,8 @@
 - Java-side connectedhomeip controller command seam maps this app's `MatterController` commands to the reflection-backed `ChipDeviceController` gateway, including Thread dataset, PIN, discriminator, attestation bypass, controller state, and OCW iteration inputs.
 - Thread datasets can be converted from normalized hex to `byte[]` for connectedhomeip `NetworkCredentials.ThreadCredentials`.
 - Reflection command factory can construct connectedhomeip Thread `NetworkCredentials`, `CommissionParameters`, and locate the `pairDeviceThroughBLE(...)` and `openPairingWindowWithPINCallback(...)` controller methods without compile-time CHIP dependencies.
-- Reflection command factory can invoke `pairDeviceThroughBLE(...)` and bridge `OpenCommissioningCallback` success/error responses into the app's OCW result model.
+- Reflection command factory can invoke `pairDeviceThroughBLE(...)` and bridge `OpenCommissioningCallback` success/error responses, including manual and QR setup codes, into the app's OCW result model.
+- OpenCommissioningWindow results can display a temporary Matter setup QR code in the app when connectedhomeip returns one, with manual setup code instructions retained as a fallback.
 - Reflection-backed `ConnectedHomeIpControllerGateway` orchestration invokes the connectedhomeip BLE Thread and OCW commands through injectable controller, BLE connection, node-id, attestation-handler, commissioning-monitor, and connected-device-pointer seams.
 - Reflection bridges cover connectedhomeip `CompletionListener`, `DeviceAttestationDelegate`, `continueCommissioning(...)`, `getConnectedDevicePointer(...)`, and `releaseConnectedDevicePointer(...)`.
 - Reflection commissioning monitor installs a fresh connectedhomeip completion listener before each BLE pairing command, preventing stale one-shot callback state across commissioning attempts.

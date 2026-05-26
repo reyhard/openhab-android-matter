@@ -29,12 +29,12 @@ Create the Android companion app described in `docs/research.md`: a phone-based 
 | BLE Thread commissioning on Android through connectedhomeip | Offline integration seams implemented; not proven on hardware | `ConnectedHomeIpMatterController`, `ConnectedHomeIpReflectionGateway`, `docs/chip-jni-integration.md` |
 | Attestation handling with developer bypass option | Implemented as a persisted option and reflection seam; production trust-store behavior still needs real artifact validation | `ConnectedHomeIpReflectionAttestationHandler`, `MainActivity`, `docs/chip-jni-integration.md` |
 | OpenCommissioningWindow from Android | Offline reflection and result model implemented; not proven on hardware | `ConnectedHomeIpOpenCommissioningWindowCallback`, `ConnectedHomeIpReflectionCommandFactory`, tests |
-| Display temporary code and openHAB Scan Input instructions | Implemented for simulated/OCW result path | `OpenHabInstructions`, `MainActivity.runOpenCommissioningWindow()` |
+| Display temporary code and openHAB Scan Input instructions | Implemented for simulated/OCW result path, including QR display when the OCW result includes a QR payload | `OpenHabInstructions`, `MainActivity.runOpenCommissioningWindow()`, `QrCodeMatrix` |
 | openHAB Matter readiness and Inbox confirmation | Implemented with optional bearer-token authentication | `HttpOpenHabClient`, `HttpOpenHabInboxClient`, `OpenHabInboxSseClient` |
 | Real connectedhomeip artifacts packaged into APK | Packaging gates implemented; real artifacts are not present in this workspace | `docs/chip-jni-integration.md`, `build.gradle`, `scripts/test_connectedhomeip_artifacts.ps1` |
 | Real-device Matter/Thread validation | Not complete | `docs/implementation-status.md` Not Implemented Yet |
 | Standalone troubleshooting/help screen | Implemented as an in-app guide action | `OpenHabInstructions.troubleshootingGuide()`, `MainActivity`, `OpenHabInstructionsTest` |
-| Temporary QR display for OCW result | Not complete; manual temporary code instructions exist | `docs/research.md`, `MainActivity.runOpenCommissioningWindow()` |
+| Temporary QR display for OCW result | Implemented when connectedhomeip returns a QR payload; manual code remains available | `MatterOpenCommissioningWindowResult`, `ConnectedHomeIpOpenCommissioningWindowCallback`, `QrCodeMatrix`, `MainActivity.runOpenCommissioningWindow()` |
 | Wi-Fi/generic multi-admin direct openHAB REST pairing | Not required for the copy-paste path and not implemented; current app supports validated handoff to Scan Input | `docs/research.md`, `MatterHandoffCodeParser` |
 
 ## Remaining Completion Gates
@@ -45,10 +45,9 @@ Create the Android companion app described in `docs/research.md`: a phone-based 
 4. Validate Android BLE scan/connect against a real Matter-over-Thread device in pairing mode.
 5. Validate PASE, attestation continuation or deliberate developer bypass, and Thread dataset provisioning into the target OTBR network.
 6. Validate fabric restore after app restart using the connectedhomeip fabric-restore probe.
-7. Validate OpenCommissioningWindow returns a usable temporary manual or QR code.
+7. Validate OpenCommissioningWindow returns a usable temporary manual or QR code on real hardware.
 8. Enter that temporary code in openHAB Matter Scan Input and verify the device appears in the openHAB Inbox.
 9. Decide whether the phone bootstrap fabric is intentionally ephemeral or must persist full connectedhomeip fabric state across restarts.
-10. Decide whether displaying a temporary QR code is necessary for MVP acceptance or whether the manual code and Scan Input instructions are sufficient.
 
 ## Completion Judgment
 

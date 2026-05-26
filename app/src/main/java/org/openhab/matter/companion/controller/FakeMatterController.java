@@ -28,7 +28,10 @@ public final class FakeMatterController implements MatterController {
             ProgressListener listener) {
         emit(listener, "Simulated: opening commissioning window on node " + nodeId + " for " + timeoutSeconds + " seconds", false);
         emit(listener, "Simulated: temporary setup code generated for discriminator " + discriminator, true);
-        return new MatterOpenCommissioningWindowResult("3497-0112-332", "fake-controller-state:" + nodeId);
+        return new MatterOpenCommissioningWindowResult(
+                "3497-0112-332",
+                "MT:Y.K9042C00KA0648G00",
+                "fake-controller-state:" + nodeId);
     }
 
     private static void emit(ProgressListener listener, String message, boolean complete) {

@@ -46,7 +46,8 @@ public final class ConnectedHomeIpOpenCommissioningWindowCallback {
                 String qrCode = stringArg(args, 2);
                 try {
                     result = new MatterOpenCommissioningWindowResult(
-                            manualPairingCode.isEmpty() ? qrCode : manualPairingCode,
+                            manualPairingCode,
+                            qrCode,
                             controllerState);
                 } catch (IllegalArgumentException exception) {
                     error = new IllegalStateException(

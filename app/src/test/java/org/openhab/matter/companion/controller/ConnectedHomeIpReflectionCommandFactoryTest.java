@@ -92,6 +92,7 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
         assertEquals(1000L, controller.iteration);
         assertEquals(3840, controller.discriminator);
         assertEquals("3497-0112-332", result.temporaryCode());
+        assertEquals("MT:TEST", result.qrCode());
         assertEquals("controller-state", result.controllerState());
     }
 

@@ -6,6 +6,7 @@ import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -14,6 +15,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -53,6 +55,7 @@ import org.openhab.matter.companion.otbr.OtbrClient;
 import org.openhab.matter.companion.otbr.OtbrStatus;
 import org.openhab.matter.companion.permissions.CommissioningPermissionPlanner;
 import org.openhab.matter.companion.qr.InAppQrScannerActivity;
+import org.openhab.matter.companion.qr.QrCodeBitmapFactory;
 import org.openhab.matter.companion.qr.QrScanIntentFactory;
 import org.openhab.matter.companion.ui.AppState;
 
@@ -98,6 +101,7 @@ public final class MainActivity extends Activity {
     private EditText openHabTokenInput;
     private EditText otbrInput;
     private CheckBox attestationBypassInput;
+    private ImageView temporaryQrImage;
     private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
     private boolean persistedOpenHabApiTokenUnreadable;
@@ -178,6 +182,12 @@ public final class MainActivity extends Activity {
         Button useNativeChip = button(MainActivityPresentation.useControllerButtonLabel());
         Button troubleshootingGuide = button(MainActivityPresentation.troubleshootingGuideButtonLabel());
         Button saveConfig = button("Save dataset, OTBR address, openHAB URL, and token");
+        temporaryQrImage = new ImageView(this);
+        temporaryQrImage.setAdjustViewBounds(true);
+        temporaryQrImage.setBackgroundColor(Color.WHITE);
+        temporaryQrImage.setPadding(dp(12), dp(12), dp(12), dp(12));
+        temporaryQrImage.setVisibility(android.view.View.GONE);
+        temporaryQrImage.setLayoutParams(blockParams());
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
 
@@ -227,6 +237,7 @@ public final class MainActivity extends Activity {
         root.addView(useNativeChip);
         root.addView(troubleshootingGuide);
         root.addView(saveConfig);
+        root.addView(temporaryQrImage);
         root.addView(section("Guide output"));
         root.addView(output);
 
@@ -404,6 +415,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     state.temporaryCode = result.temporaryCode();
                     saveBootstrapState(nodeId, result.controllerState());
+                    showTemporaryQrCode(result);
                     append(OpenHabInstructions.scanInputInstructions(state.temporaryCode));
                     append(OpenHabInstructions.troubleshooting());
                 });
@@ -429,6 +441,26 @@ public final class MainActivity extends Activity {
 
     private void showTroubleshootingGuide() {
         append(OpenHabInstructions.troubleshootingGuide());
+    }
+
+    private void showTemporaryQrCode(MatterOpenCommissioningWindowResult result) {
+        if (temporaryQrImage == null) {
+            return;
+        }
+        if (!result.hasQrCode()) {
+            temporaryQrImage.setVisibility(android.view.View.GONE);
+            return;
+        }
+        try {
+            Bitmap bitmap = QrCodeBitmapFactory.createBitmap(result.qrCode(), Math.max(4, dp(4)));
+            temporaryQrImage.setImageBitmap(bitmap);
+            temporaryQrImage.setContentDescription("Temporary Matter setup QR code for openHAB Scan Input");
+            temporaryQrImage.setVisibility(android.view.View.VISIBLE);
+            append("Temporary Matter setup QR displayed for openHAB Scan Input.");
+        } catch (IllegalArgumentException exception) {
+            temporaryQrImage.setVisibility(android.view.View.GONE);
+            append("Temporary Matter setup QR could not be displayed: " + exception.getMessage());
+        }
     }
 
     private void scanMatterQrWithExternalScanner() {
