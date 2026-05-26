@@ -30,12 +30,32 @@ public class SharedPreferencesAppConfigRepositoryTest {
         repository.save(new AppConfig(
                 "hex:0E080000000000010000",
                 "http://openhab.local:8080",
+                "oh.test.token",
                 "http://otbr.local",
                 false,
                 true));
 
         assertEquals(true, preferences.getBoolean("attestation_bypass_enabled", false));
+        assertEquals("enc:v1:encoded(oh.test.token)", preferences.getString("openhab_api_token", ""));
         assertEquals(true, repository.load().attestationBypassEnabled());
+        assertEquals("oh.test.token", repository.load().openHabApiToken());
+    }
+
+    @Test
+    public void loadMigratesLegacyPlaintextOpenHabTokenToEncryptedStorage() {
+        FakeSharedPreferences preferences = new FakeSharedPreferences();
+        preferences.edit()
+                .putString("thread_dataset", "enc:v1:encoded(hex:001122)")
+                .putString("openhab_base_url", "http://openhab.local:8080")
+                .putString("openhab_api_token", "oh.legacy.token")
+                .putString("otbr_base_url", "fd00::1")
+                .apply();
+        SharedPreferencesAppConfigRepository repository = repository(preferences);
+
+        AppConfig config = repository.load();
+
+        assertEquals("oh.legacy.token", config.openHabApiToken());
+        assertEquals("enc:v1:encoded(oh.legacy.token)", preferences.getString("openhab_api_token", ""));
     }
 
     private static SharedPreferencesAppConfigRepository repository(FakeSharedPreferences preferences) {

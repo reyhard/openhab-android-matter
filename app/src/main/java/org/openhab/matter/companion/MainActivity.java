@@ -77,6 +77,7 @@ public final class MainActivity extends Activity {
     private static final int PAYLOAD_INPUT_ID = 1002;
     private static final int OPENHAB_INPUT_ID = 1003;
     private static final int OTBR_INPUT_ID = 1004;
+    private static final int OPENHAB_TOKEN_INPUT_ID = 1005;
     private static final int PANEL_COLOR = Color.rgb(255, 251, 240);
     private static final int TEXT_COLOR = Color.rgb(36, 50, 48);
     private static final int MUTED_COLOR = Color.rgb(74, 94, 90);
@@ -94,10 +95,12 @@ public final class MainActivity extends Activity {
     private EditText datasetInput;
     private EditText payloadInput;
     private EditText openHabInput;
+    private EditText openHabTokenInput;
     private EditText otbrInput;
     private CheckBox attestationBypassInput;
     private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
+    private boolean persistedOpenHabApiTokenUnreadable;
     private boolean persistedBootstrapStateUnreadable;
     private MatterBootstrapState persistedBootstrapState = MatterBootstrapState.empty();
     private volatile boolean sseWatchActive;
@@ -138,7 +141,7 @@ public final class MainActivity extends Activity {
         datasetInput = input("Thread Active Operational Dataset hex", true);
         datasetInput.setId(DATASET_INPUT_ID);
         datasetInput.setText(state.dataset);
-        otbrInput = input("OTBR base URL, for example http://otbr.local", false);
+        otbrInput = input("OTBR address or diagnostic URL, for example fd00::1 or http://otbr.local", false);
         otbrInput.setId(OTBR_INPUT_ID);
         otbrInput.setText(state.otbrBaseUrl);
         payloadInput = input("Matter setup payload: MT:... or pin=20202021;disc=3840;vendor=Aqara;product=U200", false);
@@ -147,6 +150,12 @@ public final class MainActivity extends Activity {
         openHabInput = input("openHAB base URL, for example http://openhab.local:8080", false);
         openHabInput.setId(OPENHAB_INPUT_ID);
         openHabInput.setText(state.openHabBaseUrl);
+        openHabTokenInput = input("openHAB REST API token (optional)", false);
+        openHabTokenInput.setId(OPENHAB_TOKEN_INPUT_ID);
+        openHabTokenInput.setText(state.openHabApiToken);
+        openHabTokenInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         attestationBypassInput = new CheckBox(this);
         attestationBypassInput.setText(MainActivityPresentation.attestationBypassLabel());
         attestationBypassInput.setTextColor(TEXT_COLOR);
@@ -167,7 +176,7 @@ public final class MainActivity extends Activity {
         Button checkChip = button(MainActivityPresentation.checkControllerButtonLabel());
         Button checkFabricRestore = button(MainActivityPresentation.checkFabricRestoreButtonLabel());
         Button useNativeChip = button(MainActivityPresentation.useControllerButtonLabel());
-        Button saveConfig = button("Save dataset, OTBR URL, and openHAB URL");
+        Button saveConfig = button("Save dataset, OTBR address, openHAB URL, and token");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
 
@@ -197,6 +206,7 @@ public final class MainActivity extends Activity {
         root.addView(payloadInput);
         root.addView(section("openHAB readiness"));
         root.addView(openHabInput);
+        root.addView(openHabTokenInput);
         root.addView(section("connectedhomeip attestation"));
         root.addView(panel(MainActivityPresentation.attestationBypassWarning()));
         root.addView(attestationBypassInput);
@@ -226,6 +236,9 @@ public final class MainActivity extends Activity {
             append("Paste your OTBR Thread dataset and Matter setup payload. Sensitive input is validated but not echoed in this log.");
             if (persistedThreadDatasetUnreadable) {
                 append(MainActivityPresentation.threadDatasetUnreadable());
+            }
+            if (persistedOpenHabApiTokenUnreadable) {
+                append(MainActivityPresentation.openHabApiTokenUnreadable());
             }
             if (persistedBootstrapStateUnreadable) {
                 append(MainActivityPresentation.bootstrapStateUnreadable());
@@ -507,6 +520,7 @@ public final class MainActivity extends Activity {
     private void saveConfiguration() {
         state.dataset = datasetInput.getText().toString();
         state.openHabBaseUrl = openHabInput.getText().toString();
+        state.openHabApiToken = openHabTokenInput.getText().toString();
         state.otbrBaseUrl = otbrInput.getText().toString();
         syncAttestationBypassFromInput();
         try {
@@ -516,10 +530,13 @@ public final class MainActivity extends Activity {
             configRepository.save(new AppConfig(
                     state.dataset,
                     state.openHabBaseUrl,
+                    state.openHabApiToken,
                     state.otbrBaseUrl,
                     false,
                     state.attestationBypassEnabled));
-            append(MainActivityPresentation.encryptedConfigSaved(state.attestationBypassEnabled));
+            append(MainActivityPresentation.encryptedConfigSaved(
+                    state.attestationBypassEnabled,
+                    hasOpenHabApiToken()));
         } catch (Exception ex) {
             append("Configuration was not saved. Check the Thread dataset format; sensitive values are not repeated in this log.");
         }
@@ -528,16 +545,16 @@ public final class MainActivity extends Activity {
     private void checkOtbrConnectivity() {
         state.otbrBaseUrl = otbrInput.getText().toString();
         if (state.otbrBaseUrl == null || state.otbrBaseUrl.trim().isEmpty()) {
-            append("Enter an OTBR base URL first.");
+            append("Enter an OTBR address or diagnostic URL first.");
             return;
         }
 
-        String baseUrl = state.otbrBaseUrl.trim();
-        append("Checking OTBR connectivity at " + MainActivityPresentation.safeUrlForLog(baseUrl) + " ...");
+        String target = state.otbrBaseUrl.trim();
+        append("Checking OTBR connectivity at " + MainActivityPresentation.safeUrlForLog(target) + " ...");
         new Thread(() -> {
             OtbrStatus status;
             try {
-                status = otbrClient.checkReadiness(baseUrl);
+                status = otbrClient.checkReadiness(target);
             } catch (Exception ex) {
                 status = new OtbrStatus(false, "OTBR connectivity check failed", ex.getMessage());
             }
@@ -553,6 +570,7 @@ public final class MainActivity extends Activity {
 
     private void checkOpenHabReadiness() {
         state.openHabBaseUrl = openHabInput.getText().toString();
+        state.openHabApiToken = openHabTokenInput.getText().toString();
         if (state.openHabBaseUrl == null || state.openHabBaseUrl.trim().isEmpty()) {
             append("Enter an openHAB base URL first.");
             return;
@@ -562,7 +580,7 @@ public final class MainActivity extends Activity {
         new Thread(() -> {
             OpenHabStatus status;
             try {
-                status = openHabClient.checkReadiness(state.openHabBaseUrl);
+                status = openHabClient.checkReadiness(state.openHabBaseUrl, state.openHabApiToken);
             } catch (Exception ex) {
                 status = new OpenHabStatus(false, "openHAB readiness check failed", ex.getMessage());
             }
@@ -601,6 +619,7 @@ public final class MainActivity extends Activity {
 
     private void checkOpenHabInbox() {
         state.openHabBaseUrl = openHabInput.getText().toString();
+        state.openHabApiToken = openHabTokenInput.getText().toString();
         if (state.openHabBaseUrl == null || state.openHabBaseUrl.trim().isEmpty()) {
             append("Enter an openHAB base URL first.");
             return;
@@ -611,7 +630,7 @@ public final class MainActivity extends Activity {
         new Thread(() -> {
             OpenHabInboxStatus status;
             try {
-                status = openHabInboxClient.checkInbox(baseUrl);
+                status = openHabInboxClient.checkInbox(baseUrl, state.openHabApiToken);
             } catch (Exception ex) {
                 status = new OpenHabInboxStatus(false, false, "openHAB Inbox check failed", ex.getMessage());
             }
@@ -628,6 +647,7 @@ public final class MainActivity extends Activity {
 
     private void watchOpenHabInboxSse() {
         state.openHabBaseUrl = openHabInput.getText().toString();
+        state.openHabApiToken = openHabTokenInput.getText().toString();
         if (state.openHabBaseUrl == null || state.openHabBaseUrl.trim().isEmpty()) {
             append("Enter an openHAB base URL first.");
             return;
@@ -646,7 +666,7 @@ public final class MainActivity extends Activity {
                     runOnUiThread(() -> append(MainActivityPresentation.openHabInboxSseEvent(
                             event.matterEntryDetected())));
                     return !event.matterEntryDetected();
-                }, () -> sseWatchActive && !Thread.currentThread().isInterrupted());
+                }, () -> sseWatchActive && !Thread.currentThread().isInterrupted(), state.openHabApiToken);
             } catch (Exception ex) {
                 if (sseWatchActive) {
                     runOnUiThread(() -> append("openHAB Inbox SSE observation failed: "
@@ -768,9 +788,11 @@ public final class MainActivity extends Activity {
         AppConfig config = configRepository.load();
         state.dataset = config.threadDataset();
         state.openHabBaseUrl = config.openHabBaseUrl();
+        state.openHabApiToken = config.openHabApiToken();
         state.otbrBaseUrl = config.otbrBaseUrl();
         state.attestationBypassEnabled = config.attestationBypassEnabled();
         persistedThreadDatasetUnreadable = config.threadDatasetUnreadable();
+        persistedOpenHabApiTokenUnreadable = config.openHabApiTokenUnreadable();
     }
 
     private void loadPersistedBootstrapState() {
@@ -825,6 +847,10 @@ public final class MainActivity extends Activity {
         if (controllerSession.syncAttestationBypass(checked)) {
             restoreNativeControllerSelection = false;
         }
+    }
+
+    private boolean hasOpenHabApiToken() {
+        return state.openHabApiToken != null && !state.openHabApiToken.trim().isEmpty();
     }
 
     private NativeChipControllerSession newNativeControllerSession(boolean attestationBypassEnabled) {

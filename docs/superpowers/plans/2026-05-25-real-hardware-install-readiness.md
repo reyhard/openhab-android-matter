@@ -203,7 +203,8 @@ Collect:
 Thread Active Operational Dataset from OTBR: hex:$ThreadDatasetHex
 Matter setup payload from device QR: MT:$MatterQrPayload
 openHAB base URL: http://$OpenHabHost:8080
-OTBR base URL or diagnostic endpoint: http://$OtbrHost
+openHAB REST API token if REST access requires authentication
+OTBR IP/host address or diagnostic URL: $OtbrAddress
 ```
 
 Do not store these values in repository files.
@@ -214,15 +215,16 @@ In the app:
 
 ```text
 Paste Thread dataset
-Paste OTBR base URL
+Paste OTBR IP/host address or diagnostic URL
 Paste openHAB base URL
-Tap Save dataset, OTBR URL, and openHAB URL
+Paste openHAB REST API token if required
+Tap Save dataset, OTBR address, openHAB URL, and token
 ```
 
 Expected log:
 
 ```text
-Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: on or off. Setup payloads and PINs are not saved.
+Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: on or off. openHAB REST API token configured: on or off. Setup payloads, PINs, and tokens are not printed.
 ```
 
 - [ ] **Step 3: Check prerequisites**
@@ -239,6 +241,8 @@ Expected logs:
 
 ```text
 OTBR connectivity: endpoint reachable.
+or
+OTBR connectivity: address accepted.
 openHAB Matter controller is ready
 Runtime commissioning permissions already granted: the granted permission list
 ```

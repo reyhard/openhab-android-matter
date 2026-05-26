@@ -8,16 +8,17 @@ import static org.junit.Assert.assertEquals;
 
 public class SecureAppConfigMapperTest {
     @Test
-    public void encodesThreadDatasetButLeavesOpenHabUrlPlaintext() throws Exception {
+    public void encodesThreadDatasetAndOpenHabTokenButLeavesUrlsPlaintext() throws Exception {
         SecretCodec codec = new FixedSecretCodec();
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
         SecureAppConfigMapper.StoredConfig stored = mapper.toStoredValues(
-                new AppConfig("hex:001122", "http://openhab.local:8080", "http://otbr.local"));
+                new AppConfig("hex:001122", "http://openhab.local:8080", "oh.test.token", "fd00::1"));
 
         assertEquals("enc:v1:encoded(hex:001122)", stored.threadDataset());
         assertEquals("http://openhab.local:8080", stored.openHabBaseUrl());
-        assertEquals("http://otbr.local", stored.otbrBaseUrl());
+        assertEquals("enc:v1:encoded(oh.test.token)", stored.openHabApiToken());
+        assertEquals("fd00::1", stored.otbrBaseUrl());
     }
 
     @Test
@@ -27,10 +28,12 @@ public class SecureAppConfigMapperTest {
 
         AppConfig config = mapper.fromStoredValues("enc:v1:encoded(hex:001122)",
                 "http://openhab.local:8080",
+                "enc:v1:encoded(oh.test.token)",
                 "http://otbr.local");
 
         assertEquals("hex:001122", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
+        assertEquals("oh.test.token", config.openHabApiToken());
         assertEquals("http://otbr.local", config.otbrBaseUrl());
     }
 
@@ -42,6 +45,7 @@ public class SecureAppConfigMapperTest {
         AppConfig config = mapper.fromStoredValues(
                 "enc:v1:encoded(hex:001122)",
                 "http://openhab.local:8080",
+                "enc:v1:encoded(oh.test.token)",
                 "http://otbr.local",
                 true);
 
@@ -56,6 +60,7 @@ public class SecureAppConfigMapperTest {
         AppConfig config = mapper.fromStoredValues(
                 "enc:v1:encoded(hex:001122)",
                 "http://openhab.local:8080",
+                "",
                 "http://otbr.local");
 
         assertEquals(false, config.attestationBypassEnabled());
@@ -66,7 +71,7 @@ public class SecureAppConfigMapperTest {
         SecretCodec codec = new FixedSecretCodec();
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
-        AppConfig config = mapper.fromStoredValues("hex:legacy", "http://openhab.local:8080", "http://otbr.local");
+        AppConfig config = mapper.fromStoredValues("hex:legacy", "http://openhab.local:8080", "", "http://otbr.local");
 
         assertEquals("hex:legacy", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
@@ -78,7 +83,7 @@ public class SecureAppConfigMapperTest {
         SecretCodec codec = new FixedSecretCodec();
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
-        AppConfig config = mapper.fromStoredValues("hex:legacy", "http://openhab.local:8080", "http://otbr.local",
+        AppConfig config = mapper.fromStoredValues("hex:legacy", "http://openhab.local:8080", "", "http://otbr.local",
                 true);
 
         assertEquals(true, config.attestationBypassEnabled());
@@ -89,7 +94,7 @@ public class SecureAppConfigMapperTest {
         SecretCodec codec = new FixedSecretCodec();
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
-        AppConfig config = mapper.fromStoredValues("", "http://openhab.local:8080", "http://otbr.local", true);
+        AppConfig config = mapper.fromStoredValues("", "http://openhab.local:8080", "", "http://otbr.local", true);
 
         assertEquals(true, config.attestationBypassEnabled());
     }
@@ -101,12 +106,30 @@ public class SecureAppConfigMapperTest {
 
         AppConfig config = mapper.fromStoredValues(SecretCodec.ENCRYPTED_PREFIX + "broken",
                 "http://openhab.local:8080",
+                "enc:v1:encoded(oh.test.token)",
                 "http://otbr.local");
 
         assertEquals("", config.threadDataset());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
+        assertEquals("oh.test.token", config.openHabApiToken());
         assertEquals("http://otbr.local", config.otbrBaseUrl());
         assertEquals(true, config.threadDatasetUnreadable());
+    }
+
+    @Test
+    public void tokenDecodeFailureClearsTokenAndMarksItUnreadable() throws Exception {
+        SecretCodec codec = new FixedSecretCodec();
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
+
+        AppConfig config = mapper.fromStoredValues(
+                "enc:v1:encoded(hex:001122)",
+                "http://openhab.local:8080",
+                SecretCodec.ENCRYPTED_PREFIX + "broken",
+                "http://otbr.local");
+
+        assertEquals("hex:001122", config.threadDataset());
+        assertEquals("", config.openHabApiToken());
+        assertEquals(true, config.openHabApiTokenUnreadable());
     }
 
     @Test
@@ -117,6 +140,7 @@ public class SecureAppConfigMapperTest {
         AppConfig config = mapper.fromStoredValues(
                 SecretCodec.ENCRYPTED_PREFIX + "broken",
                 "http://openhab.local:8080",
+                "",
                 "http://otbr.local",
                 true);
 
@@ -130,6 +154,15 @@ public class SecureAppConfigMapperTest {
         assertEquals(true, mapper.isLegacyPlaintextThreadDataset("hex:legacy"));
         assertEquals(false, mapper.isLegacyPlaintextThreadDataset(""));
         assertEquals(false, mapper.isLegacyPlaintextThreadDataset("enc:v1:encoded(hex:001122)"));
+    }
+
+    @Test
+    public void detectsLegacyPlaintextOpenHabApiToken() {
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(new FixedSecretCodec());
+
+        assertEquals(true, mapper.isLegacyPlaintextOpenHabApiToken("oh.legacy.token"));
+        assertEquals(false, mapper.isLegacyPlaintextOpenHabApiToken(""));
+        assertEquals(false, mapper.isLegacyPlaintextOpenHabApiToken("enc:v1:encoded(oh.test.token)"));
     }
 
     private static final class FixedSecretCodec implements SecretCodec {

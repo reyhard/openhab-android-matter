@@ -13,6 +13,7 @@ public final class SecureAppConfigMapper {
         return new StoredConfig(
                 secretCodec.encode(config.threadDataset()),
                 config.openHabBaseUrl(),
+                secretCodec.encode(config.openHabApiToken()),
                 config.otbrBaseUrl());
     }
 
@@ -21,7 +22,15 @@ public final class SecureAppConfigMapper {
     }
 
     public AppConfig fromStoredValues(String threadDataset, String openHabBaseUrl, String otbrBaseUrl) {
-        return fromStoredValues(threadDataset, openHabBaseUrl, otbrBaseUrl, false);
+        return fromStoredValues(threadDataset, openHabBaseUrl, "", otbrBaseUrl, false);
+    }
+
+    public AppConfig fromStoredValues(
+            String threadDataset,
+            String openHabBaseUrl,
+            String openHabApiToken,
+            String otbrBaseUrl) {
+        return fromStoredValues(threadDataset, openHabBaseUrl, openHabApiToken, otbrBaseUrl, false);
     }
 
     public AppConfig fromStoredValues(
@@ -29,24 +38,26 @@ public final class SecureAppConfigMapper {
             String openHabBaseUrl,
             String otbrBaseUrl,
             boolean attestationBypassEnabled) {
-        String safeThreadDataset = threadDataset == null ? "" : threadDataset;
-        if (isLegacyPlaintextThreadDataset(safeThreadDataset)) {
-            return new AppConfig(safeThreadDataset, openHabBaseUrl, otbrBaseUrl, false, attestationBypassEnabled);
-        }
-        if (safeThreadDataset.isEmpty()) {
-            return new AppConfig("", openHabBaseUrl, otbrBaseUrl, false, attestationBypassEnabled);
-        }
+        return fromStoredValues(threadDataset, openHabBaseUrl, "", otbrBaseUrl, attestationBypassEnabled);
+    }
 
-        try {
-            return new AppConfig(
-                    secretCodec.decode(safeThreadDataset),
-                    openHabBaseUrl,
-                    otbrBaseUrl,
-                    false,
-                    attestationBypassEnabled);
-        } catch (GeneralSecurityException e) {
-            return new AppConfig("", openHabBaseUrl, otbrBaseUrl, true, attestationBypassEnabled);
-        }
+    public AppConfig fromStoredValues(
+            String threadDataset,
+            String openHabBaseUrl,
+            String openHabApiToken,
+            String otbrBaseUrl,
+            boolean attestationBypassEnabled) {
+        String safeThreadDataset = threadDataset == null ? "" : threadDataset;
+        DecodedSecret decodedThreadDataset = decodeThreadDataset(safeThreadDataset);
+        DecodedSecret decodedToken = decodeStoredSecret(openHabApiToken);
+        return new AppConfig(
+                decodedThreadDataset.value,
+                openHabBaseUrl,
+                decodedToken.value,
+                otbrBaseUrl,
+                decodedThreadDataset.unreadable,
+                decodedToken.unreadable,
+                attestationBypassEnabled);
     }
 
     public boolean isLegacyPlaintextThreadDataset(String threadDataset) {
@@ -54,14 +65,53 @@ public final class SecureAppConfigMapper {
         return !safeThreadDataset.isEmpty() && !safeThreadDataset.startsWith(SecretCodec.ENCRYPTED_PREFIX);
     }
 
+    public boolean isLegacyPlaintextOpenHabApiToken(String openHabApiToken) {
+        String safeOpenHabApiToken = openHabApiToken == null ? "" : openHabApiToken;
+        return !safeOpenHabApiToken.isEmpty() && !safeOpenHabApiToken.startsWith(SecretCodec.ENCRYPTED_PREFIX);
+    }
+
+    private DecodedSecret decodeThreadDataset(String threadDataset) {
+        if (isLegacyPlaintextThreadDataset(threadDataset)) {
+            return new DecodedSecret(threadDataset, false);
+        }
+        return decodeStoredSecret(threadDataset);
+    }
+
+    private DecodedSecret decodeStoredSecret(String encoded) {
+        String safeEncoded = encoded == null ? "" : encoded;
+        if (safeEncoded.isEmpty()) {
+            return new DecodedSecret("", false);
+        }
+        if (!safeEncoded.startsWith(SecretCodec.ENCRYPTED_PREFIX)) {
+            return new DecodedSecret(safeEncoded, false);
+        }
+        try {
+            return new DecodedSecret(secretCodec.decode(safeEncoded), false);
+        } catch (GeneralSecurityException e) {
+            return new DecodedSecret("", true);
+        }
+    }
+
+    private static final class DecodedSecret {
+        private final String value;
+        private final boolean unreadable;
+
+        DecodedSecret(String value, boolean unreadable) {
+            this.value = value == null ? "" : value;
+            this.unreadable = unreadable;
+        }
+    }
+
     public static final class StoredConfig {
         private final String threadDataset;
         private final String openHabBaseUrl;
+        private final String openHabApiToken;
         private final String otbrBaseUrl;
 
-        StoredConfig(String threadDataset, String openHabBaseUrl, String otbrBaseUrl) {
+        StoredConfig(String threadDataset, String openHabBaseUrl, String openHabApiToken, String otbrBaseUrl) {
             this.threadDataset = threadDataset == null ? "" : threadDataset;
             this.openHabBaseUrl = openHabBaseUrl == null ? "" : openHabBaseUrl;
+            this.openHabApiToken = openHabApiToken == null ? "" : openHabApiToken;
             this.otbrBaseUrl = otbrBaseUrl == null ? "" : otbrBaseUrl;
         }
 
@@ -71,6 +121,10 @@ public final class SecureAppConfigMapper {
 
         public String openHabBaseUrl() {
             return openHabBaseUrl;
+        }
+
+        public String openHabApiToken() {
+            return openHabApiToken;
         }
 
         public String otbrBaseUrl() {

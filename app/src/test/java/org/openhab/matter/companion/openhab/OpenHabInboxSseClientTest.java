@@ -41,6 +41,19 @@ public class OpenHabInboxSseClientTest {
     }
 
     @Test
+    public void sendsBearerTokenWhenConfigured() throws Exception {
+        OneShotSseServer server = new OneShotSseServer(
+                "data: {\"topic\":\"openhab/inbox/matter:node:abc/added\",\"payload\":{\"thingUID\":\"matter:node:abc\"}}\n\n");
+        server.start();
+
+        new OpenHabInboxSseClient().observe(server.baseUrl(), event -> false, () -> true, "oh.test.token");
+        server.join();
+
+        assertEquals("Bearer oh.test.token", server.authorizationHeader());
+    }
+
+
+    @Test
     public void ignoresKeepAliveEventsUntilInboxMessageArrives() throws Exception {
         OneShotSseServer server = new OneShotSseServer(
                 "event: alive\n"
@@ -118,6 +131,7 @@ public class OpenHabInboxSseClientTest {
         private final ServerSocket serverSocket;
         private Thread thread;
         private String requestLine = "";
+        private String authorizationHeader = "";
         private boolean acceptsEventStream;
 
         OneShotSseServer(String body) throws IOException {
@@ -146,6 +160,10 @@ public class OpenHabInboxSseClientTest {
             return acceptsEventStream;
         }
 
+        String authorizationHeader() {
+            return authorizationHeader;
+        }
+
         private void serveOnce() {
             try (ServerSocket ignored = serverSocket;
                     Socket socket = serverSocket.accept();
@@ -156,6 +174,9 @@ public class OpenHabInboxSseClientTest {
                 while ((line = reader.readLine()) != null) {
                     if (line.toLowerCase().startsWith("accept:") && line.contains("text/event-stream")) {
                         acceptsEventStream = true;
+                    }
+                    if (line.toLowerCase().startsWith("authorization:")) {
+                        authorizationHeader = line.substring("authorization:".length()).trim();
                     }
                     if (line.isEmpty()) {
                         break;

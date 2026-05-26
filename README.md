@@ -10,14 +10,14 @@ This branch builds an installable Android APK with:
 - Matter setup payload validation for explicit `pin=...;disc=...` input.
 - Wi-Fi/multi-admin openHAB handoff validation for Matter QR payloads and Verhoeff-validated 11- or 21-digit manual setup codes.
 - Local Matter `MT:` QR setup payload decoding for PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.
-- openHAB readiness checking via `/rest/` plus `/rest/things` Matter controller detection.
-- openHAB Inbox observation via `/rest/inbox` to report whether a Matter Inbox entry is visible.
-- openHAB Inbox SSE observation via `/rest/events?topics=openhab/inbox/*`.
-- OTBR connectivity diagnostics via a configured base URL.
+- openHAB readiness checking via `/rest/` plus `/rest/things` Matter controller detection, with optional REST API bearer-token authentication.
+- openHAB Inbox observation via `/rest/inbox` to report whether a Matter Inbox entry is visible, with optional REST API bearer-token authentication.
+- openHAB Inbox SSE observation via `/rest/events?topics=openhab/inbox/*`, with optional REST API bearer-token authentication.
+- OTBR connectivity diagnostics via a configured IP/host address or optional HTTP diagnostic URL.
 - Runtime commissioning permission readiness checks for the current Android SDK version.
 - Encrypted app-private storage for the OTBR Thread dataset using Android Keystore-backed AES-GCM.
-- App-private persistence for the openHAB base URL.
-- App-private persistence for the OTBR base URL.
+- App-private persistence for the openHAB base URL and encrypted openHAB REST API token.
+- App-private persistence for the OTBR address or diagnostic URL.
 - Persisted developer attestation bypass setting for connectedhomeip commissioning; it defaults off and is passed to the selectable native Matter controller only when explicitly enabled.
 - Encrypted app-private bootstrap controller state repository for future native Matter fabric/controller state.
 - Legacy native bridge command contract carries attestation-bypass intent and opaque controller state through commissioning and OpenCommissioningWindow results.
@@ -33,7 +33,7 @@ This branch builds an installable Android APK with:
 The real connectedhomeip controller path is isolated behind `MatterController`. The debug APK keeps a deterministic simulated controller as the safe fallback and exposes a connectedhomeip controller selection path for builds that include the official Android controller artifacts.
 
 This MVP does not perform real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
-Setup payloads, setup PINs, QR payloads, and device credentials are not persisted.
+Setup payloads, setup PINs, QR payloads, and device credentials are not persisted. The optional openHAB REST API token is stored encrypted in app-private storage and is never printed in logs.
 The bootstrap controller state repository persists the bootstrap node id and provides an encrypted opaque state slot; the Java/native command contract can carry updated controller state, but the packaged JNI stub does not emit real connectedhomeip fabric material.
 
 ## Build Configuration

@@ -19,6 +19,11 @@ public final class OpenHabInboxSseClient {
     }
 
     public void observe(String baseUrl, OpenHabInboxEventListener listener, BooleanSupplier shouldContinue) throws IOException {
+        observe(baseUrl, listener, shouldContinue, "");
+    }
+
+    public void observe(String baseUrl, OpenHabInboxEventListener listener, BooleanSupplier shouldContinue,
+            String apiToken) throws IOException {
         HttpURLConnection connection = null;
         try {
             URL url = eventsUrl(baseUrl);
@@ -30,6 +35,7 @@ public final class OpenHabInboxSseClient {
             connection.setReadTimeout(READ_TIMEOUT_MILLIS);
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Accept", "text/event-stream");
+            applyBearerToken(connection, apiToken);
 
             int responseCode = connection.getResponseCode();
             if (responseCode < 200 || responseCode >= 300) {
@@ -41,6 +47,12 @@ public final class OpenHabInboxSseClient {
             if (connection != null) {
                 connection.disconnect();
             }
+        }
+    }
+
+    private static void applyBearerToken(HttpURLConnection connection, String apiToken) {
+        if (apiToken != null && !apiToken.trim().isEmpty()) {
+            connection.setRequestProperty("Authorization", "Bearer " + apiToken.trim());
         }
     }
 

@@ -14,6 +14,11 @@ public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
 
     @Override
     public OpenHabInboxStatus checkInbox(String baseUrl) {
+        return checkInbox(baseUrl, "");
+    }
+
+    @Override
+    public OpenHabInboxStatus checkInbox(String baseUrl, String apiToken) {
         HttpURLConnection connection = null;
         try {
             URL url = inboxUrl(baseUrl);
@@ -25,6 +30,7 @@ public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
             connection.setConnectTimeout(TIMEOUT_MILLIS);
             connection.setReadTimeout(TIMEOUT_MILLIS);
             connection.setRequestMethod("GET");
+            applyBearerToken(connection, apiToken);
 
             int responseCode = connection.getResponseCode();
             if (responseCode >= 200 && responseCode < 300) {
@@ -42,6 +48,12 @@ public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
             if (connection != null) {
                 connection.disconnect();
             }
+        }
+    }
+
+    private static void applyBearerToken(HttpURLConnection connection, String apiToken) {
+        if (apiToken != null && !apiToken.trim().isEmpty()) {
+            connection.setRequestProperty("Authorization", "Bearer " + apiToken.trim());
         }
     }
 

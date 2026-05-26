@@ -29,7 +29,7 @@ public final class FakeOpenHabInboxClient implements OpenHabInboxClient {
     }
 
     @Override
-    public OpenHabInboxStatus checkInbox(String baseUrl) {
+    public OpenHabInboxStatus checkInbox(String baseUrl, String apiToken) {
         String resolvedDetails = details != null ? details : "Simulated Inbox check for " + baseUrl;
         return new OpenHabInboxStatus(reachable, matterEntryDetected, message, resolvedDetails);
     }

@@ -40,11 +40,29 @@ public final class HttpOtbrClientTest {
     }
 
     @Test
+    public void acceptsPlainIpAddressAsNetworkReachabilityTarget() {
+        OtbrStatus status = new HttpOtbrClient().checkReadiness("127.0.0.1");
+
+        assertTrue(status.reachable());
+        assertEquals("OTBR address is accepted", status.message());
+        assertTrue(status.details().contains("127.0.0.1"));
+    }
+
+    @Test
+    public void acceptsScopedIpv6AddressAsNetworkAddress() {
+        OtbrStatus status = new HttpOtbrClient().checkReadiness("fe80::abcd%wlan0");
+
+        assertTrue(status.reachable());
+        assertEquals("OTBR address is accepted", status.message());
+        assertTrue(status.details().contains("fe80::abcd%wlan0"));
+    }
+
+    @Test
     public void reportsUnreachableForUnsupportedProtocol() {
         OtbrStatus status = new HttpOtbrClient().checkReadiness("file:/tmp/otbr");
 
         assertFalse(status.reachable());
-        assertEquals("OTBR base URL is invalid", status.message());
+        assertEquals("OTBR address is invalid", status.message());
         assertTrue(status.details().contains("Unsupported protocol"));
     }
 

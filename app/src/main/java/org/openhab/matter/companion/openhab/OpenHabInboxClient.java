@@ -1,5 +1,9 @@
 package org.openhab.matter.companion.openhab;
 
 public interface OpenHabInboxClient {
-    OpenHabInboxStatus checkInbox(String baseUrl) throws Exception;
+    default OpenHabInboxStatus checkInbox(String baseUrl) throws Exception {
+        return checkInbox(baseUrl, "");
+    }
+
+    OpenHabInboxStatus checkInbox(String baseUrl, String apiToken) throws Exception;
 }

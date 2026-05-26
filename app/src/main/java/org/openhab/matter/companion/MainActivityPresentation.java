@@ -23,6 +23,10 @@ final class MainActivityPresentation {
                     + "\\s*(?:=|:)?\\s*\\d{8}\\b");
     private static final Pattern MATTER_MANUAL_CODE_PATTERN = Pattern.compile("\\b(?:\\d{4}-\\d{4}-\\d{3}|\\d{11})\\b");
     private static final Pattern THREAD_DATASET_PATTERN = Pattern.compile("(?i)\\b(?:hex:)?[0-9a-f]{16,}\\b");
+    private static final Pattern AUTHORIZATION_HEADER_PATTERN = Pattern.compile(
+            "(?i)\\b(Authorization\\s*:\\s*)(Bearer|Basic)\\s+[^\\s,;]+");
+    private static final Pattern TOKEN_FIELD_PATTERN = Pattern.compile(
+            "(?i)\\b((?:api[-_\\s]?token|access[-_\\s]?token|token)\\s*(?:=|:)\\s*)[^\\s,;]+");
 
     private MainActivityPresentation() {
     }
@@ -54,9 +58,15 @@ final class MainActivityPresentation {
     }
 
     static String encryptedConfigSaved(boolean attestationBypassEnabled) {
-        return "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: "
+        return encryptedConfigSaved(attestationBypassEnabled, false);
+    }
+
+    static String encryptedConfigSaved(boolean attestationBypassEnabled, boolean openHabApiTokenConfigured) {
+        return "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: "
                 + onOff(attestationBypassEnabled)
-                + ". Setup payloads and PINs are not saved.";
+                + ". openHAB REST API token configured: "
+                + onOff(openHabApiTokenConfigured)
+                + ". Setup payloads, PINs, and tokens are not printed.";
     }
 
     static String attestationBypassWarning() {
@@ -95,6 +105,10 @@ final class MainActivityPresentation {
         return "Stored Thread dataset could not be decrypted. Paste and save the dataset again to continue.";
     }
 
+    static String openHabApiTokenUnreadable() {
+        return "Stored openHAB REST API token could not be decrypted. Paste and save the token again to use authenticated REST calls.";
+    }
+
     static String bootstrapStateUnreadable() {
         return "Stored Matter bootstrap controller state could not be decrypted. Re-run Thread commissioning before opening a commissioning window.";
     }
@@ -108,7 +122,13 @@ final class MainActivityPresentation {
 
     static String otbrConnectivityResult(OtbrStatus status) {
         if (status.reachable()) {
+            if ("OTBR address is accepted".equals(status.message())) {
+                return "OTBR connectivity: address accepted.";
+            }
             return "OTBR connectivity: endpoint reachable.";
+        }
+        if ("OTBR address is invalid".equals(status.message())) {
+            return "OTBR connectivity failed: address was invalid.";
         }
         return "OTBR connectivity failed: endpoint was not reachable.";
     }
@@ -224,6 +244,8 @@ final class MainActivityPresentation {
 
     private static String redactMatterSecrets(String value) {
         String redacted = MATTER_QR_PAYLOAD_PATTERN.matcher(value).replaceAll("<redacted-matter-qr-payload>");
+        redacted = AUTHORIZATION_HEADER_PATTERN.matcher(redacted).replaceAll("$1<redacted>");
+        redacted = TOKEN_FIELD_PATTERN.matcher(redacted).replaceAll("$1<redacted>");
         redacted = MATTER_PIN_PATTERN.matcher(redacted).replaceAll("pin=<redacted>");
         redacted = MATTER_MANUAL_CODE_PATTERN.matcher(redacted).replaceAll("<redacted-matter-code>");
         return THREAD_DATASET_PATTERN.matcher(redacted).replaceAll("<redacted-thread-dataset>");

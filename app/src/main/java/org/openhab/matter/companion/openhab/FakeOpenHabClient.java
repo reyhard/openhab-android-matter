@@ -22,7 +22,7 @@ public final class FakeOpenHabClient implements OpenHabClient {
     }
 
     @Override
-    public OpenHabStatus checkReadiness(String baseUrl) {
+    public OpenHabStatus checkReadiness(String baseUrl, String apiToken) {
         String resolvedDetails = details != null ? details : "Simulated readiness check for " + baseUrl;
         return new OpenHabStatus(online, message, resolvedDetails);
     }

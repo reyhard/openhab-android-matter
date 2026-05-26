@@ -11,6 +11,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class HttpOpenHabInboxClientTest {
@@ -36,11 +37,23 @@ public class HttpOpenHabInboxClientTest {
         assertFalse(status.matterEntryDetected());
     }
 
+    @Test
+    public void sendsBearerTokenWhenConfigured() throws Exception {
+        OneShotHttpServer server = new OneShotHttpServer(200, "[{\"thingUID\":\"matter:node:controller:device\"}]");
+        server.start();
+
+        OpenHabInboxStatus status = new HttpOpenHabInboxClient().checkInbox(server.baseUrl(), "oh.test.token");
+
+        assertTrue(status.reachable());
+        assertEquals("Bearer oh.test.token", server.authorizationHeader());
+    }
+
     private static final class OneShotHttpServer {
         private final int statusCode;
         private final String body;
         private final ServerSocket serverSocket;
         private Thread thread;
+        private String authorizationHeader = "";
 
         OneShotHttpServer(int statusCode, String body) throws IOException {
             this.statusCode = statusCode;
@@ -57,6 +70,10 @@ public class HttpOpenHabInboxClientTest {
             return "http://127.0.0.1:" + serverSocket.getLocalPort();
         }
 
+        String authorizationHeader() {
+            return authorizationHeader;
+        }
+
         private void serveOnce() {
             try (ServerSocket ignored = serverSocket;
                     Socket socket = serverSocket.accept();
@@ -64,6 +81,9 @@ public class HttpOpenHabInboxClientTest {
                     OutputStream output = socket.getOutputStream()) {
                 String line;
                 while ((line = reader.readLine()) != null) {
+                    if (line.toLowerCase().startsWith("authorization:")) {
+                        authorizationHeader = line.substring("authorization:".length()).trim();
+                    }
                     if (line.isEmpty()) {
                         break;
                     }

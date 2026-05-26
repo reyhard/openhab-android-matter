@@ -10,6 +10,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -33,6 +35,23 @@ public final class HttpOpenHabClientTest {
         assertTrue(status.matterControllerReady());
         assertEquals("openHAB Matter controller is ready", status.message());
         assertTrue(status.details().contains("/rest/things"));
+    }
+
+    @Test
+    public void sendsBearerTokenToRestAndThingsEndpointsWhenConfigured() throws Exception {
+        RouteHttpServer server = new RouteHttpServer()
+                .route("/rest/", 200, "{}")
+                .route("/rest/things", 200, "[{\"UID\":\"matter:controller:home\","
+                        + "\"thingTypeUID\":\"matter:controller\","
+                        + "\"statusInfo\":{\"status\":\"ONLINE\"}}]");
+        server.start(2);
+
+        OpenHabStatus status = new HttpOpenHabClient().checkReadiness(server.baseUrl(), "oh.test.token");
+
+        assertTrue(status.online());
+        assertEquals(2, server.authorizationHeaders().size());
+        assertEquals("Bearer oh.test.token", server.authorizationHeaders().get(0));
+        assertEquals("Bearer oh.test.token", server.authorizationHeaders().get(1));
     }
 
     @Test
@@ -133,6 +152,7 @@ public final class HttpOpenHabClientTest {
     private static final class RouteHttpServer {
         private final ServerSocket serverSocket;
         private final Map<String, TestResponse> responses = new HashMap<>();
+        private final List<String> authorizationHeaders = new ArrayList<>();
         private Thread thread;
 
         RouteHttpServer() throws IOException {
@@ -155,6 +175,10 @@ public final class HttpOpenHabClientTest {
             return "http://127.0.0.1:" + serverSocket.getLocalPort();
         }
 
+        List<String> authorizationHeaders() {
+            return authorizationHeaders;
+        }
+
         private void serve(int expectedRequests) {
             try (ServerSocket ignored = serverSocket) {
                 for (int i = 0; i < expectedRequests; i++) {
@@ -165,6 +189,9 @@ public final class HttpOpenHabClientTest {
                         String requestLine = reader.readLine();
                         String line;
                         while ((line = reader.readLine()) != null) {
+                            if (line.toLowerCase().startsWith("authorization:")) {
+                                authorizationHeaders.add(line.substring("authorization:".length()).trim());
+                            }
                             if (line.isEmpty()) {
                                 break;
                             }

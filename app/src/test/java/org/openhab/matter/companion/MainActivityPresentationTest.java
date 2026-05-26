@@ -208,6 +208,14 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void redactsAuthorizationHeadersAndTokenFieldsInsideDetails() {
+        assertEquals(
+                "HTTP 401 Authorization: <redacted> token=<redacted> api_token:<redacted>",
+                MainActivityPresentation.safeTextForLog(
+                        "HTTP 401 Authorization: Bearer oh.secret.token token=abc123 api_token:xyz789"));
+    }
+
+    @Test
     public void redactsMatterPinCodeFieldVariantsInsideDetails() {
         assertEquals(
                 "Errors: pin=<redacted>; pin=<redacted>; pin=<redacted>; pin=<redacted>",
@@ -218,7 +226,7 @@ public class MainActivityPresentationTest {
     @Test
     public void describesEncryptedConfigSave() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: off. Setup payloads and PINs are not saved.",
+                "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: off. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
                 MainActivityPresentation.encryptedConfigSaved());
     }
 
@@ -251,15 +259,22 @@ public class MainActivityPresentationTest {
     @Test
     public void describesConfigSaveWithAttestationBypassDisabled() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: off. Setup payloads and PINs are not saved.",
+                "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: off. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
                 MainActivityPresentation.encryptedConfigSaved(false));
     }
 
     @Test
     public void describesConfigSaveWithAttestationBypassEnabled() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage, saved OTBR base URL, saved openHAB base URL, and saved developer attestation bypass: on. Setup payloads and PINs are not saved.",
+                "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: on. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
                 MainActivityPresentation.encryptedConfigSaved(true));
+    }
+
+    @Test
+    public void describesConfigSaveWithOpenHabApiTokenConfigured() {
+        assertEquals(
+                "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: on. openHAB REST API token configured: on. Setup payloads, PINs, and tokens are not printed.",
+                MainActivityPresentation.encryptedConfigSaved(true, true));
     }
 
     @Test
@@ -273,6 +288,16 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void describesAcceptedOtbrAddress() {
+        assertEquals(
+                "OTBR connectivity: address accepted.",
+                MainActivityPresentation.otbrConnectivityResult(new OtbrStatus(
+                        true,
+                        "OTBR address is accepted",
+                        "Address fd00::1 resolves to fd00:0:0:0:0:0:0:1")));
+    }
+
+    @Test
     public void describesUnreachableOtbrConnectivity() {
         assertEquals(
                 "OTBR connectivity failed: endpoint was not reachable.",
@@ -283,10 +308,27 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void describesInvalidOtbrAddress() {
+        assertEquals(
+                "OTBR connectivity failed: address was invalid.",
+                MainActivityPresentation.otbrConnectivityResult(new OtbrStatus(
+                        false,
+                        "OTBR address is invalid",
+                        "Unsupported protocol: file")));
+    }
+
+    @Test
     public void warnsWhenEncryptedThreadDatasetCannotBeRead() {
         assertEquals(
                 "Stored Thread dataset could not be decrypted. Paste and save the dataset again to continue.",
                 MainActivityPresentation.threadDatasetUnreadable());
+    }
+
+    @Test
+    public void warnsWhenOpenHabApiTokenCannotBeRead() {
+        assertEquals(
+                "Stored openHAB REST API token could not be decrypted. Paste and save the token again to use authenticated REST calls.",
+                MainActivityPresentation.openHabApiTokenUnreadable());
     }
 
     @Test

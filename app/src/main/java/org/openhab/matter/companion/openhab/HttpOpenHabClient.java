@@ -19,6 +19,11 @@ public final class HttpOpenHabClient implements OpenHabClient {
 
     @Override
     public OpenHabStatus checkReadiness(String baseUrl) {
+        return checkReadiness(baseUrl, "");
+    }
+
+    @Override
+    public OpenHabStatus checkReadiness(String baseUrl, String apiToken) {
         try {
             URL restUrl = restUrl(baseUrl);
             if (!isHttpUrl(restUrl)) {
@@ -26,7 +31,7 @@ public final class HttpOpenHabClient implements OpenHabClient {
                         "Unsupported protocol: " + restUrl.getProtocol());
             }
 
-            HttpResponse restResponse = get(restUrl);
+            HttpResponse restResponse = get(restUrl, apiToken);
             if (!restResponse.success()) {
                 return new OpenHabStatus(false, false, false, "openHAB REST API is not reachable",
                         "HTTP " + restResponse.statusCode + " from " + restUrl);
@@ -35,7 +40,7 @@ public final class HttpOpenHabClient implements OpenHabClient {
             URL thingsUrl = thingsUrl(baseUrl);
             HttpResponse thingsResponse;
             try {
-                thingsResponse = get(thingsUrl);
+                thingsResponse = get(thingsUrl, apiToken);
             } catch (IOException e) {
                 return new OpenHabStatus(false, true, false,
                         "openHAB Matter controller readiness could not be verified",
@@ -87,13 +92,14 @@ public final class HttpOpenHabClient implements OpenHabClient {
         return "http".equals(url.getProtocol()) || "https".equals(url.getProtocol());
     }
 
-    private static HttpResponse get(URL url) throws IOException {
+    private static HttpResponse get(URL url, String apiToken) throws IOException {
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) url.openConnection();
             connection.setConnectTimeout(TIMEOUT_MILLIS);
             connection.setReadTimeout(TIMEOUT_MILLIS);
             connection.setRequestMethod("GET");
+            applyBearerToken(connection, apiToken);
 
             int responseCode = connection.getResponseCode();
             String body = responseCode >= 200 && responseCode < 400 ? readBody(connection.getInputStream()) : "";
@@ -102,6 +108,12 @@ public final class HttpOpenHabClient implements OpenHabClient {
             if (connection != null) {
                 connection.disconnect();
             }
+        }
+    }
+
+    private static void applyBearerToken(HttpURLConnection connection, String apiToken) {
+        if (apiToken != null && !apiToken.trim().isEmpty()) {
+            connection.setRequestProperty("Authorization", "Bearer " + apiToken.trim());
         }
     }
 

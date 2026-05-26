@@ -9,14 +9,14 @@
 - Explicit setup payload parser accepts `pin=...;disc=...;vendor=...;product=...`.
 - Wi-Fi/multi-admin handoff accepts Matter QR payloads and normalized Verhoeff-validated 11- or 21-digit manual setup or multi-admin codes for openHAB Scan Input.
 - Matter `MT:` QR setup payload parser decodes PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.
-- openHAB readiness check calls `/rest/` and verifies an online Matter controller through `/rest/things`.
-- openHAB Inbox observation calls `/rest/inbox` from a configured base URL and reports whether a Matter Inbox entry was detected.
-- openHAB SSE streaming observes `/rest/events?topics=openhab/inbox/*` and reports Matter Inbox events.
-- OTBR connectivity diagnostics check a configured base URL before Thread commissioning.
+- openHAB readiness check calls `/rest/` and verifies an online Matter controller through `/rest/things`, using a configured bearer token when provided.
+- openHAB Inbox observation calls `/rest/inbox` from a configured base URL and reports whether a Matter Inbox entry was detected, using a configured bearer token when provided.
+- openHAB SSE streaming observes `/rest/events?topics=openhab/inbox/*` and reports Matter Inbox events, using a configured bearer token when provided.
+- OTBR connectivity diagnostics check a configured IP/host address or optional HTTP diagnostic URL before Thread commissioning.
 - Runtime commissioning permission readiness uses the Android SDK-specific permission plan and requests missing runtime permissions.
 - Android Keystore-backed AES-GCM encrypted app-private storage stores the OTBR Thread dataset.
-- App-private configuration persistence stores the openHAB base URL.
-- App-private configuration persistence stores the OTBR base URL.
+- App-private configuration persistence stores the openHAB base URL and encrypted openHAB REST API token.
+- App-private configuration persistence stores the OTBR address or diagnostic URL.
 - Persisted developer attestation bypass setting is exposed in the UI and passed into connectedhomeip/native Matter commissioning requests.
 - Encrypted app-private bootstrap controller state repository stores the bootstrap node id and reserves an encrypted opaque controller-state slot.
 - Legacy native bridge command contract passes attestation-bypass intent plus opaque controller state into and out of commissioning and OCW calls.
