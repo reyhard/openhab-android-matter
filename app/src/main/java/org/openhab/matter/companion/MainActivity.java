@@ -176,6 +176,7 @@ public final class MainActivity extends Activity {
         Button checkChip = button(MainActivityPresentation.checkControllerButtonLabel());
         Button checkFabricRestore = button(MainActivityPresentation.checkFabricRestoreButtonLabel());
         Button useNativeChip = button(MainActivityPresentation.useControllerButtonLabel());
+        Button troubleshootingGuide = button(MainActivityPresentation.troubleshootingGuideButtonLabel());
         Button saveConfig = button("Save dataset, OTBR address, openHAB URL, and token");
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
@@ -193,6 +194,7 @@ public final class MainActivity extends Activity {
         checkChip.setOnClickListener(view -> checkNativeChipController());
         checkFabricRestore.setOnClickListener(view -> checkConnectedHomeIpFabricRestore());
         useNativeChip.setOnClickListener(view -> useNativeChipControllerIfReady());
+        troubleshootingGuide.setOnClickListener(view -> showTroubleshootingGuide());
         saveConfig.setOnClickListener(view -> saveConfiguration());
 
         root.addView(title);
@@ -223,6 +225,7 @@ public final class MainActivity extends Activity {
         root.addView(checkChip);
         root.addView(checkFabricRestore);
         root.addView(useNativeChip);
+        root.addView(troubleshootingGuide);
         root.addView(saveConfig);
         root.addView(section("Guide output"));
         root.addView(output);
@@ -422,6 +425,10 @@ public final class MainActivity extends Activity {
 
         append("Wi-Fi / multi-admin handoff selected. The phone is not commissioning this device in demo mode.");
         append(OpenHabInstructions.scanInputInstructionsWithoutEcho());
+    }
+
+    private void showTroubleshootingGuide() {
+        append(OpenHabInstructions.troubleshootingGuide());
     }
 
     private void scanMatterQrWithExternalScanner() {

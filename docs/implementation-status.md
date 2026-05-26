@@ -13,6 +13,7 @@
 - openHAB Inbox observation calls `/rest/inbox` from a configured base URL and reports whether a Matter Inbox entry was detected, using a configured bearer token when provided.
 - openHAB SSE streaming observes `/rest/events?topics=openhab/inbox/*` and reports Matter Inbox events, using a configured bearer token when provided.
 - OTBR connectivity diagnostics check a configured IP/host address or optional HTTP diagnostic URL before Thread commissioning.
+- Standalone troubleshooting guide in the app covers openHAB Matter binding/controller setup, REST token authentication, OTBR address expectations, IPv6 routing, mDNS/Avahi, connectedhomeip artifact packaging, and Scan Input handoff.
 - Runtime commissioning permission readiness uses the Android SDK-specific permission plan and requests missing runtime permissions.
 - Android Keystore-backed AES-GCM encrypted app-private storage stores the OTBR Thread dataset.
 - App-private configuration persistence stores the openHAB base URL and encrypted openHAB REST API token.

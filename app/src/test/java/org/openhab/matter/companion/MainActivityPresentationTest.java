@@ -251,6 +251,7 @@ public class MainActivityPresentationTest {
         assertEquals("Check connectedhomeip controller", MainActivityPresentation.checkControllerButtonLabel());
         assertEquals("Check connectedhomeip fabric restore", MainActivityPresentation.checkFabricRestoreButtonLabel());
         assertEquals("Use connectedhomeip controller if ready", MainActivityPresentation.useControllerButtonLabel());
+        assertEquals("Show troubleshooting guide", MainActivityPresentation.troubleshootingGuideButtonLabel());
         assertEquals(
                 "Developer attestation bypass for connectedhomeip commissioning",
                 MainActivityPresentation.attestationBypassLabel());

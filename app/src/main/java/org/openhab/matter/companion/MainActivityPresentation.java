@@ -97,6 +97,10 @@ final class MainActivityPresentation {
         return "Use connectedhomeip controller if ready";
     }
 
+    static String troubleshootingGuideButtonLabel() {
+        return "Show troubleshooting guide";
+    }
+
     static String attestationBypassLabel() {
         return "Developer attestation bypass for connectedhomeip commissioning";
     }

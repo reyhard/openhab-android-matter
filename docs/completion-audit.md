@@ -21,7 +21,7 @@ Create the Android companion app described in `docs/research.md`: a phone-based 
 
 | Requirement from `docs/research.md` | Current status | Evidence |
 | --- | --- | --- |
-| Build an installable Android APK | Implemented for debug builds; device install not yet validated in this session | `README.md` build/install section, `scripts/install_debug.ps1`, latest preflight output |
+| Build an installable Android APK | Implemented for debug builds; latest helper install succeeded on a connected phone | `README.md` build/install section, `scripts/install_debug.ps1`, helper install output on device `62311e26` |
 | Thread dataset configuration and storage | Implemented | `ThreadDataset`, `SharedPreferencesAppConfigRepository`, `AndroidKeystoreSecretCodec`, `docs/implementation-status.md` |
 | Basic OTBR connectivity check | Implemented as IP/host reachability, with optional HTTP diagnostic URL support | `HttpOtbrClient`, `MainActivity.checkOtbrConnectivity()`, `docs/implementation-status.md` |
 | QR/manual Matter setup payload parsing | Implemented for Matter QR, explicit input, and handoff manual codes | `MatterSetupPayloadParser`, `MatterHandoffCodeParser`, parser tests |
@@ -33,7 +33,7 @@ Create the Android companion app described in `docs/research.md`: a phone-based 
 | openHAB Matter readiness and Inbox confirmation | Implemented with optional bearer-token authentication | `HttpOpenHabClient`, `HttpOpenHabInboxClient`, `OpenHabInboxSseClient` |
 | Real connectedhomeip artifacts packaged into APK | Packaging gates implemented; real artifacts are not present in this workspace | `docs/chip-jni-integration.md`, `build.gradle`, `scripts/test_connectedhomeip_artifacts.ps1` |
 | Real-device Matter/Thread validation | Not complete | `docs/implementation-status.md` Not Implemented Yet |
-| Standalone troubleshooting/help screen | Not complete; only short OCW failure guidance exists | `docs/research.md`, `OpenHabInstructions.troubleshooting()` |
+| Standalone troubleshooting/help screen | Implemented as an in-app guide action | `OpenHabInstructions.troubleshootingGuide()`, `MainActivity`, `OpenHabInstructionsTest` |
 | Temporary QR display for OCW result | Not complete; manual temporary code instructions exist | `docs/research.md`, `MainActivity.runOpenCommissioningWindow()` |
 | Wi-Fi/generic multi-admin direct openHAB REST pairing | Not required for the copy-paste path and not implemented; current app supports validated handoff to Scan Input | `docs/research.md`, `MatterHandoffCodeParser` |
 
@@ -48,8 +48,7 @@ Create the Android companion app described in `docs/research.md`: a phone-based 
 7. Validate OpenCommissioningWindow returns a usable temporary manual or QR code.
 8. Enter that temporary code in openHAB Matter Scan Input and verify the device appears in the openHAB Inbox.
 9. Decide whether the phone bootstrap fabric is intentionally ephemeral or must persist full connectedhomeip fabric state across restarts.
-10. Add an approved troubleshooting/help UX for IPv6, mDNS/Avahi, OTBR, and openHAB Matter binding setup.
-11. Decide whether displaying a temporary QR code is necessary for MVP acceptance or whether the manual code and Scan Input instructions are sufficient.
+10. Decide whether displaying a temporary QR code is necessary for MVP acceptance or whether the manual code and Scan Input instructions are sufficient.
 
 ## Completion Judgment
 
