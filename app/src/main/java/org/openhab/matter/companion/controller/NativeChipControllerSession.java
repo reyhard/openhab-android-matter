@@ -69,6 +69,16 @@ public final class NativeChipControllerSession {
         return true;
     }
 
+    public MatterControllerSelection selectNativeIfReady() {
+        SelectionRequest request = selectionRequest();
+        MatterControllerSelection selection = MatterControllerSelector.select(
+                fallbackController,
+                request.nativeController(),
+                true);
+        applySelection(request, selection);
+        return selection;
+    }
+
     public synchronized boolean isCurrent(SelectionRequest request) {
         return request != null
                 && request.generation == generation

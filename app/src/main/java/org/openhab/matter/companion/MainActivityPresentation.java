@@ -3,6 +3,7 @@ package org.openhab.matter.companion;
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpControllerArtifactsStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreStatus;
+import org.openhab.matter.companion.controller.ConnectedHomeIpRuntimePreflightStatus;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
 import org.openhab.matter.companion.otbr.OtbrStatus;
@@ -62,7 +63,7 @@ final class MainActivityPresentation {
     }
 
     static String encryptedConfigSaved(boolean attestationBypassEnabled, boolean openHabApiTokenConfigured) {
-        return "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: "
+        return "Saved Thread dataset and Matter setup payload in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: "
                 + onOff(attestationBypassEnabled)
                 + ". openHAB REST API token configured: "
                 + onOff(openHabApiTokenConfigured)
@@ -74,7 +75,7 @@ final class MainActivityPresentation {
     }
 
     static String controllerModeNotice() {
-        return "Controller mode: simulated fallback is used by default. If connectedhomeip Android controller artifacts are bundled and readiness passes, the app can attempt real BLE Thread commissioning and OpenCommissioningWindow; Matter-over-Thread hardware, OTBR, and openHAB validation are still required.";
+        return "Controller mode: connectedhomeip is selected automatically when packaged and ready. If it is not ready, Thread commissioning and OpenCommissioningWindow stop instead of silently using simulation.";
     }
 
     static String threadCommissioningButtonLabel() {
@@ -83,6 +84,18 @@ final class MainActivityPresentation {
 
     static String openCommissioningWindowButtonLabel() {
         return "Open commissioning window";
+    }
+
+    static String clearLogsButtonLabel() {
+        return "Clear logs";
+    }
+
+    static String bootstrapNodeId(long nodeId) {
+        return "Bootstrap Matter node id: " + formatNodeId(nodeId);
+    }
+
+    static String openCommissioningWindowTarget(long nodeId) {
+        return "Opening commissioning window for Matter node " + formatNodeId(nodeId) + ".";
     }
 
     static String checkControllerButtonLabel() {
@@ -107,6 +120,10 @@ final class MainActivityPresentation {
 
     static String threadDatasetUnreadable() {
         return "Stored Thread dataset could not be decrypted. Paste and save the dataset again to continue.";
+    }
+
+    static String setupPayloadUnreadable() {
+        return "Stored Matter setup payload could not be decrypted. Paste and save the setup payload again to continue.";
     }
 
     static String openHabApiTokenUnreadable() {
@@ -186,12 +203,36 @@ final class MainActivityPresentation {
         return "connectedhomeip fabric restore not ready: " + safeTextForLog(status.message());
     }
 
+    static String connectedHomeIpRuntimePreflight(ConnectedHomeIpRuntimePreflightStatus status) {
+        if (status.ready()) {
+            return "connectedhomeip runtime preflight ready: " + safeTextForLog(status.message()) + ".";
+        }
+        return "connectedhomeip runtime preflight not ready: " + safeTextForLog(status.message());
+    }
+
     static String matterControllerSelection(MatterControllerSelection selection) {
         return "Matter controller selection: " + selection.message();
     }
 
     static String matterControllerOperationFailed(String message) {
-        return "Matter controller operation failed: " + safeTextForLog(message);
+        String safeMessage = safeTextForLog(message);
+        String routeHint = operationalIpv6RouteHint(safeMessage);
+        if (routeHint.isEmpty()) {
+            return "Matter controller operation failed: " + safeMessage;
+        }
+        return "Matter controller operation failed: " + safeMessage + "\n" + routeHint;
+    }
+
+    private static String operationalIpv6RouteHint(String message) {
+        if (message == null) {
+            return "";
+        }
+        if (!message.contains("Network is unreachable") && !message.contains("OS Error 0x02000065")) {
+            return "";
+        }
+        return "Operational IPv6 route is unreachable from this phone. Matter DNS-SD found the Thread node, "
+                + "but Android cannot route to its IPv6 address. Check that the OTBR advertises the Thread OMR "
+                + "prefix on Wi-Fi/LAN and that this phone has an IPv6 route to that prefix.";
     }
 
     static String runtimePermissionRequestResult(String[] permissions, int[] grantResults) {
@@ -247,6 +288,10 @@ final class MainActivityPresentation {
 
     private static String onOff(boolean enabled) {
         return enabled ? "on" : "off";
+    }
+
+    private static String formatNodeId(long nodeId) {
+        return String.format("0x%016X", nodeId);
     }
 
     private static String redactMatterSecrets(String value) {

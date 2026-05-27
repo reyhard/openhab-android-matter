@@ -48,10 +48,19 @@ public final class ConnectedHomeIpDeviceAttestationDelegate {
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
             if ("onDeviceAttestationCompleted".equals(method.getName())) {
-                long devicePtr = args != null && args.length > 0 && args[0] instanceof Number
+                final long devicePtr = args != null && args.length > 0 && args[0] instanceof Number
                         ? ((Number) args[0]).longValue()
                         : -1L;
-                commandFactory.invokeContinueCommissioning(controller, devicePtr, attestationBypassEnabled);
+                ConnectedHomeIpDiagnostics.emit("Device attestation completed; continuing commissioning with attestation bypass "
+                        + (attestationBypassEnabled ? "enabled" : "disabled"));
+                new Thread(() -> {
+                    try {
+                        commandFactory.invokeContinueCommissioning(controller, devicePtr, attestationBypassEnabled);
+                    } catch (ReflectiveOperationException exception) {
+                        ConnectedHomeIpDiagnostics.emit(
+                                "Device attestation continuation failed: " + safeMessage(exception));
+                    }
+                }, "matter-attestation-continuation").start();
                 return null;
             }
             return defaultValue(method.getReturnType());
@@ -69,5 +78,10 @@ public final class ConnectedHomeIpDeviceAttestationDelegate {
             return '\0';
         }
         return 0;
+    }
+
+    private static String safeMessage(Throwable throwable) {
+        String message = throwable.getMessage();
+        return message == null || message.isEmpty() ? throwable.getClass().getSimpleName() : message;
     }
 }

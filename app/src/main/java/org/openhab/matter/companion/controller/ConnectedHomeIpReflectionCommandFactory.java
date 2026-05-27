@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothGatt;
 import org.openhab.matter.companion.domain.ThreadDataset;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 public final class ConnectedHomeIpReflectionCommandFactory {
@@ -18,6 +19,11 @@ public final class ConnectedHomeIpReflectionCommandFactory {
     private static final String DEVICE_ATTESTATION_DELEGATE_CLASS = "chip.devicecontroller.DeviceAttestationDelegate";
     private static final String GET_CONNECTED_DEVICE_CALLBACK_CLASS =
             "chip.devicecontroller.GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback";
+    private static final String ICD_REGISTRATION_INFO_CLASS = "chip.devicecontroller.ICDRegistrationInfo";
+    private static final String CONCRETE_DEVICE_ATTESTATION_DELEGATE_CLASS =
+            "org.openhab.matter.companion.controller.ConnectedHomeIpConcreteDeviceAttestationDelegate";
+    private static final String CONCRETE_CONNECTED_DEVICE_CALLBACK_CLASS =
+            "org.openhab.matter.companion.controller.ConnectedHomeIpConcreteConnectedDeviceCallback";
 
     private final Class<?> networkCredentialsClass;
     private final Class<?> threadCredentialsClass;
@@ -27,6 +33,7 @@ public final class ConnectedHomeIpReflectionCommandFactory {
     private final Class<?> completionListenerClass;
     private final Class<?> deviceAttestationDelegateClass;
     private final Class<?> getConnectedDeviceCallbackClass;
+    private final Class<?> icdRegistrationInfoClass;
 
     public ConnectedHomeIpReflectionCommandFactory(
             Class<?> networkCredentialsClass,
@@ -42,6 +49,7 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 openCommissioningCallbackClass,
                 nestedClass(chipDeviceControllerClass, "CompletionListener"),
                 null,
+                null,
                 null);
     }
 
@@ -54,6 +62,28 @@ public final class ConnectedHomeIpReflectionCommandFactory {
             Class<?> completionListenerClass,
             Class<?> deviceAttestationDelegateClass,
             Class<?> getConnectedDeviceCallbackClass) {
+        this(
+                networkCredentialsClass,
+                threadCredentialsClass,
+                commissionParametersBuilderClass,
+                chipDeviceControllerClass,
+                openCommissioningCallbackClass,
+                completionListenerClass,
+                deviceAttestationDelegateClass,
+                getConnectedDeviceCallbackClass,
+                null);
+    }
+
+    public ConnectedHomeIpReflectionCommandFactory(
+            Class<?> networkCredentialsClass,
+            Class<?> threadCredentialsClass,
+            Class<?> commissionParametersBuilderClass,
+            Class<?> chipDeviceControllerClass,
+            Class<?> openCommissioningCallbackClass,
+            Class<?> completionListenerClass,
+            Class<?> deviceAttestationDelegateClass,
+            Class<?> getConnectedDeviceCallbackClass,
+            Class<?> icdRegistrationInfoClass) {
         this.networkCredentialsClass = requireClass(networkCredentialsClass, "networkCredentialsClass");
         this.threadCredentialsClass = requireClass(threadCredentialsClass, "threadCredentialsClass");
         this.commissionParametersBuilderClass = requireClass(
@@ -66,6 +96,7 @@ public final class ConnectedHomeIpReflectionCommandFactory {
         this.completionListenerClass = completionListenerClass;
         this.deviceAttestationDelegateClass = deviceAttestationDelegateClass;
         this.getConnectedDeviceCallbackClass = getConnectedDeviceCallbackClass;
+        this.icdRegistrationInfoClass = icdRegistrationInfoClass;
     }
 
     public static ConnectedHomeIpReflectionCommandFactory fromDefaultClassLoader() throws ClassNotFoundException {
@@ -78,7 +109,8 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 Class.forName(OPEN_COMMISSIONING_CALLBACK_CLASS, false, classLoader),
                 Class.forName(COMPLETION_LISTENER_CLASS, false, classLoader),
                 Class.forName(DEVICE_ATTESTATION_DELEGATE_CLASS, false, classLoader),
-                Class.forName(GET_CONNECTED_DEVICE_CALLBACK_CLASS, false, classLoader));
+                Class.forName(GET_CONNECTED_DEVICE_CALLBACK_CLASS, false, classLoader),
+                Class.forName(ICD_REGISTRATION_INFO_CLASS, false, classLoader));
     }
 
     public Object newThreadCommissionParameters(ThreadDataset dataset) throws ReflectiveOperationException {
@@ -89,8 +121,39 @@ public final class ConnectedHomeIpReflectionCommandFactory {
         Object builder = commissionParametersBuilderClass.getConstructor().newInstance();
         findSingleParameterMethod(commissionParametersBuilderClass, "setCsrNonce").invoke(builder, new Object[] {null});
         findSingleParameterMethod(commissionParametersBuilderClass, "setNetworkCredentials").invoke(builder, networkCredentials);
-        findSingleParameterMethod(commissionParametersBuilderClass, "setICDRegistrationInfo").invoke(builder, new Object[] {null});
+        Object icdRegistrationInfo = newDeferredIcdRegistrationInfo();
+        findSingleParameterMethod(commissionParametersBuilderClass, "setICDRegistrationInfo")
+                .invoke(builder, new Object[] {icdRegistrationInfo});
         return findNoParameterMethod(commissionParametersBuilderClass, "build").invoke(builder);
+    }
+
+    public Object newIcdRegistrationInfoForStayActive(long stayActiveDurationMillis)
+            throws ReflectiveOperationException {
+        if (stayActiveDurationMillis <= 0L) {
+            throw new IllegalArgumentException("stayActiveDurationMillis must be positive");
+        }
+        Object builder = requireAvailable(icdRegistrationInfoClass, "icdRegistrationInfoClass")
+                .getMethod("newBuilder")
+                .invoke(null);
+        findSingleParameterMethod(builder.getClass(), "setICDStayActiveDurationMsec")
+                .invoke(builder, Long.valueOf(stayActiveDurationMillis));
+        return findNoParameterMethod(builder.getClass(), "build").invoke(builder);
+    }
+
+    public void invokeUpdateCommissioningIcdRegistrationInfo(Object controller, Object icdRegistrationInfo)
+            throws ReflectiveOperationException {
+        try {
+            chipDeviceControllerClass
+                    .getMethod(
+                            "updateCommissioningICDRegistrationInfo",
+                            requireAvailable(icdRegistrationInfoClass, "icdRegistrationInfoClass"))
+                    .invoke(controller, icdRegistrationInfo);
+        } catch (InvocationTargetException exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "connectedhomeip updateCommissioningICDRegistrationInfo failed: "
+                            + safeMessage(exception));
+            throw exception;
+        }
     }
 
     public Method pairDeviceThroughBleMethod() throws NoSuchMethodException {
@@ -163,7 +226,20 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 timeoutMillis);
     }
 
+    public ConnectedHomeIpCommissioningCompletionListener newCommissioningCompletionListener(
+            long timeoutMillis,
+            ConnectedHomeIpCommissioningCompletionListener.IcdRegistrationInfoRequiredHandler icdRegistrationInfoRequiredHandler) {
+        return new ConnectedHomeIpCommissioningCompletionListener(
+                requireAvailable(completionListenerClass, "completionListenerClass"),
+                timeoutMillis,
+                icdRegistrationInfoRequiredHandler);
+    }
+
     public Object newDeviceAttestationDelegate(Object controller, boolean attestationBypassEnabled) {
+        Object concreteDelegate = newConcreteDeviceAttestationDelegate(controller, attestationBypassEnabled);
+        if (concreteDelegate != null) {
+            return concreteDelegate;
+        }
         return new ConnectedHomeIpDeviceAttestationDelegate(
                 requireAvailable(deviceAttestationDelegateClass, "deviceAttestationDelegateClass"),
                 this,
@@ -173,6 +249,10 @@ public final class ConnectedHomeIpReflectionCommandFactory {
     }
 
     public Object newGetConnectedDeviceCallback(ConnectedHomeIpConnectedDeviceCallback callback) {
+        Object concreteCallback = newConcreteConnectedDeviceCallback(callback);
+        if (concreteCallback != null) {
+            return concreteCallback;
+        }
         return callback.proxy(requireAvailable(getConnectedDeviceCallbackClass, "getConnectedDeviceCallbackClass"));
     }
 
@@ -219,6 +299,12 @@ public final class ConnectedHomeIpReflectionCommandFactory {
         chipDeviceControllerClass
                 .getMethod("releaseConnectedDevicePointer", long.class)
                 .invoke(controller, devicePtr);
+    }
+
+    public void invokeClose(Object controller) throws ReflectiveOperationException {
+        chipDeviceControllerClass
+                .getMethod("close")
+                .invoke(controller);
     }
 
     private static Method findSingleParameterMethod(Class<?> targetClass, String name) throws NoSuchMethodException {
@@ -271,5 +357,96 @@ public final class ConnectedHomeIpReflectionCommandFactory {
             throw new IllegalStateException("CommissionParameters.Builder must be a nested class");
         }
         return declaringClass;
+    }
+
+    private Object newConcreteDeviceAttestationDelegate(Object controller, boolean attestationBypassEnabled) {
+        Class<?> delegateInterface = requireAvailable(deviceAttestationDelegateClass, "deviceAttestationDelegateClass");
+        try {
+            ClassLoader classLoader = ConnectedHomeIpReflectionCommandFactory.class.getClassLoader();
+            Class<?> delegateClass = Class.forName(
+                    CONCRETE_DEVICE_ATTESTATION_DELEGATE_CLASS,
+                    false,
+                    classLoader);
+            Constructor<?> constructor = delegateClass.getConstructor(chipDeviceControllerClass, boolean.class);
+            Object delegate = constructor.newInstance(controller, attestationBypassEnabled);
+            if (!delegateInterface.isInstance(delegate)) {
+                ConnectedHomeIpDiagnostics.emit("Concrete device attestation delegate is not compatible; using proxy fallback");
+                return null;
+            }
+            ConnectedHomeIpDiagnostics.emit("Using concrete connectedhomeip device attestation delegate");
+            return delegate;
+        } catch (ClassNotFoundException exception) {
+            ConnectedHomeIpDiagnostics.emit("Concrete connectedhomeip device attestation delegate not packaged; using proxy fallback");
+            return null;
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "Concrete connectedhomeip device attestation delegate unavailable: "
+                            + safeMessage(exception)
+                            + "; using proxy fallback");
+            return null;
+        }
+    }
+
+    private Object newConcreteConnectedDeviceCallback(ConnectedHomeIpConnectedDeviceCallback callback) {
+        Class<?> callbackInterface = requireAvailable(getConnectedDeviceCallbackClass, "getConnectedDeviceCallbackClass");
+        try {
+            ClassLoader classLoader = ConnectedHomeIpReflectionCommandFactory.class.getClassLoader();
+            Class<?> callbackClass = Class.forName(
+                    CONCRETE_CONNECTED_DEVICE_CALLBACK_CLASS,
+                    false,
+                    classLoader);
+            Constructor<?> constructor = callbackClass.getConstructor(ConnectedHomeIpConnectedDeviceCallback.class);
+            Object concreteCallback = constructor.newInstance(callback);
+            if (!callbackInterface.isInstance(concreteCallback)) {
+                ConnectedHomeIpDiagnostics.emit("Concrete connected device callback is not compatible; using proxy fallback");
+                return null;
+            }
+            ConnectedHomeIpDiagnostics.emit("Using concrete connectedhomeip connected device callback");
+            return concreteCallback;
+        } catch (ClassNotFoundException exception) {
+            ConnectedHomeIpDiagnostics.emit("Concrete connectedhomeip connected device callback not packaged; using proxy fallback");
+            return null;
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "Concrete connectedhomeip connected device callback unavailable: "
+                            + safeMessage(exception)
+                            + "; using proxy fallback");
+            return null;
+        }
+    }
+
+    private Object newDeferredIcdRegistrationInfo() throws ReflectiveOperationException {
+        if (icdRegistrationInfoClass == null) {
+            ConnectedHomeIpDiagnostics.emit("connectedhomeip ICD registration info class unavailable; ICD registration disabled");
+            return null;
+        }
+        try {
+            return icdRegistrationInfoClass
+                    .getMethod("createForDeferredConfiguration")
+                    .invoke(null);
+        } catch (NoSuchMethodException exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "connectedhomeip ICD deferred factory unavailable; using empty ICD registration info builder");
+            Object builder = icdRegistrationInfoClass
+                    .getMethod("newBuilder")
+                    .invoke(null);
+            return findNoParameterMethod(builder.getClass(), "build").invoke(builder);
+        }
+    }
+
+    private static String safeMessage(Throwable throwable) {
+        if (throwable instanceof InvocationTargetException
+                && ((InvocationTargetException) throwable).getTargetException() != null) {
+            return safeMessage(((InvocationTargetException) throwable).getTargetException());
+        }
+        if (throwable.getCause() != null && throwable.getCause() != throwable) {
+            String message = throwable.getMessage();
+            if (message == null || message.isEmpty()) {
+                return throwable.getClass().getSimpleName() + ": " + safeMessage(throwable.getCause());
+            }
+            return throwable.getClass().getSimpleName() + ": " + message + " / " + safeMessage(throwable.getCause());
+        }
+        String message = throwable.getMessage();
+        return message == null || message.isEmpty() ? throwable.getClass().getSimpleName() : message;
     }
 }

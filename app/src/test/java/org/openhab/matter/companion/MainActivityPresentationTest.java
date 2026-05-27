@@ -4,6 +4,7 @@ import org.junit.Test;
 import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpControllerArtifactsStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreStatus;
+import org.openhab.matter.companion.controller.ConnectedHomeIpRuntimePreflightStatus;
 import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
@@ -25,10 +26,11 @@ public class MainActivityPresentationTest {
     @Test
     public void describesRuntimePermissionsRequestedWithoutEchoingImplementationDetails() {
         assertEquals(
-                "Requesting runtime commissioning permissions: android.permission.BLUETOOTH_SCAN, android.permission.BLUETOOTH_CONNECT",
+                "Requesting runtime commissioning permissions: android.permission.BLUETOOTH_SCAN, android.permission.BLUETOOTH_CONNECT, android.permission.ACCESS_FINE_LOCATION",
                 MainActivityPresentation.runtimePermissionsRequested(Arrays.asList(
                         "android.permission.BLUETOOTH_SCAN",
-                        "android.permission.BLUETOOTH_CONNECT")));
+                        "android.permission.BLUETOOTH_CONNECT",
+                        "android.permission.ACCESS_FINE_LOCATION")));
     }
 
     @Test
@@ -226,7 +228,7 @@ public class MainActivityPresentationTest {
     @Test
     public void describesEncryptedConfigSave() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: off. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
+                "Saved Thread dataset and Matter setup payload in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: off. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
                 MainActivityPresentation.encryptedConfigSaved());
     }
 
@@ -240,7 +242,7 @@ public class MainActivityPresentationTest {
     @Test
     public void describesSelectableControllerModeNotice() {
         assertEquals(
-                "Controller mode: simulated fallback is used by default. If connectedhomeip Android controller artifacts are bundled and readiness passes, the app can attempt real BLE Thread commissioning and OpenCommissioningWindow; Matter-over-Thread hardware, OTBR, and openHAB validation are still required.",
+                "Controller mode: connectedhomeip is selected automatically when packaged and ready. If it is not ready, Thread commissioning and OpenCommissioningWindow stop instead of silently using simulation.",
                 MainActivityPresentation.controllerModeNotice());
     }
 
@@ -248,6 +250,7 @@ public class MainActivityPresentationTest {
     public void describesControllerActionLabelsWithoutFakeOnlyWording() {
         assertEquals("Run Thread commissioning", MainActivityPresentation.threadCommissioningButtonLabel());
         assertEquals("Open commissioning window", MainActivityPresentation.openCommissioningWindowButtonLabel());
+        assertEquals("Clear logs", MainActivityPresentation.clearLogsButtonLabel());
         assertEquals("Check connectedhomeip controller", MainActivityPresentation.checkControllerButtonLabel());
         assertEquals("Check connectedhomeip fabric restore", MainActivityPresentation.checkFabricRestoreButtonLabel());
         assertEquals("Use connectedhomeip controller if ready", MainActivityPresentation.useControllerButtonLabel());
@@ -258,23 +261,33 @@ public class MainActivityPresentationTest {
     }
 
     @Test
+    public void describesCommissionedNodeIdsInHexForUsers() {
+        assertEquals(
+                "Bootstrap Matter node id: 0x1C856AE5C5AA4C95",
+                MainActivityPresentation.bootstrapNodeId(0x1C856AE5C5AA4C95L));
+        assertEquals(
+                "Opening commissioning window for Matter node 0x1C856AE5C5AA4C95.",
+                MainActivityPresentation.openCommissioningWindowTarget(0x1C856AE5C5AA4C95L));
+    }
+
+    @Test
     public void describesConfigSaveWithAttestationBypassDisabled() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: off. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
+                "Saved Thread dataset and Matter setup payload in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: off. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
                 MainActivityPresentation.encryptedConfigSaved(false));
     }
 
     @Test
     public void describesConfigSaveWithAttestationBypassEnabled() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: on. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
+                "Saved Thread dataset and Matter setup payload in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: on. openHAB REST API token configured: off. Setup payloads, PINs, and tokens are not printed.",
                 MainActivityPresentation.encryptedConfigSaved(true));
     }
 
     @Test
     public void describesConfigSaveWithOpenHabApiTokenConfigured() {
         assertEquals(
-                "Saved Thread dataset in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: on. openHAB REST API token configured: on. Setup payloads, PINs, and tokens are not printed.",
+                "Saved Thread dataset and Matter setup payload in encrypted app storage, saved OTBR address, saved openHAB base URL, and saved developer attestation bypass: on. openHAB REST API token configured: on. Setup payloads, PINs, and tokens are not printed.",
                 MainActivityPresentation.encryptedConfigSaved(true, true));
     }
 
@@ -323,6 +336,13 @@ public class MainActivityPresentationTest {
         assertEquals(
                 "Stored Thread dataset could not be decrypted. Paste and save the dataset again to continue.",
                 MainActivityPresentation.threadDatasetUnreadable());
+    }
+
+    @Test
+    public void warnsWhenEncryptedSetupPayloadCannotBeRead() {
+        assertEquals(
+                "Stored Matter setup payload could not be decrypted. Paste and save the setup payload again to continue.",
+                MainActivityPresentation.setupPayloadUnreadable());
     }
 
     @Test
@@ -410,6 +430,26 @@ public class MainActivityPresentationTest {
         assertEquals(
                 "Native Matter controller ready: openhab_matter_chip. Developer attestation bypass: on.",
                 MainActivityPresentation.nativeChipReadiness(status));
+    }
+
+    @Test
+    public void describesReadyConnectedHomeIpRuntimePreflight() {
+        assertEquals(
+                "connectedhomeip runtime preflight ready: controller and BLE manager initialized.",
+                MainActivityPresentation.connectedHomeIpRuntimePreflight(
+                        new ConnectedHomeIpRuntimePreflightStatus(
+                                true,
+                                "controller and BLE manager initialized")));
+    }
+
+    @Test
+    public void describesFailedConnectedHomeIpRuntimePreflightWithoutLeakingSecrets() {
+        assertEquals(
+                "connectedhomeip runtime preflight not ready: failed for pin=<redacted> and <redacted-matter-qr-payload>",
+                MainActivityPresentation.connectedHomeIpRuntimePreflight(
+                        new ConnectedHomeIpRuntimePreflightStatus(
+                                false,
+                                "failed for pin=20202021 and MT:TEST")));
     }
 
     @Test
@@ -506,5 +546,17 @@ public class MainActivityPresentationTest {
                 "Matter controller operation failed: parser failed for <redacted-matter-qr-payload>",
                 MainActivityPresentation.matterControllerOperationFailed(
                         "parser failed for MT:Y.K9042C00KA0648G00"));
+    }
+
+    @Test
+    public void describesOperationalIpv6RouteFailure() {
+        assertEquals(
+                "Matter controller operation failed: src/inet/UDPEndPointImplSockets.cpp:417: "
+                        + "OS Error 0x02000065: Network is unreachable\n"
+                        + "Operational IPv6 route is unreachable from this phone. Matter DNS-SD found the Thread node, "
+                        + "but Android cannot route to its IPv6 address. Check that the OTBR advertises the Thread OMR "
+                        + "prefix on Wi-Fi/LAN and that this phone has an IPv6 route to that prefix.",
+                MainActivityPresentation.matterControllerOperationFailed(
+                        "src/inet/UDPEndPointImplSockets.cpp:417: OS Error 0x02000065: Network is unreachable"));
     }
 }

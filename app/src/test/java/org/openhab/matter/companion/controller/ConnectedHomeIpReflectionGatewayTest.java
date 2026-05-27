@@ -6,6 +6,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -73,6 +74,32 @@ public final class ConnectedHomeIpReflectionGatewayTest {
 
         assertSame(controller, monitor.preparedController);
         assertTrue(controller.pairedAfterMonitorPrepared);
+    }
+
+    @Test
+    public void commissionBleThreadClearsStaleBleConnectionBeforePairingCommand() throws Exception {
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        controller.staleBleConnection = true;
+        ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
+                () -> controller,
+                new CapturingBleConnectionProvider(),
+                () -> 987654321L,
+                new CapturingCommissioningMonitor(),
+                unusedAttestationHandler(),
+                unusedPointerProvider(),
+                fakeCommandFactory(),
+                1000L);
+
+        gateway.commissionBleThread(new ConnectedHomeIpCommissioningRequest(
+                "0E080000000000010000",
+                20202021L,
+                3840,
+                false,
+                "controller-state"));
+
+        assertEquals(1, controller.closeCalls);
+        assertFalse(controller.staleBleConnection);
+        assertEquals(42, controller.connId);
     }
 
     @Test
@@ -204,6 +231,50 @@ public final class ConnectedHomeIpReflectionGatewayTest {
         assertSame(controller, pointerProvider.controller);
         assertEquals(987654321L, pointerProvider.nodeId);
         assertTrue(pointerProvider.pointer.released);
+    }
+
+    @Test
+    public void checkRuntimePreflightBuildsControllerAndChecksBleManagerCallback() {
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        CapturingControllerProvider controllerProvider = new CapturingControllerProvider(controller);
+        CapturingRuntimePreflightBleProvider bleProvider = new CapturingRuntimePreflightBleProvider();
+        ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
+                controllerProvider,
+                bleProvider,
+                () -> 1L,
+                new CapturingCommissioningMonitor(),
+                unusedAttestationHandler(),
+                unusedPointerProvider(),
+                fakeCommandFactory(),
+                1000L);
+
+        ConnectedHomeIpRuntimePreflightStatus status = gateway.checkRuntimePreflight();
+
+        assertTrue(status.ready());
+        assertTrue(status.message().contains("controller "));
+        assertTrue(status.message().contains("BLE manager initialized"));
+        assertSame(controller, controllerProvider.controller);
+        assertTrue(bleProvider.checked);
+    }
+
+    @Test
+    public void checkRuntimePreflightReportsControllerConstructionFailure() {
+        ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
+                () -> {
+                    throw new IllegalStateException("controller boom");
+                },
+                unusedBleProvider(),
+                () -> 1L,
+                new CapturingCommissioningMonitor(),
+                unusedAttestationHandler(),
+                unusedPointerProvider(),
+                fakeCommandFactory(),
+                1000L);
+
+        ConnectedHomeIpRuntimePreflightStatus status = gateway.checkRuntimePreflight();
+
+        assertFalse(status.ready());
+        assertTrue(status.message().contains("controller boom"));
     }
 
     @Test
@@ -365,11 +436,18 @@ public final class ConnectedHomeIpReflectionGatewayTest {
         private boolean monitorPrepared;
         private boolean pairedAfterMonitorPrepared;
         private boolean requireCompletionListenerBeforePairing;
+        private boolean staleBleConnection;
+        private int closeCalls;
         private CompletionListener completionListener;
         private CompletionListener completionListenerAtPairing;
 
         public void setCompletionListener(CompletionListener listener) {
             completionListener = listener;
+        }
+
+        public void close() {
+            closeCalls++;
+            staleBleConnection = false;
         }
 
         public void pairDeviceThroughBLE(
@@ -384,6 +462,9 @@ public final class ConnectedHomeIpReflectionGatewayTest {
             }
             if (failPairing) {
                 throw new IllegalStateException("pair failed");
+            }
+            if (staleBleConnection) {
+                throw new IllegalStateException("Bluetooth connection already in use.");
             }
             this.connId = connId;
             this.deviceId = deviceId;
@@ -439,6 +520,35 @@ public final class ConnectedHomeIpReflectionGatewayTest {
         public ConnectedHomeIpBleConnection connect(int discriminator) {
             this.discriminator = discriminator;
             return connection;
+        }
+    }
+
+    private static final class CapturingRuntimePreflightBleProvider
+            implements ConnectedHomeIpBleConnectionProvider, ConnectedHomeIpRuntimePreflightChecker {
+        private boolean checked;
+
+        @Override
+        public ConnectedHomeIpBleConnection connect(int discriminator) {
+            throw new AssertionError("runtime preflight must not connect to BLE devices");
+        }
+
+        @Override
+        public ConnectedHomeIpRuntimePreflightStatus checkRuntimePreflight() {
+            checked = true;
+            return new ConnectedHomeIpRuntimePreflightStatus(true, "ble-ok");
+        }
+    }
+
+    private static final class CapturingControllerProvider implements ConnectedHomeIpControllerProvider {
+        private final Object controller;
+
+        private CapturingControllerProvider(Object controller) {
+            this.controller = controller;
+        }
+
+        @Override
+        public Object controller() {
+            return controller;
         }
     }
 

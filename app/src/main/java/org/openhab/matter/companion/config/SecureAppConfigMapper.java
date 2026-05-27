@@ -12,6 +12,7 @@ public final class SecureAppConfigMapper {
     public StoredConfig toStoredValues(AppConfig config) throws GeneralSecurityException {
         return new StoredConfig(
                 secretCodec.encode(config.threadDataset()),
+                secretCodec.encode(config.setupPayload()),
                 config.openHabBaseUrl(),
                 secretCodec.encode(config.openHabApiToken()),
                 config.otbrBaseUrl());
@@ -23,6 +24,15 @@ public final class SecureAppConfigMapper {
 
     public AppConfig fromStoredValues(String threadDataset, String openHabBaseUrl, String otbrBaseUrl) {
         return fromStoredValues(threadDataset, openHabBaseUrl, "", otbrBaseUrl, false);
+    }
+
+    public AppConfig fromStoredValues(
+            String threadDataset,
+            String setupPayload,
+            String openHabBaseUrl,
+            String openHabApiToken,
+            String otbrBaseUrl) {
+        return fromStoredValues(threadDataset, setupPayload, openHabBaseUrl, openHabApiToken, otbrBaseUrl, false);
     }
 
     public AppConfig fromStoredValues(
@@ -47,15 +57,29 @@ public final class SecureAppConfigMapper {
             String openHabApiToken,
             String otbrBaseUrl,
             boolean attestationBypassEnabled) {
+        return fromStoredValues(threadDataset, "", openHabBaseUrl, openHabApiToken, otbrBaseUrl,
+                attestationBypassEnabled);
+    }
+
+    public AppConfig fromStoredValues(
+            String threadDataset,
+            String setupPayload,
+            String openHabBaseUrl,
+            String openHabApiToken,
+            String otbrBaseUrl,
+            boolean attestationBypassEnabled) {
         String safeThreadDataset = threadDataset == null ? "" : threadDataset;
         DecodedSecret decodedThreadDataset = decodeThreadDataset(safeThreadDataset);
+        DecodedSecret decodedSetupPayload = decodeStoredSecret(setupPayload);
         DecodedSecret decodedToken = decodeStoredSecret(openHabApiToken);
         return new AppConfig(
                 decodedThreadDataset.value,
+                decodedSetupPayload.value,
                 openHabBaseUrl,
                 decodedToken.value,
                 otbrBaseUrl,
                 decodedThreadDataset.unreadable,
+                decodedSetupPayload.unreadable,
                 decodedToken.unreadable,
                 attestationBypassEnabled);
     }
@@ -104,12 +128,19 @@ public final class SecureAppConfigMapper {
 
     public static final class StoredConfig {
         private final String threadDataset;
+        private final String setupPayload;
         private final String openHabBaseUrl;
         private final String openHabApiToken;
         private final String otbrBaseUrl;
 
-        StoredConfig(String threadDataset, String openHabBaseUrl, String openHabApiToken, String otbrBaseUrl) {
+        StoredConfig(
+                String threadDataset,
+                String setupPayload,
+                String openHabBaseUrl,
+                String openHabApiToken,
+                String otbrBaseUrl) {
             this.threadDataset = threadDataset == null ? "" : threadDataset;
+            this.setupPayload = setupPayload == null ? "" : setupPayload;
             this.openHabBaseUrl = openHabBaseUrl == null ? "" : openHabBaseUrl;
             this.openHabApiToken = openHabApiToken == null ? "" : openHabApiToken;
             this.otbrBaseUrl = otbrBaseUrl == null ? "" : otbrBaseUrl;
@@ -117,6 +148,10 @@ public final class SecureAppConfigMapper {
 
         public String threadDataset() {
             return threadDataset;
+        }
+
+        public String setupPayload() {
+            return setupPayload;
         }
 
         public String openHabBaseUrl() {

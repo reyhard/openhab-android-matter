@@ -31,6 +31,22 @@ public final class ConnectedHomeIpConnectedDeviceCallback {
                 new CallbackHandler());
     }
 
+    public void onDeviceConnected(long connectedDevicePtr) throws Exception {
+        synchronized (lock) {
+            if (abandoned) {
+                lateDevicePointerReleaser.release(connectedDevicePtr);
+                return;
+            }
+            devicePtr = connectedDevicePtr;
+        }
+        latch.countDown();
+    }
+
+    public void onConnectionFailure(long nodeId, Exception cause) {
+        error = new IllegalStateException("Connected device pointer failed for node " + nodeId, cause);
+        latch.countDown();
+    }
+
     public long awaitDevicePointer(long nodeId, long timeoutMillis) throws InterruptedException {
         boolean completed;
         try {
@@ -62,14 +78,7 @@ public final class ConnectedHomeIpConnectedDeviceCallback {
                 long connectedDevicePtr = args != null && args.length > 0 && args[0] instanceof Number
                         ? ((Number) args[0]).longValue()
                         : 0L;
-                synchronized (lock) {
-                    if (abandoned) {
-                        lateDevicePointerReleaser.release(connectedDevicePtr);
-                        return null;
-                    }
-                    devicePtr = connectedDevicePtr;
-                }
-                latch.countDown();
+                onDeviceConnected(connectedDevicePtr);
                 return null;
             }
             if ("onConnectionFailure".equals(method.getName())) {
@@ -79,8 +88,7 @@ public final class ConnectedHomeIpConnectedDeviceCallback {
                 Throwable cause = args != null && args.length > 1 && args[1] instanceof Throwable
                         ? (Throwable) args[1]
                         : null;
-                error = new IllegalStateException("Connected device pointer failed for node " + nodeId, cause);
-                latch.countDown();
+                onConnectionFailure(nodeId, cause instanceof Exception ? (Exception) cause : new Exception(cause));
                 return null;
             }
             return defaultValue(method.getReturnType());

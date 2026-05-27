@@ -12,6 +12,7 @@ public class InMemoryAppConfigRepositoryTest {
         AppConfig config = repository.load();
 
         assertEquals("", config.threadDataset());
+        assertEquals("", config.setupPayload());
         assertEquals("", config.openHabBaseUrl());
         assertEquals("", config.openHabApiToken());
         assertEquals("", config.otbrBaseUrl());
@@ -32,12 +33,14 @@ public class InMemoryAppConfigRepositoryTest {
 
         repository.save(new AppConfig(
                 "hex:0E080000000000010000",
+                "pin=20202021;disc=1740",
                 "http://openhab.local:8080",
                 "oh.test.token",
                 "fd00::1"));
         AppConfig config = repository.load();
 
         assertEquals("hex:0E080000000000010000", config.threadDataset());
+        assertEquals("pin=20202021;disc=1740", config.setupPayload());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
         assertEquals("oh.test.token", config.openHabApiToken());
         assertEquals("fd00::1", config.otbrBaseUrl());
@@ -49,6 +52,7 @@ public class InMemoryAppConfigRepositoryTest {
 
         repository.save(new AppConfig(
                 "hex:0E080000000000010000",
+                "",
                 "http://openhab.local:8080",
                 "oh.test.token",
                 "http://otbr.local",

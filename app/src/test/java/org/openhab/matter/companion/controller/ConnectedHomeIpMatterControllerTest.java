@@ -39,6 +39,25 @@ public final class ConnectedHomeIpMatterControllerTest {
     }
 
     @Test
+    public void commissionBleThreadForwardsNativeDiagnosticsToProgressListener() throws Exception {
+        CapturingGateway gateway = new CapturingGateway();
+        gateway.commissioningDiagnostic = "Matter BLE scan round 1 of 3 for discriminator 1740";
+        ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
+                readyArtifacts(),
+                gateway,
+                true);
+        List<String> steps = new ArrayList<>();
+
+        controller.commissionBleThread(
+                ThreadDataset.parse("hex:0e080000000000010000"),
+                new MatterSetupPayload("pin=20202021;disc=1740", 20202021L, 1740, "Aqara", "U200", false),
+                "controller-state",
+                step -> steps.add(step.message()));
+
+        assertEquals("Matter BLE scan round 1 of 3 for discriminator 1740", steps.get(1));
+    }
+
+    @Test
     public void openCommissioningWindowMapsRequestAndResult() throws Exception {
         CapturingGateway gateway = new CapturingGateway();
         ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
@@ -79,6 +98,36 @@ public final class ConnectedHomeIpMatterControllerTest {
         assertTrue(status.ready());
         assertEquals(987654321L, gateway.fabricRestoreNodeId);
         assertEquals("restore-ok", status.message());
+    }
+
+    @Test
+    public void checkRuntimePreflightDelegatesToGatewayWhenArtifactsAreReady() {
+        CapturingGateway gateway = new CapturingGateway();
+        ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
+                readyArtifacts(),
+                gateway,
+                false);
+
+        ConnectedHomeIpRuntimePreflightStatus status = controller.checkRuntimePreflight();
+
+        assertTrue(status.ready());
+        assertEquals("runtime-ok", status.message());
+        assertEquals(1, gateway.runtimePreflightCalls);
+    }
+
+    @Test
+    public void checkRuntimePreflightRejectsMissingArtifactsBeforeCallingGateway() {
+        CapturingGateway gateway = new CapturingGateway();
+        ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
+                missingArtifacts(),
+                gateway,
+                false);
+
+        ConnectedHomeIpRuntimePreflightStatus status = controller.checkRuntimePreflight();
+
+        assertEquals("Missing connectedhomeip controller class: chip.devicecontroller.ChipDeviceController",
+                status.message());
+        assertEquals(0, gateway.runtimePreflightCalls);
     }
 
     @Test
@@ -124,12 +173,17 @@ public final class ConnectedHomeIpMatterControllerTest {
         private ConnectedHomeIpCommissioningRequest commissioningRequest;
         private ConnectedHomeIpOpenCommissioningWindowRequest openCommissioningWindowRequest;
         private long fabricRestoreNodeId = -1L;
+        private int runtimePreflightCalls;
         private int callCount;
+        private String commissioningDiagnostic;
 
         @Override
         public MatterCommissioningResult commissionBleThread(ConnectedHomeIpCommissioningRequest request) {
             callCount++;
             commissioningRequest = request;
+            if (commissioningDiagnostic != null) {
+                ConnectedHomeIpDiagnostics.emit(commissioningDiagnostic);
+            }
             return new MatterCommissioningResult(987654321L, "updated-state");
         }
 
@@ -145,6 +199,12 @@ public final class ConnectedHomeIpMatterControllerTest {
             callCount++;
             fabricRestoreNodeId = bootstrapNodeId;
             return new ConnectedHomeIpFabricRestoreStatus(true, true, bootstrapNodeId, "restore-ok");
+        }
+
+        @Override
+        public ConnectedHomeIpRuntimePreflightStatus checkRuntimePreflight() {
+            runtimePreflightCalls++;
+            return new ConnectedHomeIpRuntimePreflightStatus(true, "runtime-ok");
         }
     }
 }

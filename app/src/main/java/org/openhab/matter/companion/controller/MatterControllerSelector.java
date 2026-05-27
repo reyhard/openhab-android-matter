@@ -21,10 +21,20 @@ public final class MatterControllerSelector {
             return new MatterControllerSelection(
                     fallbackController,
                     false,
-                    "Native Matter controller not configured. Continuing with simulated Matter controller.");
+                    "Native Matter controller not configured.");
         }
         ChipMatterControllerStatus status = nativeController.readiness();
         if (status.ready()) {
+            if (nativeController instanceof ConnectedHomeIpRuntimePreflightChecker) {
+                ConnectedHomeIpRuntimePreflightStatus runtimeStatus =
+                        ((ConnectedHomeIpRuntimePreflightChecker) nativeController).checkRuntimePreflight();
+                if (!runtimeStatus.ready()) {
+                    return new MatterControllerSelection(
+                            fallbackController,
+                            false,
+                            "Native Matter controller runtime preflight failed: " + runtimeStatus.message());
+                }
+            }
             return new MatterControllerSelection(
                     nativeController,
                     true,
@@ -33,7 +43,6 @@ public final class MatterControllerSelector {
         return new MatterControllerSelection(
                 fallbackController,
                 false,
-                "Native Matter controller not ready: " + status.message()
-                        + ". Continuing with simulated Matter controller.");
+                "Native Matter controller not ready: " + status.message());
     }
 }

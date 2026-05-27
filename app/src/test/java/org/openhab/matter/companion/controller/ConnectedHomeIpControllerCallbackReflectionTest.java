@@ -2,6 +2,9 @@ package org.openhab.matter.companion.controller;
 
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
@@ -91,6 +94,78 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
     }
 
     @Test
+    public void commissioningCompletionListenerIncludesOnErrorCauseMessage() throws Exception {
+        ConnectedHomeIpCommissioningCompletionListener listener = fakeFactory().newCommissioningCompletionListener();
+
+        ((FakeCompletionListener) listener.proxy()).onError(new IllegalStateException("Bluetooth connection already in use."));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> listener.awaitCommissioned(987654321L, "controller-state"));
+
+        assertTrue(exception.getMessage().contains("Bluetooth connection already in use."));
+    }
+
+    @Test
+    public void commissioningCompletionListenerEmitsCommissioningProgressDiagnostics() throws Exception {
+        ConnectedHomeIpCommissioningCompletionListener listener = fakeFactory().newCommissioningCompletionListener();
+        List<String> diagnostics = new ArrayList<>();
+
+        ConnectedHomeIpDiagnostics.withListener(diagnostics::add, () -> {
+            FakeCompletionListener proxy = (FakeCompletionListener) listener.proxy();
+            proxy.onCommissioningStageStart(987654321L, "ICDGetRegistrationInfo");
+            proxy.onCommissioningStatusUpdate(987654321L, "ICDGetRegistrationInfo", 0L);
+            proxy.onICDRegistrationInfoRequired();
+            proxy.onICDRegistrationComplete(987654321L, new Object());
+            proxy.onCommissioningComplete(987654321L, 0L);
+            return null;
+        });
+
+        assertTrue(diagnostics.contains("connectedhomeip commissioning stage started: ICDGetRegistrationInfo"));
+        assertTrue(diagnostics.contains("connectedhomeip commissioning stage update: ICDGetRegistrationInfo succeeded"));
+        assertTrue(diagnostics.contains("connectedhomeip ICD registration info required"));
+        assertTrue(diagnostics.contains("connectedhomeip ICD registration complete for node 987654321"));
+        assertTrue(diagnostics.contains("connectedhomeip commissioning complete for node 987654321"));
+    }
+
+    @Test
+    public void reflectionCommissioningMonitorSubmitsIcdRegistrationInfoWhenRequested() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        ConnectedHomeIpReflectionCommissioningMonitor monitor = new ConnectedHomeIpReflectionCommissioningMonitor(
+                factory,
+                1000L);
+
+        monitor.prepare(controller);
+        controller.completionListener.onICDRegistrationInfoRequired();
+
+        assertSame(
+                ConnectedHomeIpReflectionCommandFactoryTest.FakeICDRegistrationInfo.BUILT,
+                controller.icdRegistrationInfo);
+        assertEquals(
+                Long.valueOf(30000L),
+                ConnectedHomeIpReflectionCommandFactoryTest.FakeICDRegistrationInfo.lastBuilder.stayActiveDurationMsec);
+    }
+
+    @Test
+    public void reflectionCommissioningMonitorReportsIcdRegistrationUpdateFailure() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        controller.failIcdRegistrationUpdate = true;
+        ConnectedHomeIpReflectionCommissioningMonitor monitor = new ConnectedHomeIpReflectionCommissioningMonitor(
+                factory,
+                1000L);
+
+        monitor.prepare(controller);
+        controller.completionListener.onICDRegistrationInfoRequired();
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> monitor.awaitCommissioned(987654321L, "controller-state"));
+        assertTrue(exception.getMessage().contains("CHIP Error 0x00000003"));
+    }
+
+    @Test
     public void reflectionAttestationHandlerRegistersDelegateAndContinuesWithBypassFlag() throws Exception {
         FakeChipDeviceController controller = new FakeChipDeviceController();
         ConnectedHomeIpReflectionAttestationHandler handler = new ConnectedHomeIpReflectionAttestationHandler(
@@ -101,7 +176,25 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
         controller.attestationDelegate.onDeviceAttestationCompleted(1234L, new Object(), 42L);
 
         assertEquals(120, controller.attestationFailSafeExpiryTimeoutSecs);
+        waitFor(() -> controller.continueCommissioningDevicePtr == 1234L);
         assertEquals(1234L, controller.continueCommissioningDevicePtr);
+        assertTrue(controller.continueCommissioningIgnoreAttestationFailure);
+    }
+
+    @Test
+    public void attestationDelegateReturnsBeforeContinuingCommissioning() throws Exception {
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+        controller.blockContinueCommissioning = true;
+        ConnectedHomeIpReflectionAttestationHandler handler = new ConnectedHomeIpReflectionAttestationHandler(
+                fakeFactory(),
+                120);
+
+        handler.prepareForCommissioning(controller, 987654321L, true);
+        controller.attestationDelegate.onDeviceAttestationCompleted(1234L, new Object(), 42L);
+
+        assertEquals(0L, controller.continueCommissioningDevicePtr);
+        controller.blockContinueCommissioning = false;
+        waitFor(() -> controller.continueCommissioningDevicePtr == 1234L);
         assertTrue(controller.continueCommissioningIgnoreAttestationFailure);
     }
 
@@ -161,7 +254,8 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
                 ConnectedHomeIpReflectionCommandFactoryTest.FakeOpenCommissioningCallback.class,
                 FakeCompletionListener.class,
                 FakeDeviceAttestationDelegate.class,
-                FakeGetConnectedDeviceCallback.class);
+                FakeGetConnectedDeviceCallback.class,
+                ConnectedHomeIpReflectionCommandFactoryTest.FakeICDRegistrationInfo.class);
     }
 
     public static final class FakeChipDeviceController {
@@ -170,11 +264,14 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
         private FakeDeviceAttestationDelegate attestationDelegate;
         private long continueCommissioningDevicePtr;
         private boolean continueCommissioningIgnoreAttestationFailure;
+        private volatile boolean blockContinueCommissioning;
         private long connectedDeviceNodeId;
         private boolean connectedDeviceFailure;
         private boolean connectedDeviceDelayed;
         private FakeGetConnectedDeviceCallback connectedDeviceCallback;
         private long releasedDevicePtr;
+        private ConnectedHomeIpReflectionCommandFactoryTest.FakeICDRegistrationInfo icdRegistrationInfo;
+        private boolean failIcdRegistrationUpdate;
 
         public void setCompletionListener(FakeCompletionListener listener) {
             completionListener = listener;
@@ -188,6 +285,14 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
         }
 
         public void continueCommissioning(long devicePtr, boolean ignoreAttestationFailure) {
+            while (blockContinueCommissioning) {
+                try {
+                    Thread.sleep(5L);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
             continueCommissioningDevicePtr = devicePtr;
             continueCommissioningIgnoreAttestationFailure = ignoreAttestationFailure;
         }
@@ -208,6 +313,14 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
         public void releaseConnectedDevicePointer(long devicePtr) {
             releasedDevicePtr = devicePtr;
         }
+
+        public void updateCommissioningICDRegistrationInfo(
+                ConnectedHomeIpReflectionCommandFactoryTest.FakeICDRegistrationInfo icdRegistrationInfo) {
+            if (failIcdRegistrationUpdate) {
+                throw new IllegalStateException("CHIP Error 0x00000003: Incorrect state");
+            }
+            this.icdRegistrationInfo = icdRegistrationInfo;
+        }
     }
 
     public interface FakeCompletionListener {
@@ -227,6 +340,10 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
 
         void onCloseBleComplete();
 
+        void onICDRegistrationInfoRequired();
+
+        void onICDRegistrationComplete(long nodeId, Object icdDeviceInfo);
+
         void onError(Throwable error);
     }
 
@@ -238,5 +355,20 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
         void onDeviceConnected(long devicePointer);
 
         void onConnectionFailure(long nodeId, Exception error);
+    }
+
+    private static void waitFor(BooleanCondition condition) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 1000L;
+        while (System.currentTimeMillis() < deadline) {
+            if (condition.get()) {
+                return;
+            }
+            Thread.sleep(10L);
+        }
+        throw new AssertionError("condition was not met before timeout");
+    }
+
+    private interface BooleanCondition {
+        boolean get();
     }
 }

@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -24,6 +25,8 @@ import org.openhab.matter.companion.controller.ChipMatterControllerStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreChecker;
 import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreStatus;
 import org.openhab.matter.companion.controller.ConnectedHomeIpMatterControllerFactory;
+import org.openhab.matter.companion.controller.ConnectedHomeIpRuntimePreflightChecker;
+import org.openhab.matter.companion.controller.ConnectedHomeIpRuntimePreflightStatus;
 import org.openhab.matter.companion.config.AppConfig;
 import org.openhab.matter.companion.config.AppConfigRepository;
 import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository;
@@ -63,6 +66,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MainActivity extends Activity {
+    public static final String ACTION_COMMISSION_THREAD =
+            "org.openhab.matter.companion.action.COMMISSION_THREAD";
+    public static final String EXTRA_COMMISSION_THREAD = "org.openhab.matter.companion.extra.COMMISSION_THREAD";
+
     private static final String KEY_DATASET = "dataset";
     private static final String KEY_SETUP_PAYLOAD = "setupPayload";
     private static final String KEY_OPENHAB_BASE_URL = "openHabBaseUrl";
@@ -104,6 +111,7 @@ public final class MainActivity extends Activity {
     private ImageView temporaryQrImage;
     private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
+    private boolean persistedSetupPayloadUnreadable;
     private boolean persistedOpenHabApiTokenUnreadable;
     private boolean persistedBootstrapStateUnreadable;
     private MatterBootstrapState persistedBootstrapState = MatterBootstrapState.empty();
@@ -113,6 +121,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         configRepository = new SharedPreferencesAppConfigRepository(this);
         bootstrapStateRepository = new SharedPreferencesMatterBootstrapStateRepository(this);
         loadPersistedConfig();
@@ -181,7 +190,8 @@ public final class MainActivity extends Activity {
         Button checkFabricRestore = button(MainActivityPresentation.checkFabricRestoreButtonLabel());
         Button useNativeChip = button(MainActivityPresentation.useControllerButtonLabel());
         Button troubleshootingGuide = button(MainActivityPresentation.troubleshootingGuideButtonLabel());
-        Button saveConfig = button("Save dataset, OTBR address, openHAB URL, and token");
+        Button saveConfig = button("Save dataset, setup payload, OTBR address, openHAB URL, and token");
+        Button clearLogs = button(MainActivityPresentation.clearLogsButtonLabel());
         temporaryQrImage = new ImageView(this);
         temporaryQrImage.setAdjustViewBounds(true);
         temporaryQrImage.setBackgroundColor(Color.WHITE);
@@ -206,6 +216,7 @@ public final class MainActivity extends Activity {
         useNativeChip.setOnClickListener(view -> useNativeChipControllerIfReady());
         troubleshootingGuide.setOnClickListener(view -> showTroubleshootingGuide());
         saveConfig.setOnClickListener(view -> saveConfiguration());
+        clearLogs.setOnClickListener(view -> clearLogs());
 
         root.addView(title);
         root.addView(subtitle);
@@ -239,17 +250,19 @@ public final class MainActivity extends Activity {
         root.addView(saveConfig);
         root.addView(temporaryQrImage);
         root.addView(section("Guide output"));
+        root.addView(clearLogs);
         root.addView(output);
 
         setContentView(scrollView);
+        boolean hadRestoredLogs = !state.logs.isEmpty();
         output.setText(state.logs);
-        if (restoreNativeControllerSelection) {
-            restoreNativeChipControllerSelectionAsync();
-        }
         if (state.logs.isEmpty()) {
             append("Paste your OTBR Thread dataset and Matter setup payload. Sensitive input is validated but not echoed in this log.");
             if (persistedThreadDatasetUnreadable) {
                 append(MainActivityPresentation.threadDatasetUnreadable());
+            }
+            if (persistedSetupPayloadUnreadable) {
+                append(MainActivityPresentation.setupPayloadUnreadable());
             }
             if (persistedOpenHabApiTokenUnreadable) {
                 append(MainActivityPresentation.openHabApiTokenUnreadable());
@@ -258,6 +271,19 @@ public final class MainActivity extends Activity {
                 append(MainActivityPresentation.bootstrapStateUnreadable());
             }
         }
+        if (restoreNativeControllerSelection) {
+            restoreNativeChipControllerSelectionAsync();
+        } else {
+            selectNativeChipControllerAsync(!hadRestoredLogs);
+        }
+        handleLaunchIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleLaunchIntent(intent);
     }
 
     @Override
@@ -356,31 +382,49 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        MatterController selectedController = controllerSession.controller();
-        boolean nativeControllerSelected = controllerSession.nativeSelected();
-        MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
-        String controllerState = bootstrapState.controllerState();
-        append(nativeControllerSelected
-                ? "Starting connectedhomeip Thread commissioning."
-                : "Starting simulated Thread commissioning. No real BLE, Thread, or Matter operation will be performed.");
         append("Validated Thread dataset without displaying it.");
         append(payloadSummary(payload));
         new Thread(() -> {
+            MatterControllerSelection selection = controllerSession.selectNativeIfReady();
+            appendFromWorker(MainActivityPresentation.matterControllerSelection(selection));
+            if (!selection.nativeSelected()) {
+                return;
+            }
+            MatterBootstrapState bootstrapState = bootstrapStateRepository.load();
+            String controllerState = bootstrapState.controllerState();
+            appendFromWorker("Starting connectedhomeip Thread commissioning.");
             try {
-                MatterCommissioningResult result = selectedController.commissionBleThread(
+                MatterCommissioningResult result = selection.controller().commissionBleThread(
                         dataset,
                         payload,
                         controllerState,
-                        step -> appendFromWorker(step.message()));
+                        step -> appendFromWorker(MainActivityPresentation.safeTextForLog(step.message())));
                 runOnUiThread(() -> {
                     state.commissionedNodeId = result.nodeId();
                     saveBootstrapState(result.nodeId(), result.controllerState());
-                    append("Bootstrap node id: " + state.commissionedNodeId);
+                    append(MainActivityPresentation.bootstrapNodeId(state.commissionedNodeId));
                 });
             } catch (Exception ex) {
                 appendFromWorker(MainActivityPresentation.matterControllerOperationFailed(ex.getMessage()));
             }
         }, "matter-commissioning").start();
+    }
+
+    private void handleLaunchIntent(Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        boolean requested = ACTION_COMMISSION_THREAD.equals(intent.getAction())
+                || intent.getBooleanExtra(EXTRA_COMMISSION_THREAD, false);
+        if (!requested) {
+            return;
+        }
+        append("Launch intent requested Thread commissioning.");
+        runCommissioning();
+        intent.removeExtra(EXTRA_COMMISSION_THREAD);
+        if (ACTION_COMMISSION_THREAD.equals(intent.getAction())) {
+            intent.setAction(Intent.ACTION_MAIN);
+        }
     }
 
     private void runOpenCommissioningWindow() {
@@ -400,18 +444,20 @@ public final class MainActivity extends Activity {
             return;
         }
         state.commissionedNodeId = nodeId;
+        append(MainActivityPresentation.openCommissioningWindowTarget(nodeId));
 
-        MatterController selectedController = controllerSession.controller();
-        boolean nativeControllerSelected = controllerSession.nativeSelected();
-        String controllerState = bootstrapState.controllerState();
-        append(nativeControllerSelected
-                ? "Opening connectedhomeip commissioning window."
-                : "Opening a simulated commissioning window. This does not call a real Matter controller.");
         new Thread(() -> {
+            MatterControllerSelection selection = controllerSession.selectNativeIfReady();
+            appendFromWorker(MainActivityPresentation.matterControllerSelection(selection));
+            if (!selection.nativeSelected()) {
+                return;
+            }
+            String controllerState = bootstrapState.controllerState();
+            appendFromWorker("Opening connectedhomeip commissioning window.");
             try {
-                MatterOpenCommissioningWindowResult result = selectedController.openCommissioningWindow(nodeId, 300, 3840,
+                MatterOpenCommissioningWindowResult result = selection.controller().openCommissioningWindow(nodeId, 300, 3840,
                         controllerState,
-                        step -> appendFromWorker(step.message()));
+                        step -> appendFromWorker(MainActivityPresentation.safeTextForLog(step.message())));
                 runOnUiThread(() -> {
                     state.temporaryCode = result.temporaryCode();
                     saveBootstrapState(nodeId, result.controllerState());
@@ -496,9 +542,16 @@ public final class MainActivity extends Activity {
         new Thread(() -> {
             NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
             ChipMatterControllerStatus status = request.nativeController().readiness();
+            ConnectedHomeIpRuntimePreflightStatus runtimeStatus =
+                    request.nativeController() instanceof ConnectedHomeIpRuntimePreflightChecker
+                            ? ((ConnectedHomeIpRuntimePreflightChecker) request.nativeController()).checkRuntimePreflight()
+                            : null;
             runOnUiThread(() -> {
                 if (controllerSession.isCurrent(request)) {
                     append(MainActivityPresentation.nativeChipReadiness(status));
+                    if (runtimeStatus != null) {
+                        append(MainActivityPresentation.connectedHomeIpRuntimePreflight(runtimeStatus));
+                    }
                 }
             });
         }, "matter-chip-readiness").start();
@@ -558,6 +611,7 @@ public final class MainActivity extends Activity {
 
     private void saveConfiguration() {
         state.dataset = datasetInput.getText().toString();
+        state.setupPayload = payloadInput.getText().toString();
         state.openHabBaseUrl = openHabInput.getText().toString();
         state.openHabApiToken = openHabTokenInput.getText().toString();
         state.otbrBaseUrl = otbrInput.getText().toString();
@@ -568,6 +622,7 @@ public final class MainActivity extends Activity {
             }
             configRepository.save(new AppConfig(
                     state.dataset,
+                    state.setupPayload,
                     state.openHabBaseUrl,
                     state.openHabApiToken,
                     state.otbrBaseUrl,
@@ -802,6 +857,16 @@ public final class MainActivity extends Activity {
         output.setText(state.logs);
     }
 
+    private void clearLogs() {
+        state.logs = "";
+        state.temporaryCode = "";
+        if (temporaryQrImage != null) {
+            temporaryQrImage.setVisibility(android.view.View.GONE);
+            temporaryQrImage.setImageBitmap(null);
+        }
+        output.setText("");
+    }
+
     private void appendFromWorker(String message) {
         runOnUiThread(() -> append(message));
     }
@@ -826,11 +891,13 @@ public final class MainActivity extends Activity {
     private void loadPersistedConfig() {
         AppConfig config = configRepository.load();
         state.dataset = config.threadDataset();
+        state.setupPayload = config.setupPayload();
         state.openHabBaseUrl = config.openHabBaseUrl();
         state.openHabApiToken = config.openHabApiToken();
         state.otbrBaseUrl = config.otbrBaseUrl();
         state.attestationBypassEnabled = config.attestationBypassEnabled();
         persistedThreadDatasetUnreadable = config.threadDatasetUnreadable();
+        persistedSetupPayloadUnreadable = config.setupPayloadUnreadable();
         persistedOpenHabApiTokenUnreadable = config.openHabApiTokenUnreadable();
     }
 
@@ -863,16 +930,8 @@ public final class MainActivity extends Activity {
 
     private void selectNativeChipControllerAsync(boolean appendWhenSelected) {
         new Thread(() -> {
-            NativeChipControllerSession.SelectionRequest request = controllerSession.selectionRequest();
-            MatterControllerSelection selection = MatterControllerSelector.select(
-                    fakeMatterController,
-                    request.nativeController(),
-                    true);
+            MatterControllerSelection selection = controllerSession.selectNativeIfReady();
             runOnUiThread(() -> {
-                boolean applied = controllerSession.applySelection(request, selection);
-                if (!applied) {
-                    return;
-                }
                 if (appendWhenSelected || !selection.nativeSelected()) {
                     append(MainActivityPresentation.matterControllerSelection(selection));
                 }

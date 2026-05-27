@@ -57,6 +57,35 @@ public final class MatterControllerSelectorTest {
     }
 
     @Test
+    public void fallsBackWhenReadyNativeControllerFailsRuntimePreflight() {
+        MatterController fallback = new FakeMatterController();
+        MatterControllerCandidate nativeController = new RuntimePreflightCandidate(false, "runtime boom");
+
+        MatterControllerSelection selection = MatterControllerSelector.select(
+                fallback,
+                nativeController,
+                true);
+
+        assertSame(fallback, selection.controller());
+        assertFalse(selection.nativeSelected());
+        assertTrue(selection.message().contains("Native Matter controller runtime preflight failed: runtime boom"));
+    }
+
+    @Test
+    public void selectsReadyNativeControllerWhenRuntimePreflightPasses() {
+        MatterController fallback = new FakeMatterController();
+        MatterControllerCandidate nativeController = new RuntimePreflightCandidate(true, "runtime-ok");
+
+        MatterControllerSelection selection = MatterControllerSelector.select(
+                fallback,
+                nativeController,
+                true);
+
+        assertSame(nativeController, selection.controller());
+        assertTrue(selection.nativeSelected());
+    }
+
+    @Test
     public void fallsBackWhenRequestedNativeControllerIsNotReady() {
         MatterController fallback = new FakeMatterController();
         ChipMatterController nativeController = new ChipMatterController(name -> {
@@ -71,7 +100,7 @@ public final class MatterControllerSelectorTest {
         assertSame(fallback, selection.controller());
         assertFalse(selection.nativeSelected());
         assertTrue(selection.message().contains("Native Matter controller not ready"));
-        assertTrue(selection.message().contains("Continuing with simulated Matter controller"));
+        assertFalse(selection.message().contains("Continuing with simulated Matter controller"));
     }
 
     @Test
@@ -88,6 +117,7 @@ public final class MatterControllerSelectorTest {
         assertSame(fallback, selection.controller());
         assertFalse(selection.nativeSelected());
         assertTrue(selection.message().contains("Native Matter controller not ready"));
+        assertFalse(selection.message().contains("Continuing with simulated Matter controller"));
         assertTrue(selection.message().contains("stub"));
     }
 
@@ -137,7 +167,7 @@ public final class MatterControllerSelectorTest {
         };
     }
 
-    private static final class ReadyCandidate implements MatterControllerCandidate {
+    private static class ReadyCandidate implements MatterControllerCandidate {
         private final String libraryName;
 
         private ReadyCandidate(String libraryName) {
@@ -172,6 +202,22 @@ public final class MatterControllerSelectorTest {
                 String controllerState,
                 ProgressListener listener) {
             return new MatterOpenCommissioningWindowResult("3497-0112-332", controllerState);
+        }
+    }
+
+    private static final class RuntimePreflightCandidate extends ReadyCandidate implements ConnectedHomeIpRuntimePreflightChecker {
+        private final boolean runtimeReady;
+        private final String runtimeMessage;
+
+        private RuntimePreflightCandidate(boolean runtimeReady, String runtimeMessage) {
+            super("connectedhomeip-java");
+            this.runtimeReady = runtimeReady;
+            this.runtimeMessage = runtimeMessage;
+        }
+
+        @Override
+        public ConnectedHomeIpRuntimePreflightStatus checkRuntimePreflight() {
+            return new ConnectedHomeIpRuntimePreflightStatus(runtimeReady, runtimeMessage);
         }
     }
 }

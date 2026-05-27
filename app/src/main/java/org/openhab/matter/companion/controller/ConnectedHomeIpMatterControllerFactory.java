@@ -8,13 +8,15 @@ import org.openhab.matter.companion.domain.ThreadDataset;
 public final class ConnectedHomeIpMatterControllerFactory {
     private static final int ATTESTATION_FAIL_SAFE_EXPIRY_SECONDS = 120;
     private static final long DEVICE_POINTER_TIMEOUT_MILLIS = 300_000L;
+    private static final Object DEFAULT_GATEWAY_LOCK = new Object();
+    private static ConnectedHomeIpControllerGateway defaultGateway;
 
     private final Context context;
     private final ConnectedHomeIpControllerArtifacts artifacts;
     private final GatewayFactory gatewayFactory;
 
     public ConnectedHomeIpMatterControllerFactory(Context context) {
-        this(context, new ConnectedHomeIpControllerArtifacts(), ConnectedHomeIpMatterControllerFactory::newDefaultGateway);
+        this(context, new ConnectedHomeIpControllerArtifacts(), ConnectedHomeIpMatterControllerFactory::cachedDefaultGateway);
     }
 
     public ConnectedHomeIpMatterControllerFactory(
@@ -50,6 +52,30 @@ public final class ConnectedHomeIpMatterControllerFactory {
         ConnectedHomeIpControllerGateway create(Context context) throws Exception;
     }
 
+    static ConnectedHomeIpControllerGateway cachedDefaultGateway(Context context, GatewayFactory gatewayFactory)
+            throws Exception {
+        synchronized (DEFAULT_GATEWAY_LOCK) {
+            if (defaultGateway == null) {
+                Context stableContext = applicationContext(context);
+                defaultGateway = gatewayFactory.create(stableContext);
+                ConnectedHomeIpDiagnostics.emit("Created shared connectedhomeip Android gateway");
+            } else {
+                ConnectedHomeIpDiagnostics.emit("Reusing shared connectedhomeip Android gateway");
+            }
+            return defaultGateway;
+        }
+    }
+
+    static void resetCachedDefaultGatewayForTesting() {
+        synchronized (DEFAULT_GATEWAY_LOCK) {
+            defaultGateway = null;
+        }
+    }
+
+    private static ConnectedHomeIpControllerGateway cachedDefaultGateway(Context context) throws Exception {
+        return cachedDefaultGateway(context, ConnectedHomeIpMatterControllerFactory::newDefaultGateway);
+    }
+
     private static ConnectedHomeIpControllerGateway newDefaultGateway(Context context) throws Exception {
         if (context == null) {
             throw new IllegalArgumentException("context is required");
@@ -64,6 +90,14 @@ public final class ConnectedHomeIpMatterControllerFactory {
                 new ConnectedHomeIpReflectionAttestationHandler(commandFactory, ATTESTATION_FAIL_SAFE_EXPIRY_SECONDS),
                 new ConnectedHomeIpReflectionDevicePointerProvider(commandFactory, DEVICE_POINTER_TIMEOUT_MILLIS),
                 commandFactory);
+    }
+
+    private static Context applicationContext(Context context) {
+        if (context == null) {
+            return null;
+        }
+        Context applicationContext = context.getApplicationContext();
+        return applicationContext == null ? context : applicationContext;
     }
 
     private static String safeMessage(Throwable throwable) {

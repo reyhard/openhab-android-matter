@@ -4,7 +4,8 @@ import org.openhab.matter.companion.domain.CommissioningStep;
 import org.openhab.matter.companion.domain.MatterSetupPayload;
 import org.openhab.matter.companion.domain.ThreadDataset;
 
-public final class ConnectedHomeIpMatterController implements MatterControllerCandidate, ConnectedHomeIpFabricRestoreChecker {
+public final class ConnectedHomeIpMatterController implements MatterControllerCandidate, ConnectedHomeIpFabricRestoreChecker,
+        ConnectedHomeIpRuntimePreflightChecker {
     private static final long ENHANCED_COMMISSIONING_WINDOW_ITERATION = 1000L;
 
     private final ConnectedHomeIpControllerArtifacts artifacts;
@@ -43,12 +44,14 @@ public final class ConnectedHomeIpMatterController implements MatterControllerCa
             ProgressListener listener) throws Exception {
         requireArtifactsReady();
         emit(listener, "Starting connectedhomeip Java BLE Thread commissioning", false);
-        MatterCommissioningResult result = gateway.commissionBleThread(new ConnectedHomeIpCommissioningRequest(
-                dataset.hex(),
-                payload.pin(),
-                payload.discriminator(),
-                attestationBypassEnabled,
-                controllerState));
+        MatterCommissioningResult result = ConnectedHomeIpDiagnostics.withListener(
+                message -> emit(listener, message, false),
+                () -> gateway.commissionBleThread(new ConnectedHomeIpCommissioningRequest(
+                        dataset.hex(),
+                        payload.pin(),
+                        payload.discriminator(),
+                        attestationBypassEnabled,
+                        controllerState)));
         emit(listener, "connectedhomeip Java BLE Thread commissioning complete for node " + result.nodeId(), true);
         return result;
     }
@@ -62,13 +65,15 @@ public final class ConnectedHomeIpMatterController implements MatterControllerCa
             ProgressListener listener) throws Exception {
         requireArtifactsReady();
         emit(listener, "Opening connectedhomeip Java commissioning window", false);
-        MatterOpenCommissioningWindowResult result = gateway.openCommissioningWindow(
-                new ConnectedHomeIpOpenCommissioningWindowRequest(
-                        nodeId,
-                        timeoutSeconds,
-                        ENHANCED_COMMISSIONING_WINDOW_ITERATION,
-                        discriminator,
-                        controllerState));
+        MatterOpenCommissioningWindowResult result = ConnectedHomeIpDiagnostics.withListener(
+                message -> emit(listener, message, false),
+                () -> gateway.openCommissioningWindow(
+                        new ConnectedHomeIpOpenCommissioningWindowRequest(
+                                nodeId,
+                                timeoutSeconds,
+                                ENHANCED_COMMISSIONING_WINDOW_ITERATION,
+                                discriminator,
+                                controllerState)));
         emit(listener, "connectedhomeip Java commissioning window opened", true);
         return result;
     }
@@ -77,6 +82,15 @@ public final class ConnectedHomeIpMatterController implements MatterControllerCa
     public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) throws Exception {
         requireArtifactsReady();
         return gateway.checkFabricRestore(bootstrapNodeId);
+    }
+
+    @Override
+    public ConnectedHomeIpRuntimePreflightStatus checkRuntimePreflight() {
+        ConnectedHomeIpControllerArtifactsStatus status = artifacts.check();
+        if (!status.ready()) {
+            return new ConnectedHomeIpRuntimePreflightStatus(false, status.message());
+        }
+        return gateway.checkRuntimePreflight();
     }
 
     private void requireArtifactsReady() {

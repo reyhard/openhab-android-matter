@@ -63,6 +63,8 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
         Object controller = controllerProvider.controller();
         long nodeId = nodeIdAllocator.nextNodeId();
         Object commissionParameters = commandFactory.newThreadCommissionParameters(ThreadDataset.parse(request.datasetHex()));
+        commandFactory.invokeClose(controller);
+        ConnectedHomeIpDiagnostics.emit("Cleared stale connectedhomeip BLE controller state before commissioning");
         attestationHandler.prepareForCommissioning(controller, nodeId, request.attestationBypassEnabled());
         commissioningMonitor.prepare(controller);
         try (ConnectedHomeIpBleConnection connection = bleConnectionProvider.connect(request.discriminator())) {
@@ -74,6 +76,14 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
                     request.setupPin(),
                     commissionParameters);
             return commissioningMonitor.awaitCommissioned(nodeId, request.controllerState());
+        } catch (Exception exception) {
+            try {
+                commandFactory.invokeClose(controller);
+                ConnectedHomeIpDiagnostics.emit("Cleared connectedhomeip BLE controller state after commissioning failure");
+            } catch (ReflectiveOperationException cleanupException) {
+                exception.addSuppressed(cleanupException);
+            }
+            throw exception;
         }
     }
 
@@ -105,10 +115,36 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
         return new ConnectedHomeIpFabricRestoreProbe(controllerProvider, devicePointerProvider).check(bootstrapNodeId);
     }
 
+    @Override
+    public ConnectedHomeIpRuntimePreflightStatus checkRuntimePreflight() {
+        try {
+            Object controller = controllerProvider.controller();
+            if (bleConnectionProvider instanceof ConnectedHomeIpRuntimePreflightChecker) {
+                ConnectedHomeIpRuntimePreflightStatus bleStatus =
+                        ((ConnectedHomeIpRuntimePreflightChecker) bleConnectionProvider).checkRuntimePreflight();
+                if (!bleStatus.ready()) {
+                    return bleStatus;
+                }
+            }
+            return new ConnectedHomeIpRuntimePreflightStatus(
+                    true,
+                    "controller " + controller.getClass().getName() + " and BLE manager initialized");
+        } catch (Exception | LinkageError ex) {
+            return new ConnectedHomeIpRuntimePreflightStatus(
+                    false,
+                    "connectedhomeip runtime preflight failed: " + safeMessage(ex));
+        }
+    }
+
     private static <T> T require(T value, String name) {
         if (value == null) {
             throw new IllegalArgumentException(name + " is required");
         }
         return value;
+    }
+
+    private static String safeMessage(Throwable throwable) {
+        String message = throwable.getMessage();
+        return message == null || message.isEmpty() ? throwable.getClass().getSimpleName() : message;
     }
 }

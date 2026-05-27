@@ -10,9 +10,12 @@ import static org.junit.Assert.assertEquals;
 
 public class CommissioningPermissionPlannerTest {
     @Test
-    public void sdk31RequiresBluetoothRuntimePermissions() {
+    public void sdk31RequiresBluetoothAndFineLocationRuntimePermissions() {
         assertEquals(
-                Arrays.asList("android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"),
+                Arrays.asList(
+                        "android.permission.BLUETOOTH_SCAN",
+                        "android.permission.BLUETOOTH_CONNECT",
+                        "android.permission.ACCESS_FINE_LOCATION"),
                 CommissioningPermissionPlanner.requiredPermissions(31));
     }
 
@@ -41,7 +44,10 @@ public class CommissioningPermissionPlannerTest {
         }
 
         assertEquals(
-                Arrays.asList("android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"),
+                Arrays.asList(
+                        "android.permission.BLUETOOTH_SCAN",
+                        "android.permission.BLUETOOTH_CONNECT",
+                        "android.permission.ACCESS_FINE_LOCATION"),
                 CommissioningPermissionPlanner.requiredPermissions(31));
     }
 }

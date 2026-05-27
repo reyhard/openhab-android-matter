@@ -166,6 +166,38 @@ public class NativeChipControllerSessionTest {
         assertTrue(session.nativeSelected());
     }
 
+    @Test
+    public void selectNativeIfReadySelectsReadyCandidate() {
+        MatterController fallback = new FakeMatterController();
+        ReadyCandidate candidate = new ReadyCandidate("connectedhomeip-java", false);
+        NativeChipControllerSession session = new NativeChipControllerSession(
+                fallback,
+                false,
+                attestationBypassEnabled -> candidate);
+
+        MatterControllerSelection selection = session.selectNativeIfReady();
+
+        assertTrue(selection.nativeSelected());
+        assertTrue(session.nativeSelected());
+        assertSame(candidate, session.controller());
+    }
+
+    @Test
+    public void selectNativeIfReadyKeepsFallbackWhenCandidateIsNotReady() {
+        MatterController fallback = new FakeMatterController();
+        NativeChipControllerSession session = new NativeChipControllerSession(
+                fallback,
+                false,
+                attestationBypassEnabled -> new NotReadyCandidate());
+
+        MatterControllerSelection selection = session.selectNativeIfReady();
+
+        assertFalse(selection.nativeSelected());
+        assertFalse(session.nativeSelected());
+        assertSame(fallback, session.controller());
+        assertTrue(selection.message().contains("Native Matter controller not ready"));
+    }
+
     private static NativeChipControllerSession.NativeControllerFactory productionFactory() {
         return attestationBypassEnabled -> new ChipMatterController(
                 productionBridge(),
@@ -232,6 +264,38 @@ public class NativeChipControllerSessionTest {
                 String controllerState,
                 ProgressListener listener) {
             return new MatterOpenCommissioningWindowResult("3497-0112-332", controllerState);
+        }
+    }
+
+    private static final class NotReadyCandidate implements MatterControllerCandidate {
+        @Override
+        public ChipMatterControllerStatus readiness() {
+            return new ChipMatterControllerStatus(
+                    false,
+                    "connectedhomeip-java",
+                    false,
+                    "connectedhomeip-java",
+                    true,
+                    "test native controller unavailable");
+        }
+
+        @Override
+        public MatterCommissioningResult commissionBleThread(
+                ThreadDataset dataset,
+                MatterSetupPayload payload,
+                String controllerState,
+                ProgressListener listener) {
+            throw new AssertionError("not-ready controller must not be used");
+        }
+
+        @Override
+        public MatterOpenCommissioningWindowResult openCommissioningWindow(
+                long nodeId,
+                int timeoutSeconds,
+                int discriminator,
+                String controllerState,
+                ProgressListener listener) {
+            throw new AssertionError("not-ready controller must not be used");
         }
     }
 }

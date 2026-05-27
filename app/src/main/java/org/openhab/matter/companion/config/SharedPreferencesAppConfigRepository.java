@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 public final class SharedPreferencesAppConfigRepository implements AppConfigRepository {
     private static final String PREFERENCE_FILE = "openhab_matter_config";
     private static final String KEY_THREAD_DATASET = "thread_dataset";
+    private static final String KEY_SETUP_PAYLOAD = "setup_payload";
     private static final String KEY_OPENHAB_BASE_URL = "openhab_base_url";
     private static final String KEY_OPENHAB_API_TOKEN = "openhab_api_token";
     private static final String KEY_OTBR_BASE_URL = "otbr_base_url";
@@ -27,12 +28,14 @@ public final class SharedPreferencesAppConfigRepository implements AppConfigRepo
     @Override
     public AppConfig load() {
         String storedThreadDataset = preferences.getString(KEY_THREAD_DATASET, "");
+        String storedSetupPayload = preferences.getString(KEY_SETUP_PAYLOAD, "");
         String storedOpenHabBaseUrl = preferences.getString(KEY_OPENHAB_BASE_URL, "");
         String storedOpenHabApiToken = preferences.getString(KEY_OPENHAB_API_TOKEN, "");
         String storedOtbrBaseUrl = preferences.getString(KEY_OTBR_BASE_URL, "");
         boolean storedAttestationBypassEnabled = preferences.getBoolean(KEY_ATTESTATION_BYPASS_ENABLED, false);
         AppConfig config = mapper.fromStoredValues(
                 storedThreadDataset,
+                storedSetupPayload,
                 storedOpenHabBaseUrl,
                 storedOpenHabApiToken,
                 storedOtbrBaseUrl,
@@ -54,6 +57,7 @@ public final class SharedPreferencesAppConfigRepository implements AppConfigRepo
             SecureAppConfigMapper.StoredConfig storedConfig = mapper.toStoredValues(config);
             preferences.edit()
                     .putString(KEY_THREAD_DATASET, storedConfig.threadDataset())
+                    .putString(KEY_SETUP_PAYLOAD, storedConfig.setupPayload())
                     .putString(KEY_OPENHAB_BASE_URL, storedConfig.openHabBaseUrl())
                     .putString(KEY_OPENHAB_API_TOKEN, storedConfig.openHabApiToken())
                     .putString(KEY_OTBR_BASE_URL, storedConfig.otbrBaseUrl())

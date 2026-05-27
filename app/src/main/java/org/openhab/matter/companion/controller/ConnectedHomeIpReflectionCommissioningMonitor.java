@@ -1,6 +1,8 @@
 package org.openhab.matter.companion.controller;
 
 public final class ConnectedHomeIpReflectionCommissioningMonitor implements ConnectedHomeIpCommissioningMonitor {
+    private static final long DEFAULT_ICD_STAY_ACTIVE_DURATION_MILLIS = 30_000L;
+
     private final ConnectedHomeIpReflectionCommandFactory commandFactory;
     private final long timeoutMillis;
     private ConnectedHomeIpCommissioningCompletionListener listener;
@@ -21,7 +23,13 @@ public final class ConnectedHomeIpReflectionCommissioningMonitor implements Conn
 
     @Override
     public void prepare(Object controller) throws Exception {
-        listener = commandFactory.newCommissioningCompletionListener(timeoutMillis);
+        listener = commandFactory.newCommissioningCompletionListener(
+                timeoutMillis,
+                () -> {
+                    Object icdRegistrationInfo =
+                            commandFactory.newIcdRegistrationInfoForStayActive(DEFAULT_ICD_STAY_ACTIVE_DURATION_MILLIS);
+                    commandFactory.invokeUpdateCommissioningIcdRegistrationInfo(controller, icdRegistrationInfo);
+                });
         commandFactory.invokeSetCompletionListener(controller, listener.proxy());
     }
 

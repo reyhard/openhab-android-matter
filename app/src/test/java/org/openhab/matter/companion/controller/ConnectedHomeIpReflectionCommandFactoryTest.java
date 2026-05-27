@@ -17,12 +17,7 @@ import static org.junit.Assert.assertTrue;
 public final class ConnectedHomeIpReflectionCommandFactoryTest {
     @Test
     public void buildsThreadCommissionParametersWithNetworkCredentials() throws Exception {
-        ConnectedHomeIpReflectionCommandFactory factory = new ConnectedHomeIpReflectionCommandFactory(
-                FakeNetworkCredentials.class,
-                FakeNetworkCredentials.ThreadCredentials.class,
-                FakeCommissionParameters.Builder.class,
-                FakeChipDeviceController.class,
-                FakeOpenCommissioningCallback.class);
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
 
         Object params = factory.newThreadCommissionParameters(ThreadDataset.parse("hex:0E08FF1000000000"));
 
@@ -39,7 +34,35 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
         assertSame(FakeCommissionParameters.BUILT, params);
         assertNull(FakeCommissionParameters.lastBuilder.csrNonce);
         assertEquals("network:8", FakeCommissionParameters.lastBuilder.networkCredentials);
-        assertNull(FakeCommissionParameters.lastBuilder.icdRegistrationInfo);
+        assertSame(FakeICDRegistrationInfo.DEFERRED, FakeCommissionParameters.lastBuilder.icdRegistrationInfo);
+    }
+
+    @Test
+    public void buildsThreadCommissionParametersWithBuilderIcdFallbackWhenDeferredFactoryMissing() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory(FakeICDRegistrationInfoWithoutDeferredFactory.class);
+
+        Object params = factory.newThreadCommissionParameters(ThreadDataset.parse("hex:0E08FF1000000000"));
+
+        assertSame(FakeCommissionParameters.BUILT, params);
+        assertSame(
+                FakeICDRegistrationInfoWithoutDeferredFactory.BUILT,
+                FakeCommissionParameters.lastBuilder.icdRegistrationInfo);
+        assertSame(
+                FakeICDRegistrationInfoWithoutDeferredFactory.lastBuilder,
+                FakeICDRegistrationInfoWithoutDeferredFactory.Builder.lastBuiltBuilder);
+    }
+
+    @Test
+    public void buildsStayActiveIcdRegistrationInfoAndUpdatesCommissioning() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+
+        Object icdRegistrationInfo = factory.newIcdRegistrationInfoForStayActive(30000L);
+        factory.invokeUpdateCommissioningIcdRegistrationInfo(controller, icdRegistrationInfo);
+
+        assertSame(FakeICDRegistrationInfo.BUILT, icdRegistrationInfo);
+        assertEquals(Long.valueOf(30000L), FakeICDRegistrationInfo.lastBuilder.stayActiveDurationMsec);
+        assertSame(FakeICDRegistrationInfo.BUILT, controller.icdRegistrationInfo);
     }
 
     @Test
@@ -138,12 +161,20 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
     }
 
     private static ConnectedHomeIpReflectionCommandFactory fakeFactory() {
+        return fakeFactory(FakeICDRegistrationInfo.class);
+    }
+
+    private static ConnectedHomeIpReflectionCommandFactory fakeFactory(Class<?> icdRegistrationInfoClass) {
         return new ConnectedHomeIpReflectionCommandFactory(
                 FakeNetworkCredentials.class,
                 FakeNetworkCredentials.ThreadCredentials.class,
                 FakeCommissionParameters.Builder.class,
                 FakeChipDeviceController.class,
-                FakeOpenCommissioningCallback.class);
+                FakeOpenCommissioningCallback.class,
+                null,
+                null,
+                null,
+                icdRegistrationInfoClass);
     }
 
     public static final class FakeNetworkCredentials {
@@ -197,6 +228,54 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
         }
     }
 
+    public static final class FakeICDRegistrationInfo {
+        static final FakeICDRegistrationInfo DEFERRED = new FakeICDRegistrationInfo();
+        static final FakeICDRegistrationInfo BUILT = new FakeICDRegistrationInfo();
+        static Builder lastBuilder;
+
+        public static FakeICDRegistrationInfo createForDeferredConfiguration() {
+            return DEFERRED;
+        }
+
+        public static Builder newBuilder() {
+            lastBuilder = new Builder();
+            return lastBuilder;
+        }
+
+        public static final class Builder {
+            Long stayActiveDurationMsec;
+
+            public Builder setICDStayActiveDurationMsec(Long stayActiveDurationMsec) {
+                this.stayActiveDurationMsec = stayActiveDurationMsec;
+                return this;
+            }
+
+            public FakeICDRegistrationInfo build() {
+                return BUILT;
+            }
+        }
+    }
+
+    public static final class FakeICDRegistrationInfoWithoutDeferredFactory {
+        static final FakeICDRegistrationInfoWithoutDeferredFactory BUILT =
+                new FakeICDRegistrationInfoWithoutDeferredFactory();
+        static Builder lastBuilder;
+
+        public static Builder newBuilder() {
+            lastBuilder = new Builder();
+            return lastBuilder;
+        }
+
+        public static final class Builder {
+            static Builder lastBuiltBuilder;
+
+            public FakeICDRegistrationInfoWithoutDeferredFactory build() {
+                lastBuiltBuilder = this;
+                return BUILT;
+            }
+        }
+    }
+
     public static final class FakeChipDeviceController {
         private int connId;
         private long deviceId;
@@ -208,6 +287,7 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
         private int discriminator;
         private boolean openCommissioningWindowError;
         private boolean blankOpenCommissioningWindowSuccess;
+        private FakeICDRegistrationInfo icdRegistrationInfo;
 
         public void pairDeviceThroughBLE(
                 BluetoothGatt bleServer,
@@ -240,6 +320,10 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
                 callback.onSuccess(987654321L, "3497-0112-332", "MT:TEST");
             }
             return true;
+        }
+
+        public void updateCommissioningICDRegistrationInfo(FakeICDRegistrationInfo icdRegistrationInfo) {
+            this.icdRegistrationInfo = icdRegistrationInfo;
         }
     }
 

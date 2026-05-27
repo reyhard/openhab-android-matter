@@ -29,6 +29,7 @@ public class SharedPreferencesAppConfigRepositoryTest {
 
         repository.save(new AppConfig(
                 "hex:0E080000000000010000",
+                "pin=20202021;disc=1740",
                 "http://openhab.local:8080",
                 "oh.test.token",
                 "http://otbr.local",
@@ -36,8 +37,10 @@ public class SharedPreferencesAppConfigRepositoryTest {
                 true));
 
         assertEquals(true, preferences.getBoolean("attestation_bypass_enabled", false));
+        assertEquals("enc:v1:encoded(pin=20202021;disc=1740)", preferences.getString("setup_payload", ""));
         assertEquals("enc:v1:encoded(oh.test.token)", preferences.getString("openhab_api_token", ""));
         assertEquals(true, repository.load().attestationBypassEnabled());
+        assertEquals("pin=20202021;disc=1740", repository.load().setupPayload());
         assertEquals("oh.test.token", repository.load().openHabApiToken());
     }
 

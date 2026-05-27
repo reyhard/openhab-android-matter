@@ -13,9 +13,10 @@ public class SecureAppConfigMapperTest {
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
         SecureAppConfigMapper.StoredConfig stored = mapper.toStoredValues(
-                new AppConfig("hex:001122", "http://openhab.local:8080", "oh.test.token", "fd00::1"));
+                new AppConfig("hex:001122", "MT:ABC", "http://openhab.local:8080", "oh.test.token", "fd00::1"));
 
         assertEquals("enc:v1:encoded(hex:001122)", stored.threadDataset());
+        assertEquals("enc:v1:encoded(MT:ABC)", stored.setupPayload());
         assertEquals("http://openhab.local:8080", stored.openHabBaseUrl());
         assertEquals("enc:v1:encoded(oh.test.token)", stored.openHabApiToken());
         assertEquals("fd00::1", stored.otbrBaseUrl());
@@ -27,14 +28,32 @@ public class SecureAppConfigMapperTest {
         SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
 
         AppConfig config = mapper.fromStoredValues("enc:v1:encoded(hex:001122)",
+                "enc:v1:encoded(MT:ABC)",
                 "http://openhab.local:8080",
                 "enc:v1:encoded(oh.test.token)",
                 "http://otbr.local");
 
         assertEquals("hex:001122", config.threadDataset());
+        assertEquals("MT:ABC", config.setupPayload());
         assertEquals("http://openhab.local:8080", config.openHabBaseUrl());
         assertEquals("oh.test.token", config.openHabApiToken());
         assertEquals("http://otbr.local", config.otbrBaseUrl());
+    }
+
+    @Test
+    public void setupPayloadDecodeFailureClearsPayloadAndMarksItUnreadable() throws Exception {
+        SecretCodec codec = new FixedSecretCodec();
+        SecureAppConfigMapper mapper = new SecureAppConfigMapper(codec);
+
+        AppConfig config = mapper.fromStoredValues(
+                "enc:v1:encoded(hex:001122)",
+                SecretCodec.ENCRYPTED_PREFIX + "broken",
+                "http://openhab.local:8080",
+                "",
+                "http://otbr.local");
+
+        assertEquals("", config.setupPayload());
+        assertEquals(true, config.setupPayloadUnreadable());
     }
 
     @Test

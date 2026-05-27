@@ -8,6 +8,7 @@ import org.openhab.matter.companion.domain.ThreadDataset;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -89,6 +90,22 @@ public final class ConnectedHomeIpMatterControllerFactoryTest {
         assertTrue(status.message().contains("missing reflected dependency"));
     }
 
+    @Test
+    public void cachedDefaultGatewayReusesSameGatewayInstance() throws Exception {
+        ConnectedHomeIpMatterControllerFactory.resetCachedDefaultGatewayForTesting();
+        CapturingGatewayFactory gatewayFactory = new CapturingGatewayFactory();
+
+        ConnectedHomeIpControllerGateway first = ConnectedHomeIpMatterControllerFactory.cachedDefaultGateway(
+                null,
+                gatewayFactory);
+        ConnectedHomeIpControllerGateway second = ConnectedHomeIpMatterControllerFactory.cachedDefaultGateway(
+                null,
+                gatewayFactory);
+
+        assertSame(first, second);
+        assertEquals(1, gatewayFactory.calls);
+    }
+
     private static ConnectedHomeIpControllerArtifacts readyArtifacts() {
         return new ConnectedHomeIpControllerArtifacts(name -> true, name -> { });
     }
@@ -120,6 +137,11 @@ public final class ConnectedHomeIpMatterControllerFactoryTest {
                 @Override
                 public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) {
                     return new ConnectedHomeIpFabricRestoreStatus(true, true, bootstrapNodeId, "restore-ok");
+                }
+
+                @Override
+                public ConnectedHomeIpRuntimePreflightStatus checkRuntimePreflight() {
+                    return new ConnectedHomeIpRuntimePreflightStatus(true, "runtime-ok");
                 }
             };
         }
