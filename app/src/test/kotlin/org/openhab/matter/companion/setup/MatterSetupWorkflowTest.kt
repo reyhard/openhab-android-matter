@@ -22,6 +22,11 @@ class MatterSetupWorkflowTest {
         assertTrue(ports.openWindowCalled)
         assertTrue(ports.scanCalled)
         assertTrue(ports.inboxCalled)
+        assertEquals("MT:TEST", ports.commissionSetupPayload)
+        assertEquals(1234L, ports.openWindowNodeId)
+        assertEquals("controller-state", ports.openWindowControllerState)
+        assertEquals("34970112332", ports.scanManualCode)
+        assertEquals(120, ports.waitForInboxTimeoutSeconds)
         assertEquals(
             listOf(
                 MatterSetupStage.ReadinessChecking,
@@ -35,6 +40,27 @@ class MatterSetupWorkflowTest {
             states.map { it.stage }
         )
         assertFalse(states.joinToString("\n").contains("34970112332"))
+    }
+
+    @Test
+    fun readinessFailureIncludesWarningsThenDetailsAndOmitsBlanks() {
+        val ports = FakeMatterSetupPorts().apply {
+            readinessReady = false
+            readinessWarnings = listOf("native runtime unavailable", " ")
+            readinessDetails = listOf("", "connectedhomeip artifact missing")
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        val failure = states.last().failure!!
+        assertEquals(MatterSetupStage.ReadinessChecking, failure.step)
+        assertEquals(
+            "native runtime unavailable; connectedhomeip artifact missing",
+            failure.details
+        )
+        assertFalse(ports.commissionCalled)
     }
 
     @Test
@@ -81,6 +107,34 @@ class MatterSetupWorkflowTest {
         assertFalse(ports.diagnosticsConfig!!.attestationBypassEnabled)
         assertFalse(ports.diagnosticsConfig!!.toString().contains("ohab_secret"))
         assertFalse(ports.diagnosticsConfig!!.toString().contains("hex:001122"))
+    }
+
+    @Test
+    fun setupResultToStringRedactsSensitiveValues() {
+        val commission = MatterSetupPorts.CommissionResult(
+            nodeId = 1234L,
+            controllerState = "controller-state-secret"
+        )
+        val window = MatterSetupPorts.OpenWindowResult(
+            manualCode = "34970112332",
+            qrCode = "MT:QRSECRET",
+            controllerState = "controller-state-2-secret",
+            timeoutSeconds = 300
+        )
+
+        val commissionText = commission.toString()
+        val windowText = window.toString()
+
+        assertTrue(commissionText.contains("nodeId=1234"))
+        assertTrue(commissionText.contains("controllerState=<redacted>"))
+        assertFalse(commissionText.contains("controller-state-secret"))
+        assertTrue(windowText.contains("manualCode=<redacted>"))
+        assertTrue(windowText.contains("qrCode=<redacted>"))
+        assertTrue(windowText.contains("controllerState=<redacted>"))
+        assertTrue(windowText.contains("timeoutSeconds=300"))
+        assertFalse(windowText.contains("34970112332"))
+        assertFalse(windowText.contains("MT:QRSECRET"))
+        assertFalse(windowText.contains("controller-state-2-secret"))
     }
 
     @Test
@@ -237,6 +291,10 @@ class MatterSetupWorkflowTest {
         var scanDetails = "scan accepted"
         var scanTimeoutSeconds = 120
         var windowTimeoutSeconds = 300
+        var commissionSetupPayload: String? = null
+        var openWindowNodeId: Long? = null
+        var openWindowControllerState: String? = null
+        var scanManualCode: String? = null
         var waitForInboxTimeoutSeconds: Int? = null
         var diagnosticsFailure: MatterSetupFailure? = null
         var diagnosticsConfig: MatterSetupConfig? = null
@@ -248,6 +306,9 @@ class MatterSetupWorkflowTest {
         var qrCode = ""
         var commissionControllerState = "controller-state"
         var windowControllerState = "controller-state-2"
+        var readinessReady = true
+        var readinessDetails = listOf("openHAB connected")
+        var readinessWarnings = emptyList<String>()
 
         override fun loadConfig(): MatterSetupConfig {
             loadConfigCalled = true
@@ -263,7 +324,11 @@ class MatterSetupWorkflowTest {
 
         override fun checkReadiness(config: MatterSetupConfig): MatterSetupPorts.ReadinessResult {
             readinessCalled = true
-            return MatterSetupPorts.ReadinessResult(ready = true, details = listOf("openHAB connected"))
+            return MatterSetupPorts.ReadinessResult(
+                ready = readinessReady,
+                details = readinessDetails,
+                warnings = readinessWarnings
+            )
         }
 
         override fun commissionToPhone(
@@ -271,6 +336,7 @@ class MatterSetupWorkflowTest {
             config: MatterSetupConfig
         ): MatterSetupPorts.CommissionResult {
             commissionCalled = true
+            commissionSetupPayload = setupPayload
             return MatterSetupPorts.CommissionResult(nodeId = 1234L, controllerState = commissionControllerState)
         }
 
@@ -279,6 +345,8 @@ class MatterSetupWorkflowTest {
             controllerState: String
         ): MatterSetupPorts.OpenWindowResult {
             openWindowCalled = true
+            openWindowNodeId = nodeId
+            openWindowControllerState = controllerState
             openWindowError?.let { throw it }
             return MatterSetupPorts.OpenWindowResult(
                 manualCode = manualCode,
@@ -293,6 +361,7 @@ class MatterSetupWorkflowTest {
             config: MatterSetupConfig
         ): MatterSetupPorts.OpenHabScanResult {
             scanCalled = true
+            scanManualCode = manualCode
             return MatterSetupPorts.OpenHabScanResult(
                 started = scanStarted,
                 timeoutSeconds = scanTimeoutSeconds,

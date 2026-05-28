@@ -26,7 +26,7 @@ class MatterSetupWorkflow(
                 fail(
                     activeStage,
                     "Setup is not ready yet",
-                    readiness.warnings.joinToString("; "),
+                    readiness.failureDetails(),
                     config,
                     redactor
                 )
@@ -115,6 +115,13 @@ class MatterSetupWorkflow(
             MatterSetupDiagnosticsSummary.empty()
         }
         emit(MatterSetupUiState.failed(failure, diagnostics))
+    }
+
+    private fun MatterSetupPorts.ReadinessResult.failureDetails(): String {
+        return (warnings + details)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .joinToString("; ")
     }
 
     private fun MatterSetupConfig.toDiagnosticsSafeConfig(): MatterSetupConfig {

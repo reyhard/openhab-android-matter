@@ -24,14 +24,27 @@ interface MatterSetupPorts {
     data class CommissionResult(
         val nodeId: Long,
         val controllerState: String
-    )
+    ) {
+        override fun toString(): String {
+            return "CommissionResult(nodeId=$nodeId, controllerState=<redacted>)"
+        }
+    }
 
     data class OpenWindowResult(
         val manualCode: String,
         val qrCode: String,
         val controllerState: String,
         val timeoutSeconds: Int
-    )
+    ) {
+        override fun toString(): String {
+            return "OpenWindowResult(" +
+                "manualCode=<redacted>, " +
+                "qrCode=<redacted>, " +
+                "controllerState=<redacted>, " +
+                "timeoutSeconds=$timeoutSeconds" +
+                ")"
+        }
+    }
 
     data class OpenHabScanResult(
         val started: Boolean,
