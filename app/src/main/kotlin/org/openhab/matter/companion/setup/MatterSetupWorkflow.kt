@@ -5,15 +5,20 @@ class MatterSetupWorkflow(
     private val emit: (MatterSetupUiState) -> Unit
 ) {
     fun startAutomatedSetup(setupPayload: String) {
-        val config = ports.loadConfig()
         var activeStage = MatterSetupStage.ReadyToScan
-        var manualCode = ""
-        if (!config.openHabConfigured) {
-            emit(MatterSetupUiState.initial(openHabConfigured = false))
-            return
-        }
+        var diagnosticsConfig = emptyDiagnosticsConfig()
+        val redactor = SensitiveValueRedactor(setupPayload)
 
         runCatching {
+            val config = ports.loadConfig()
+            diagnosticsConfig = config
+            redactor.add(config.openHabApiToken)
+            redactor.add(config.threadDataset)
+            if (!config.openHabConfigured) {
+                emit(MatterSetupUiState.initial(openHabConfigured = false))
+                return
+            }
+
             activeStage = MatterSetupStage.ReadinessChecking
             emit(MatterSetupUiState.progress(activeStage))
             val readiness = ports.checkReadiness(config)
@@ -23,8 +28,7 @@ class MatterSetupWorkflow(
                     "Setup is not ready yet",
                     readiness.warnings.joinToString("; "),
                     config,
-                    manualCode,
-                    setupPayload
+                    redactor
                 )
                 return
             }
@@ -32,11 +36,25 @@ class MatterSetupWorkflow(
             activeStage = MatterSetupStage.CommissioningToPhone
             emit(MatterSetupUiState.progress(activeStage))
             val commission = ports.commissionToPhone(setupPayload, config)
+            redactor.add(commission.controllerState)
 
             activeStage = MatterSetupStage.OpeningCommissioningWindow
             emit(MatterSetupUiState.progress(activeStage))
             val window = ports.openCommissioningWindow(commission.nodeId, commission.controllerState)
-            manualCode = window.manualCode
+            redactor.add(window.manualCode)
+            redactor.add(window.qrCode)
+            redactor.add(window.controllerState)
+            if (window.manualCode.isBlank()) {
+                fail(
+                    activeStage,
+                    "OpenCommissioningWindow did not return a manual setup code",
+                    "Blank manual setup code returned by Matter controller",
+                    config,
+                    redactor
+                )
+                return
+            }
+
             activeStage = MatterSetupStage.CommissioningWindowOpen
             emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
 
@@ -49,8 +67,7 @@ class MatterSetupWorkflow(
                     "openHAB could not start pairing",
                     scan.details,
                     config,
-                    manualCode,
-                    setupPayload
+                    redactor
                 )
                 return
             }
@@ -64,8 +81,7 @@ class MatterSetupWorkflow(
                     "openHAB did not report the device yet",
                     inbox.details,
                     config,
-                    manualCode,
-                    setupPayload
+                    redactor
                 )
                 return
             }
@@ -80,7 +96,7 @@ class MatterSetupWorkflow(
                 )
             )
         }.onFailure { error ->
-            fail(activeStage, "Setup could not finish", error.message.orEmpty(), config, manualCode, setupPayload)
+            fail(activeStage, "Setup could not finish", error.message.orEmpty(), diagnosticsConfig, redactor)
         }
     }
 
@@ -89,12 +105,16 @@ class MatterSetupWorkflow(
         message: String,
         details: String,
         config: MatterSetupConfig,
-        manualCode: String,
-        setupPayload: String
+        redactor: SensitiveValueRedactor
     ) {
-        val sanitizedDetails = sanitizeFailureDetails(details, config, manualCode, setupPayload)
+        val sanitizedDetails = redactor.sanitize(details)
         val failure = MatterSetupFailure(step = stage, message = message, details = sanitizedDetails)
-        emit(MatterSetupUiState.failed(failure, ports.runDiagnostics(failure, config.toDiagnosticsSafeConfig())))
+        val diagnostics = runCatching {
+            ports.runDiagnostics(failure, config.toDiagnosticsSafeConfig()).sanitize(redactor)
+        }.getOrElse {
+            MatterSetupDiagnosticsSummary.empty()
+        }
+        emit(MatterSetupUiState.failed(failure, diagnostics))
     }
 
     private fun MatterSetupConfig.toDiagnosticsSafeConfig(): MatterSetupConfig {
@@ -104,24 +124,43 @@ class MatterSetupWorkflow(
         )
     }
 
-    private fun sanitizeFailureDetails(
-        details: String,
-        config: MatterSetupConfig,
-        manualCode: String,
-        setupPayload: String
-    ): String {
-        return details
-            .redact(manualCode)
-            .redact(config.openHabApiToken)
-            .redact(config.threadDataset)
-            .redact(setupPayload)
+    private fun emptyDiagnosticsConfig(): MatterSetupConfig {
+        return MatterSetupConfig(
+            openHabBaseUrl = "",
+            openHabApiToken = "<redacted>",
+            threadDataset = "<redacted>",
+            otbrBaseUrl = "",
+            attestationBypassEnabled = false
+        )
     }
 
-    private fun String.redact(secret: String): String {
-        return if (secret.isBlank()) {
-            this
-        } else {
-            replace(secret, "<redacted>")
+    private fun MatterSetupDiagnosticsSummary.sanitize(
+        redactor: SensitiveValueRedactor
+    ): MatterSetupDiagnosticsSummary {
+        return copy(
+            checks = checks.map(redactor::sanitize),
+            warnings = warnings.map(redactor::sanitize),
+            details = details.map(redactor::sanitize)
+        )
+    }
+
+    private class SensitiveValueRedactor(vararg initialValues: String) {
+        private val values = linkedSetOf<String>()
+
+        init {
+            initialValues.forEach(::add)
+        }
+
+        fun add(value: String) {
+            if (value.isNotBlank()) {
+                values.add(value)
+            }
+        }
+
+        fun sanitize(text: String): String {
+            return values.sortedByDescending { it.length }.fold(text) { sanitized, value ->
+                sanitized.replace(value, "<redacted>")
+            }
         }
     }
 }

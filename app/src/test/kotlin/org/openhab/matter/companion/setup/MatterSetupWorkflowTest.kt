@@ -41,24 +41,39 @@ class MatterSetupWorkflowTest {
     fun scanFailureRedactsSecretsInFailureStateAndDiagnostics() {
         val ports = FakeMatterSetupPorts().apply {
             scanStarted = false
-            scanDetails = "scan failed for 34970112332 ohab_secret hex:001122 MT:SECRET"
+            scanDetails =
+                "scan failed for 34970112332 ohab_secret hex:001122 MT:SECRET controller-state controller-state-2"
+            diagnosticsSummary = MatterSetupDiagnosticsSummary(
+                checks = listOf("check MT:SECRET"),
+                warnings = listOf("warning 34970112332 controller-state"),
+                details = listOf("detail ohab_secret hex:001122 controller-state-2")
+            )
         }
         val states = mutableListOf<MatterSetupUiState>()
         val workflow = MatterSetupWorkflow(ports) { states.add(it) }
 
         workflow.startAutomatedSetup("MT:SECRET")
 
+        val state = states.last()
         val failure = states.last().failure!!
         assertEquals(MatterSetupStage.SendingCodeToOpenHab, failure.step)
         assertFalse(failure.details.contains("34970112332"))
         assertFalse(failure.details.contains("ohab_secret"))
         assertFalse(failure.details.contains("hex:001122"))
         assertFalse(failure.details.contains("MT:SECRET"))
+        assertFalse(failure.details.contains("controller-state"))
+        assertFalse(failure.details.contains("controller-state-2"))
         assertEquals(failure, ports.diagnosticsFailure)
         assertFalse(ports.diagnosticsFailure!!.details.contains("34970112332"))
         assertFalse(ports.diagnosticsFailure!!.details.contains("ohab_secret"))
         assertFalse(ports.diagnosticsFailure!!.details.contains("hex:001122"))
         assertFalse(ports.diagnosticsFailure!!.details.contains("MT:SECRET"))
+        assertFalse(state.diagnostics.toString().contains("34970112332"))
+        assertFalse(state.diagnostics.toString().contains("ohab_secret"))
+        assertFalse(state.diagnostics.toString().contains("hex:001122"))
+        assertFalse(state.diagnostics.toString().contains("MT:SECRET"))
+        assertFalse(state.diagnostics.toString().contains("controller-state"))
+        assertFalse(state.diagnostics.toString().contains("controller-state-2"))
         assertEquals("http://openhab.local:8080", ports.diagnosticsConfig!!.openHabBaseUrl)
         assertEquals("<redacted>", ports.diagnosticsConfig!!.openHabApiToken)
         assertEquals("<redacted>", ports.diagnosticsConfig!!.threadDataset)
@@ -66,6 +81,100 @@ class MatterSetupWorkflowTest {
         assertFalse(ports.diagnosticsConfig!!.attestationBypassEnabled)
         assertFalse(ports.diagnosticsConfig!!.toString().contains("ohab_secret"))
         assertFalse(ports.diagnosticsConfig!!.toString().contains("hex:001122"))
+    }
+
+    @Test
+    fun configLoadExceptionEmitsFailedStateWithSafeDiagnosticsConfig() {
+        val ports = FakeMatterSetupPorts().apply {
+            loadConfigError = IllegalStateException("config failed for MT:SECRET")
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val state = states.last()
+        assertEquals(MatterSetupStage.Failed, state.stage)
+        assertEquals(MatterSetupStage.ReadyToScan, state.failure!!.step)
+        assertFalse(state.failure.details.contains("MT:SECRET"))
+        assertEquals(state.failure, ports.diagnosticsFailure)
+        assertEquals("", ports.diagnosticsConfig!!.openHabBaseUrl)
+        assertEquals("<redacted>", ports.diagnosticsConfig!!.openHabApiToken)
+        assertEquals("<redacted>", ports.diagnosticsConfig!!.threadDataset)
+        assertEquals("", ports.diagnosticsConfig!!.otbrBaseUrl)
+        assertFalse(ports.diagnosticsConfig!!.attestationBypassEnabled)
+    }
+
+    @Test
+    fun diagnosticsExceptionDoesNotMaskOriginalFailure() {
+        val ports = FakeMatterSetupPorts().apply {
+            scanStarted = false
+            scanDetails = "scan failed for MT:SECRET"
+            diagnosticsError = IllegalStateException("diagnostics failed")
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val state = states.last()
+        assertEquals(MatterSetupStage.Failed, state.stage)
+        assertEquals(MatterSetupStage.SendingCodeToOpenHab, state.failure!!.step)
+        assertEquals("openHAB could not start pairing", state.failure.message)
+        assertFalse(state.failure.details.contains("MT:SECRET"))
+        assertEquals(MatterSetupDiagnosticsSummary.empty(), state.diagnostics)
+    }
+
+    @Test
+    fun diagnosticsReturnIsSanitizedBeforeEmission() {
+        val ports = FakeMatterSetupPorts().apply {
+            scanStarted = false
+            scanDetails = "scan failed"
+            qrCode = "MT:QRSECRET"
+            diagnosticsSummary = MatterSetupDiagnosticsSummary(
+                checks = listOf("payload MT:SECRET"),
+                warnings = listOf("manual 34970112332"),
+                details = listOf("token ohab_secret dataset hex:001122 qr MT:QRSECRET controller-state-2")
+            )
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val diagnosticsText = states.last().diagnostics.toString()
+        assertFalse(diagnosticsText.contains("MT:SECRET"))
+        assertFalse(diagnosticsText.contains("34970112332"))
+        assertFalse(diagnosticsText.contains("ohab_secret"))
+        assertFalse(diagnosticsText.contains("hex:001122"))
+        assertFalse(diagnosticsText.contains("MT:QRSECRET"))
+        assertFalse(diagnosticsText.contains("controller-state-2"))
+    }
+
+    @Test
+    fun blankManualCodeFailsBeforeSendingCodeToOpenHab() {
+        val ports = FakeMatterSetupPorts().apply {
+            manualCode = "   "
+            qrCode = "MT:QRSECRET"
+            windowControllerState = "controller-state-2-secret"
+            diagnosticsSummary = MatterSetupDiagnosticsSummary(
+                checks = listOf("qr MT:QRSECRET"),
+                warnings = listOf("manual 34970112332 should not matter"),
+                details = listOf("controller controller-state-2-secret")
+            )
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val state = states.last()
+        assertEquals(MatterSetupStage.Failed, state.stage)
+        assertEquals(MatterSetupStage.OpeningCommissioningWindow, state.failure!!.step)
+        assertEquals("OpenCommissioningWindow did not return a manual setup code", state.failure.message)
+        assertFalse(ports.scanCalled)
+        assertFalse(state.diagnostics.toString().contains("MT:QRSECRET"))
+        assertFalse(state.diagnostics.toString().contains("controller-state-2-secret"))
     }
 
     @Test
@@ -131,10 +240,18 @@ class MatterSetupWorkflowTest {
         var waitForInboxTimeoutSeconds: Int? = null
         var diagnosticsFailure: MatterSetupFailure? = null
         var diagnosticsConfig: MatterSetupConfig? = null
+        var diagnosticsSummary = MatterSetupDiagnosticsSummary.empty()
+        var diagnosticsError: RuntimeException? = null
+        var loadConfigError: RuntimeException? = null
         var openWindowError: RuntimeException? = null
+        var manualCode = "34970112332"
+        var qrCode = ""
+        var commissionControllerState = "controller-state"
+        var windowControllerState = "controller-state-2"
 
         override fun loadConfig(): MatterSetupConfig {
             loadConfigCalled = true
+            loadConfigError?.let { throw it }
             return MatterSetupConfig(
                 openHabBaseUrl = "http://openhab.local:8080",
                 openHabApiToken = "ohab_secret",
@@ -154,7 +271,7 @@ class MatterSetupWorkflowTest {
             config: MatterSetupConfig
         ): MatterSetupPorts.CommissionResult {
             commissionCalled = true
-            return MatterSetupPorts.CommissionResult(nodeId = 1234L, controllerState = "controller-state")
+            return MatterSetupPorts.CommissionResult(nodeId = 1234L, controllerState = commissionControllerState)
         }
 
         override fun openCommissioningWindow(
@@ -164,9 +281,9 @@ class MatterSetupWorkflowTest {
             openWindowCalled = true
             openWindowError?.let { throw it }
             return MatterSetupPorts.OpenWindowResult(
-                manualCode = "34970112332",
-                qrCode = "",
-                controllerState = "controller-state-2",
+                manualCode = manualCode,
+                qrCode = qrCode,
+                controllerState = windowControllerState,
                 timeoutSeconds = windowTimeoutSeconds
             )
         }
@@ -198,7 +315,8 @@ class MatterSetupWorkflowTest {
         ): MatterSetupDiagnosticsSummary {
             diagnosticsFailure = failure
             diagnosticsConfig = config
-            return MatterSetupDiagnosticsSummary.empty()
+            diagnosticsError?.let { throw it }
+            return diagnosticsSummary
         }
     }
 }
