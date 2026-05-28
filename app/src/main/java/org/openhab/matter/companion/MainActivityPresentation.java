@@ -6,6 +6,7 @@ import org.openhab.matter.companion.controller.ConnectedHomeIpFabricRestoreStatu
 import org.openhab.matter.companion.controller.ConnectedHomeIpRuntimePreflightStatus;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
+import org.openhab.matter.companion.openhab.OpenHabMatterDiscoveryScanStatus;
 import org.openhab.matter.companion.otbr.OtbrStatus;
 
 import java.net.URI;
@@ -52,6 +53,22 @@ final class MainActivityPresentation {
             return "openHAB Inbox observation: Matter Inbox entry detected.";
         }
         return "openHAB Inbox observation: no Matter Inbox entry detected.";
+    }
+
+    static String openHabMatterScanResult(OpenHabMatterDiscoveryScanStatus status) {
+        if (status.started()) {
+            return "openHAB Matter scan: started. Waiting up to " + status.timeoutSeconds()
+                    + " seconds for an Inbox entry.";
+        }
+        return "openHAB Matter scan failed: " + safeTextForLog(status.message()) + ".";
+    }
+
+    static String openHabMatterScanDetails(OpenHabMatterDiscoveryScanStatus status) {
+        return safeTextForLog(status.details());
+    }
+
+    static String openHabMatterScanNoInboxEntry() {
+        return "openHAB Matter scan started, but no Matter Inbox entry was detected yet.";
     }
 
     static String encryptedConfigSaved() {

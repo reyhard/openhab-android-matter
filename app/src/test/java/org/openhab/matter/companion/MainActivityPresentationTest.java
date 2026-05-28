@@ -8,6 +8,7 @@ import org.openhab.matter.companion.controller.ConnectedHomeIpRuntimePreflightSt
 import org.openhab.matter.companion.controller.FakeMatterController;
 import org.openhab.matter.companion.controller.MatterControllerSelection;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
+import org.openhab.matter.companion.openhab.OpenHabMatterDiscoveryScanStatus;
 import org.openhab.matter.companion.otbr.OtbrStatus;
 
 import java.util.Arrays;
@@ -78,6 +79,55 @@ public class MainActivityPresentationTest {
         assertEquals(
                 "openHAB Inbox observation failed: openHAB Inbox was not reachable.",
                 MainActivityPresentation.openHabInboxResult(status));
+    }
+
+    @Test
+    public void describesStartedOpenHabMatterScan() {
+        OpenHabMatterDiscoveryScanStatus status = new OpenHabMatterDiscoveryScanStatus(
+                true,
+                true,
+                "openHAB Matter scan started",
+                "HTTP 200 from http://openhab.local:8080/rest/discovery/bindings/matter/scan",
+                120);
+
+        assertEquals(
+                "openHAB Matter scan: started. Waiting up to 120 seconds for an Inbox entry.",
+                MainActivityPresentation.openHabMatterScanResult(status));
+    }
+
+    @Test
+    public void describesFailedOpenHabMatterScan() {
+        OpenHabMatterDiscoveryScanStatus status = new OpenHabMatterDiscoveryScanStatus(
+                true,
+                false,
+                "openHAB Matter discovery service was not found",
+                "HTTP 404 from http://openhab.local:8080/rest/discovery/bindings/matter/scan",
+                0);
+
+        assertEquals(
+                "openHAB Matter scan failed: openHAB Matter discovery service was not found.",
+                MainActivityPresentation.openHabMatterScanResult(status));
+    }
+
+    @Test
+    public void scanResultDetailsAreSanitized() {
+        OpenHabMatterDiscoveryScanStatus status = new OpenHabMatterDiscoveryScanStatus(
+                true,
+                false,
+                "openHAB Matter scan could not be started",
+                "HTTP 500 from http://user:secret@openhab.local:8080/rest/discovery/bindings/matter/scan?input=34970112332 token=abc",
+                0);
+
+        assertEquals(
+                "HTTP 500 from http://openhab.local:8080/rest/discovery/bindings/matter/scan token=<redacted>",
+                MainActivityPresentation.openHabMatterScanDetails(status));
+    }
+
+    @Test
+    public void describesOpenHabMatterScanNoInboxEntry() {
+        assertEquals(
+                "openHAB Matter scan started, but no Matter Inbox entry was detected yet.",
+                MainActivityPresentation.openHabMatterScanNoInboxEntry());
     }
 
     @Test
