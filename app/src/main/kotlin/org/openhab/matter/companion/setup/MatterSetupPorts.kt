@@ -50,10 +50,25 @@ interface MatterSetupPorts {
         val started: Boolean,
         val timeoutSeconds: Int,
         val details: String
-    )
+    ) {
+        override fun toString(): String {
+            return "OpenHabScanResult(" +
+                "started=$started, " +
+                "timeoutSeconds=$timeoutSeconds, " +
+                "details=<redacted>" +
+                ")"
+        }
+    }
 
     data class InboxResult(
         val matterEntryDetected: Boolean,
         val details: String
-    )
+    ) {
+        override fun toString(): String {
+            return "InboxResult(" +
+                "matterEntryDetected=$matterEntryDetected, " +
+                "details=<redacted>" +
+                ")"
+        }
+    }
 }

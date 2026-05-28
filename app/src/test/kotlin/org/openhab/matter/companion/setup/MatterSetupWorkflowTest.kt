@@ -121,9 +121,20 @@ class MatterSetupWorkflowTest {
             controllerState = "controller-state-2-secret",
             timeoutSeconds = 300
         )
+        val scan = MatterSetupPorts.OpenHabScanResult(
+            started = true,
+            timeoutSeconds = 120,
+            details = "manual 34970112332 token ohab_secret dataset hex:001122 response body"
+        )
+        val inbox = MatterSetupPorts.InboxResult(
+            matterEntryDetected = true,
+            details = "inbox payload MT:QRSECRET token ohab_secret raw openHAB response"
+        )
 
         val commissionText = commission.toString()
         val windowText = window.toString()
+        val scanText = scan.toString()
+        val inboxText = inbox.toString()
 
         assertTrue(commissionText.contains("nodeId=1234"))
         assertTrue(commissionText.contains("controllerState=<redacted>"))
@@ -135,6 +146,18 @@ class MatterSetupWorkflowTest {
         assertFalse(windowText.contains("34970112332"))
         assertFalse(windowText.contains("MT:QRSECRET"))
         assertFalse(windowText.contains("controller-state-2-secret"))
+        assertTrue(scanText.contains("started=true"))
+        assertTrue(scanText.contains("timeoutSeconds=120"))
+        assertTrue(scanText.contains("details=<redacted>"))
+        assertFalse(scanText.contains("34970112332"))
+        assertFalse(scanText.contains("ohab_secret"))
+        assertFalse(scanText.contains("hex:001122"))
+        assertFalse(scanText.contains("response body"))
+        assertTrue(inboxText.contains("matterEntryDetected=true"))
+        assertTrue(inboxText.contains("details=<redacted>"))
+        assertFalse(inboxText.contains("MT:QRSECRET"))
+        assertFalse(inboxText.contains("ohab_secret"))
+        assertFalse(inboxText.contains("raw openHAB response"))
     }
 
     @Test
