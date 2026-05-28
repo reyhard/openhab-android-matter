@@ -48,10 +48,13 @@ import org.openhab.matter.companion.domain.OpenHabInstructions;
 import org.openhab.matter.companion.domain.ThreadDataset;
 import org.openhab.matter.companion.openhab.HttpOpenHabClient;
 import org.openhab.matter.companion.openhab.HttpOpenHabInboxClient;
+import org.openhab.matter.companion.openhab.HttpOpenHabMatterDiscoveryClient;
 import org.openhab.matter.companion.openhab.OpenHabClient;
 import org.openhab.matter.companion.openhab.OpenHabInboxClient;
 import org.openhab.matter.companion.openhab.OpenHabInboxSseClient;
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus;
+import org.openhab.matter.companion.openhab.OpenHabMatterDiscoveryClient;
+import org.openhab.matter.companion.openhab.OpenHabMatterDiscoveryScanStatus;
 import org.openhab.matter.companion.openhab.OpenHabStatus;
 import org.openhab.matter.companion.otbr.HttpOtbrClient;
 import org.openhab.matter.companion.otbr.OtbrClient;
@@ -98,6 +101,7 @@ public final class MainActivity extends Activity {
     private final OpenHabClient openHabClient = new HttpOpenHabClient();
     private final OpenHabInboxClient openHabInboxClient = new HttpOpenHabInboxClient();
     private final OpenHabInboxSseClient openHabInboxSseClient = new OpenHabInboxSseClient();
+    private final OpenHabMatterDiscoveryClient openHabMatterDiscoveryClient = new HttpOpenHabMatterDiscoveryClient();
     private final OtbrClient otbrClient = new HttpOtbrClient();
     private AppConfigRepository configRepository;
     private MatterBootstrapStateRepository bootstrapStateRepository;
@@ -117,6 +121,9 @@ public final class MainActivity extends Activity {
     private MatterBootstrapState persistedBootstrapState = MatterBootstrapState.empty();
     private volatile boolean sseWatchActive;
     private Thread sseWatchThread;
+    private volatile boolean autoMatterScanActive;
+    private volatile Thread autoMatterScanThread;
+    private volatile boolean activityStopped;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -305,7 +312,15 @@ public final class MainActivity extends Activity {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        activityStopped = false;
+    }
+
+    @Override
     protected void onStop() {
+        activityStopped = true;
+        stopOpenHabMatterScanObservation();
         stopOpenHabInboxSseWatch();
         super.onStop();
     }
@@ -462,7 +477,7 @@ public final class MainActivity extends Activity {
                     state.temporaryCode = result.temporaryCode();
                     saveBootstrapState(nodeId, result.controllerState());
                     showTemporaryQrCode(result);
-                    append(OpenHabInstructions.scanInputInstructions(state.temporaryCode));
+                    autoSubmitOpenHabMatterScan(state.temporaryCode);
                     append(OpenHabInstructions.troubleshooting());
                 });
             } catch (Exception ex) {
@@ -737,6 +752,113 @@ public final class MainActivity extends Activity {
                 }
             });
         }, "openhab-inbox-check").start();
+    }
+
+    private void autoSubmitOpenHabMatterScan(String pairingCode) {
+        state.openHabBaseUrl = openHabInput.getText().toString();
+        state.openHabApiToken = openHabTokenInput.getText().toString();
+        String baseUrl = state.openHabBaseUrl == null ? "" : state.openHabBaseUrl.trim();
+        String safePairingCode = pairingCode == null ? "" : pairingCode.trim();
+        if (safePairingCode.isEmpty()) {
+            append("No temporary manual code was returned for automatic openHAB scan input.");
+            append(OpenHabInstructions.scanInputInstructionsWithoutEcho());
+            return;
+        }
+        if (baseUrl.isEmpty()) {
+            append("openHAB base URL is not configured; use openHAB Scan Input manually.");
+            append(OpenHabInstructions.scanInputInstructions(safePairingCode));
+            return;
+        }
+        if (activityStopped) {
+            return;
+        }
+
+        String apiToken = state.openHabApiToken;
+        if (autoMatterScanThread != null && autoMatterScanThread.isAlive()) {
+            append("openHAB Matter scan is already running.");
+            return;
+        }
+        append("Starting openHAB Matter scan at " + MainActivityPresentation.safeUrlForLog(baseUrl) + " ...");
+        autoMatterScanActive = true;
+        Thread scanner = new Thread(() -> {
+            try {
+                startOpenHabMatterScanAndObserveInbox(baseUrl, safePairingCode, apiToken);
+            } finally {
+                if (Thread.currentThread() == autoMatterScanThread) {
+                    autoMatterScanThread = null;
+                }
+            }
+        }, "openhab-matter-scan");
+        autoMatterScanThread = scanner;
+        scanner.start();
+    }
+
+    private void startOpenHabMatterScanAndObserveInbox(String baseUrl, String pairingCode, String apiToken) {
+        OpenHabMatterDiscoveryScanStatus scanStatus;
+        try {
+            scanStatus = openHabMatterDiscoveryClient.startMatterScan(baseUrl, pairingCode, apiToken);
+        } catch (Exception ex) {
+            scanStatus = new OpenHabMatterDiscoveryScanStatus(false, false,
+                    "openHAB Matter scan could not be started", ex.getMessage(), 0);
+        }
+        OpenHabMatterDiscoveryScanStatus finalScanStatus = scanStatus;
+        appendAutoMatterScanMessage(MainActivityPresentation.openHabMatterScanResult(finalScanStatus));
+        appendAutoMatterScanMessage(MainActivityPresentation.openHabMatterScanDetails(finalScanStatus));
+        if (!scanStatus.started()) {
+            return;
+        }
+
+        boolean detected = observeOpenHabInboxAfterMatterScan(baseUrl, apiToken, scanStatus.timeoutSeconds());
+        if (!detected) {
+            appendAutoMatterScanMessage(MainActivityPresentation.openHabMatterScanNoInboxEntry());
+        }
+    }
+
+    private boolean observeOpenHabInboxAfterMatterScan(String baseUrl, String apiToken, int timeoutSeconds) {
+        long deadlineMillis = System.currentTimeMillis() + ((long) Math.max(1, timeoutSeconds) + 10L) * 1000L;
+        final boolean[] detected = new boolean[] { false };
+        try {
+            openHabInboxSseClient.observe(baseUrl, event -> {
+                boolean matterEntryDetected = event.matterEntryDetected();
+                appendAutoMatterScanMessage(MainActivityPresentation.openHabInboxSseEvent(matterEntryDetected));
+                detected[0] = matterEntryDetected;
+                return !matterEntryDetected;
+            }, () -> autoMatterScanActive && System.currentTimeMillis() < deadlineMillis
+                    && !Thread.currentThread().isInterrupted(), apiToken);
+        } catch (Exception ex) {
+            appendAutoMatterScanMessage("openHAB Inbox SSE observation failed: "
+                    + MainActivityPresentation.safeTextForLog(ex.getMessage()));
+        }
+        if (detected[0] || !autoMatterScanActive || Thread.currentThread().isInterrupted()) {
+            return true;
+        }
+        try {
+            OpenHabInboxStatus status = openHabInboxClient.checkInbox(baseUrl, apiToken);
+            appendAutoMatterScanMessage(MainActivityPresentation.openHabInboxResult(status));
+            return status.matterEntryDetected();
+        } catch (Exception ex) {
+            appendAutoMatterScanMessage("openHAB Inbox check failed: "
+                    + MainActivityPresentation.safeTextForLog(ex.getMessage()));
+            return false;
+        }
+    }
+
+    private void appendAutoMatterScanMessage(String message) {
+        if (!autoMatterScanActive || activityStopped) {
+            return;
+        }
+        runOnUiThread(() -> {
+            if (autoMatterScanActive && !activityStopped) {
+                append(message);
+            }
+        });
+    }
+
+    private void stopOpenHabMatterScanObservation() {
+        autoMatterScanActive = false;
+        if (autoMatterScanThread != null) {
+            autoMatterScanThread.interrupt();
+        }
     }
 
     private void watchOpenHabInboxSse() {
