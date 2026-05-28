@@ -75,19 +75,27 @@ data class MatterSetupUiState(
         private fun progressSteps(activeStage: MatterSetupStage): List<MatterSetupStep> {
             val stages = listOf(
                 MatterSetupStage.ReadinessChecking to "Checking setup",
-                MatterSetupStage.CommissioningToPhone to "Connecting to device",
                 MatterSetupStage.CommissioningToPhone to "Adding device to this phone",
                 MatterSetupStage.OpeningCommissioningWindow to "Opening pairing window",
                 MatterSetupStage.SendingCodeToOpenHab to "Sending setup code to openHAB",
                 MatterSetupStage.WatchingOpenHabInbox to "Waiting for openHAB"
             )
-            val activeIndex = stages.indexOfFirst { it.first == activeStage }.coerceAtLeast(0)
+            val activeIndex = when (activeStage) {
+                MatterSetupStage.CommissioningWindowOpen -> null
+                else -> stages.indexOfFirst { it.first == activeStage }.takeIf { it >= 0 }
+            }
+            val completeThroughIndex = when (activeStage) {
+                MatterSetupStage.CommissioningWindowOpen -> stages.indexOfFirst {
+                    it.first == MatterSetupStage.OpeningCommissioningWindow
+                }
+                else -> activeIndex?.minus(1) ?: -1
+            }
             return stages.mapIndexed { index, (_, label) ->
                 MatterSetupStep(
                     label = label,
                     status = when {
-                        index < activeIndex -> MatterSetupStepStatus.Complete
-                        index == activeIndex -> MatterSetupStepStatus.Active
+                        index <= completeThroughIndex -> MatterSetupStepStatus.Complete
+                        activeIndex == index -> MatterSetupStepStatus.Active
                         else -> MatterSetupStepStatus.Pending
                     }
                 )

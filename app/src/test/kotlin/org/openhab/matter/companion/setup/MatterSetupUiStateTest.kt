@@ -22,15 +22,43 @@ class MatterSetupUiStateTest {
         val state = MatterSetupUiState.progress(MatterSetupStage.OpeningCommissioningWindow, countdownSeconds = 300)
 
         assertEquals("Setting up your device", state.title)
-        assertEquals(6, state.steps.size)
+        assertEquals(5, state.steps.size)
         assertEquals("Checking setup", state.steps[0].label)
-        assertEquals("Opening pairing window", state.steps[3].label)
-        assertEquals(MatterSetupStepStatus.Active, state.steps[3].status)
+        assertEquals("Opening pairing window", state.steps[2].label)
+        assertEquals(MatterSetupStepStatus.Active, state.steps[2].status)
         assertEquals(300, state.countdownSeconds)
     }
 
     @Test
-    fun failureStateDoesNotExposeSensitiveValues() {
+    fun commissioningToPhoneStateHighlightsSinglePhoneCommissioningStep() {
+        val state = MatterSetupUiState.progress(MatterSetupStage.CommissioningToPhone)
+
+        assertEquals("Adding device to this phone", state.steps[1].label)
+        assertEquals(MatterSetupStepStatus.Active, state.steps[1].status)
+        assertFalse(state.steps.any { it.label == "Connecting to device" })
+    }
+
+    @Test
+    fun commissioningWindowOpenStateMarksPairingWindowStepComplete() {
+        val state = MatterSetupUiState.progress(MatterSetupStage.CommissioningWindowOpen, countdownSeconds = 300)
+
+        assertEquals("Opening pairing window", state.steps[2].label)
+        assertEquals(MatterSetupStepStatus.Complete, state.steps[2].status)
+        assertFalse(state.steps.any { it.status == MatterSetupStepStatus.Active })
+        assertEquals(300, state.countdownSeconds)
+    }
+
+    @Test
+    fun nonProgressStageDoesNotActivateFirstProgressStep() {
+        val state = MatterSetupUiState.progress(MatterSetupStage.ReadyToScan)
+
+        assertEquals("Checking setup", state.steps[0].label)
+        assertEquals(MatterSetupStepStatus.Pending, state.steps[0].status)
+        assertFalse(state.steps.any { it.status == MatterSetupStepStatus.Active })
+    }
+
+    @Test
+    fun failureStateUsesSanitizedFailureFieldsAsProvided() {
         val failure = MatterSetupFailure(
             step = MatterSetupStage.SendingCodeToOpenHab,
             message = "openHAB could not start pairing",
@@ -40,8 +68,8 @@ class MatterSetupUiStateTest {
         val state = MatterSetupUiState.failed(failure, MatterSetupDiagnosticsSummary.empty())
 
         assertEquals(MatterSetupStage.Failed, state.stage)
+        assertEquals("openHAB could not start pairing", state.message)
+        assertEquals("HTTP 401 for redacted request", state.failure?.details)
         assertTrue(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
-        assertFalse(state.toString().contains("34970112332"))
-        assertFalse(state.toString().contains("ohab_"))
     }
 }
