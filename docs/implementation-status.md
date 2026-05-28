@@ -25,9 +25,10 @@
 - Thread datasets can be converted from normalized hex to `byte[]` for connectedhomeip `NetworkCredentials.ThreadCredentials`.
 - Reflection command factory can construct connectedhomeip Thread `NetworkCredentials`, `CommissionParameters`, and locate the `pairDeviceThroughBLE(...)` and `openPairingWindowWithPINCallback(...)` controller methods without compile-time CHIP dependencies.
 - Reflection command factory can invoke `pairDeviceThroughBLE(...)` and bridge `OpenCommissioningCallback` success/error responses, including manual and QR setup codes, into the app's OCW result model.
-- OpenCommissioningWindow results can display a temporary Matter setup QR code in the app when connectedhomeip returns one, with manual setup code instructions retained as a fallback.
+- OpenCommissioningWindow results can display a temporary Matter setup QR code in the app when connectedhomeip returns one, and expose a copy button for the returned manual setup code for openHAB Scan Input.
 - Reflection-backed `ConnectedHomeIpControllerGateway` orchestration invokes the connectedhomeip BLE Thread and OCW commands through injectable controller, BLE connection, node-id, attestation-handler, commissioning-monitor, and connected-device-pointer seams.
 - Reflection bridges cover connectedhomeip `CompletionListener`, `DeviceAttestationDelegate`, `continueCommissioning(...)`, `getConnectedDevicePointer(...)`, and `releaseConnectedDevicePointer(...)`.
+- OpenCommissioningWindow uses a concrete connectedhomeip callback class when packaged, avoiding the JNI return-type mismatch observed with a dynamic proxy callback on real Android hardware.
 - Reflection commissioning monitor installs a fresh connectedhomeip completion listener before each BLE pairing command, preventing stale one-shot callback state across commissioning attempts.
 - Reflection-backed controller provider can initialize the connectedhomeip Android platform dependency graph, build `ControllerParams`, and construct/cache `ChipDeviceController` without compile-time CHIP dependencies.
 - Android BLE connection provider can build the Matter BLE discriminator scan filter, scan/connect through injectable Android BLE seams, register the connected `BluetoothGatt` with connectedhomeip's BLE manager, and clean up registered GATT connections.
@@ -50,16 +51,17 @@
 - Runtime controller selection automatically switches from the fake controller to the reflection-backed connectedhomeip Java controller when connectedhomeip artifacts are present and readiness passes.
 - Thread commissioning and OpenCommissioningWindow require the connectedhomeip Java controller at execution time and stop instead of silently using the fake controller when connectedhomeip is not ready.
 - connectedhomeip `v1.5.1.0` Android arm64 controller artifacts were built, packaged into the debug APK, installed on Android device `62311e26`, and observed in logcat loading `libCHIPController.so` plus AndroidChipPlatform JNI.
+- Real Android/Thread device validation succeeded on device `62311e26`: BLE Thread commissioning completed through connectedhomeip, the app restored the commissioned node id, acquired an operational device pointer over IPv6, opened the commissioning window, displayed/copy-ready the returned manual setup code and QR code, and openHAB pairing worked after stale mDNS/Avahi records were cleared.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 
 ## Not Implemented Yet
 
-- Real-device validation of PASE, attestation handling, Thread dataset provisioning, and OpenCommissioningWindow.
-- Real-device validation of Android GATT service discovery, MTU request, connectedhomeip GATT callback forwarding, plus real fabric restore/persistence using the connectedhomeip fabric-restore probe.
-- Real connectedhomeip Matter fabric key persistence and restore; the Java bridge and encrypted repository can carry opaque state, and the Java connectedhomeip path now has a device-pointer restore probe, but hardware validation with real artifacts is still required.
+- Broader hardware validation across multiple Matter/Thread devices, Android versions, and OTBR/router combinations.
+- Production-grade diagnostics for stale or conflicting `_matterc._udp` mDNS/Avahi records; the issue is currently diagnosable through logs and the troubleshooting guide, but not automatically remediated by the app.
+- Long-run connectedhomeip fabric persistence hardening across app restarts, phone reboots, and upgrade/reinstall scenarios. The current real-device flow restores enough controller state to open the commissioning window, but broader lifecycle coverage is still needed.
 
 ## Production Controller Seam
 
 `MainActivity` keeps `FakeMatterController` for deterministic offline tests and non-production diagnostics, but Thread commissioning and OpenCommissioningWindow now call `selectNativeIfReady()` immediately before execution. If the reflection-backed connectedhomeip Java controller is not ready, those flows report the readiness failure and stop rather than performing simulated commissioning.
 
-The packaged `libopenhab_matter_chip.so` remains a non-production JNI stub for the legacy bridge seam. Real commissioning now depends on validating Android BLE scan/connect, PASE, Thread provisioning, fabric restore, and OpenCommissioningWindow with real Matter/Thread hardware.
+The packaged `libopenhab_matter_chip.so` remains a non-production JNI stub for the legacy bridge seam. Real commissioning is performed by the packaged connectedhomeip Java/JNI controller artifacts, which have now been validated on one real Android phone and Thread Matter device. Remaining work is production hardening, broader device/router validation, and better in-app diagnostics for stale mDNS/Avahi discovery state during openHAB handoff.
