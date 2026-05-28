@@ -12,6 +12,7 @@
 - openHAB readiness check calls `/rest/` and verifies an online Matter controller through `/rest/things`, using a configured bearer token when provided.
 - openHAB Inbox observation calls `/rest/inbox` from a configured base URL and reports whether a Matter Inbox entry was detected, using a configured bearer token when provided.
 - openHAB SSE streaming observes `/rest/events?topics=openhab/inbox/*` and reports Matter Inbox events, using a configured bearer token when provided.
+- OpenCommissioningWindow success can automatically submit the returned 11-digit manual setup code to openHAB Matter discovery scan input through `/rest/discovery/bindings/matter/scan?input=...`, using the configured bearer token and then observing Inbox status.
 - OTBR connectivity diagnostics check a configured IP/host address or optional HTTP diagnostic URL before Thread commissioning.
 - Standalone troubleshooting guide in the app covers openHAB Matter binding/controller setup, REST token authentication, OTBR address expectations, IPv6 routing, mDNS/Avahi, connectedhomeip artifact packaging, and Scan Input handoff.
 - Runtime commissioning permission readiness uses the Android SDK-specific permission plan and requests missing runtime permissions.

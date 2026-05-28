@@ -4,7 +4,7 @@ This documents the current Android app flow for opening a Matter commissioning w
 
 ## Summary
 
-The app no longer opens an OpenCommissioningWindow through the simulated controller. The user must first run Thread commissioning successfully so the app has a bootstrap Matter node id and connectedhomeip controller state. When the user taps **Open commissioning window**, the app reloads the persisted bootstrap state, selects the connectedhomeip Java controller only if packaged artifacts and runtime preflight are ready, asks connectedhomeip for a connected-device pointer, invokes `openPairingWindowWithPINCallback`, waits for the callback, then displays the temporary manual setup code and QR code when one is returned.
+The app no longer opens an OpenCommissioningWindow through the simulated controller. The user must first run Thread commissioning successfully so the app has a bootstrap Matter node id and connectedhomeip controller state. When the user taps **Open commissioning window**, the app reloads the persisted bootstrap state, selects the connectedhomeip Java controller only if packaged artifacts and runtime preflight are ready, asks connectedhomeip for a connected-device pointer, invokes `openPairingWindowWithPINCallback`, waits for the callback, then displays the temporary manual setup code and QR code when one is returned. When an openHAB base URL is configured, the app automatically posts the returned manual setup code to openHAB Matter discovery scan input and then observes the openHAB Inbox for a Matter entry. If no openHAB URL is configured, the app keeps the manual Scan Input instructions.
 
 Important current parameters:
 
@@ -40,10 +40,18 @@ flowchart TD
     M --> N{Callback result}
     N -- onSuccess --> O[Save returned controller state]
     O --> P[Show temporary manual code and QR if returned]
-    P --> Q[Show openHAB Scan Input instructions]
+    P --> S{openHAB URL configured?}
+    S -- No --> Q[Show openHAB Scan Input instructions]
+    S -- Yes --> T[POST Matter discovery scan input with manual code]
+    T --> U[Observe openHAB Inbox SSE or poll Inbox]
+    U --> V{Matter Inbox entry detected?}
+    V -- Yes --> W[Report openHAB Matter Inbox entry detected]
+    V -- No --> X[Report scan started but no Inbox entry yet]
     N -- onError/timeout/blank codes --> N1[Report operation failure]
     N1 --> R[Release pointer]
     Q --> R
+    W --> R
+    X --> R
 ```
 
 ## App/UI Sequence
@@ -80,7 +88,11 @@ sequenceDiagram
             Controller-->>Activity: MatterOpenCommissioningWindowResult
             Activity->>Store: save(nodeId, result.controllerState)
             Activity->>UI: Render temporary QR/manual code
-            Activity->>UI: Show openHAB Scan Input instructions
+            alt openHAB URL configured
+                Activity->>UI: Start Matter discovery scan input and observe Inbox
+            else no openHAB URL configured
+                Activity->>UI: Show openHAB Scan Input instructions
+            end
         end
     end
 ```
@@ -175,4 +187,4 @@ flowchart TD
 | Connected-device pointer lifecycle | `ConnectedHomeIpReflectionDevicePointerProvider`, `ConnectedHomeIpConnectedDeviceCallback`, `ConnectedHomeIpDevicePointer` |
 | Reflected CHIP APIs | `ConnectedHomeIpReflectionCommandFactory` |
 | OCW callback/result mapping | `ConnectedHomeIpOpenCommissioningWindowCallback`, `MatterOpenCommissioningWindowResult` |
-| openHAB user instructions | `OpenHabInstructions` |
+| openHAB scan handoff and instructions | `OpenHabMatterDiscoveryClient`, `HttpOpenHabMatterDiscoveryClient`, `OpenHabInstructions` |
