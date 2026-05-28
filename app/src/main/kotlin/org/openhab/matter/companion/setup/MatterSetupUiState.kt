@@ -1,0 +1,97 @@
+package org.openhab.matter.companion.setup
+
+data class MatterSetupUiState(
+    val stage: MatterSetupStage,
+    val title: String,
+    val message: String,
+    val steps: List<MatterSetupStep> = emptyList(),
+    val countdownSeconds: Int? = null,
+    val primaryAction: MatterSetupAction? = null,
+    val primaryActionLabel: String = "",
+    val primaryActionEnabled: Boolean = true,
+    val secondaryActions: List<MatterSetupAction> = emptyList(),
+    val failure: MatterSetupFailure? = null,
+    val diagnostics: MatterSetupDiagnosticsSummary = MatterSetupDiagnosticsSummary.empty()
+) {
+    companion object {
+        fun initial(openHabConfigured: Boolean): MatterSetupUiState {
+            return if (openHabConfigured) {
+                MatterSetupUiState(
+                    stage = MatterSetupStage.ReadyToScan,
+                    title = "Add Matter device",
+                    message = "Scan the Matter QR code to add the device to openHAB.",
+                    primaryAction = MatterSetupAction.StartScan,
+                    primaryActionLabel = "Scan QR code"
+                )
+            } else {
+                MatterSetupUiState(
+                    stage = MatterSetupStage.NeedsOpenHabSetup,
+                    title = "Connect to openHAB",
+                    message = "Connect to your openHAB home before adding Matter devices.",
+                    primaryAction = MatterSetupAction.TestOpenHab,
+                    primaryActionLabel = "Test connection",
+                    primaryActionEnabled = false
+                )
+            }
+        }
+
+        fun progress(stage: MatterSetupStage, countdownSeconds: Int? = null): MatterSetupUiState {
+            return MatterSetupUiState(
+                stage = stage,
+                title = "Setting up your device",
+                message = progressMessage(stage),
+                steps = progressSteps(stage),
+                countdownSeconds = countdownSeconds,
+                secondaryActions = listOf(MatterSetupAction.ShowTroubleshooting)
+            )
+        }
+
+        fun failed(
+            failure: MatterSetupFailure,
+            diagnostics: MatterSetupDiagnosticsSummary
+        ): MatterSetupUiState {
+            return MatterSetupUiState(
+                stage = MatterSetupStage.Failed,
+                title = "Setup needs attention",
+                message = failure.message,
+                failure = failure,
+                diagnostics = diagnostics,
+                primaryAction = MatterSetupAction.Retry,
+                primaryActionLabel = "Try again",
+                secondaryActions = listOf(MatterSetupAction.ShowTroubleshooting)
+            )
+        }
+
+        private fun progressMessage(stage: MatterSetupStage): String = when (stage) {
+            MatterSetupStage.ReadinessChecking -> "Checking your phone, network, and openHAB."
+            MatterSetupStage.CommissioningToPhone -> "Adding the device to this phone first."
+            MatterSetupStage.OpeningCommissioningWindow -> "Preparing the device for openHAB."
+            MatterSetupStage.CommissioningWindowOpen -> "The device is ready for openHAB."
+            MatterSetupStage.SendingCodeToOpenHab -> "Sending the setup code to openHAB."
+            MatterSetupStage.WatchingOpenHabInbox -> "Waiting for openHAB to find the device."
+            else -> "This usually takes less than a minute."
+        }
+
+        private fun progressSteps(activeStage: MatterSetupStage): List<MatterSetupStep> {
+            val stages = listOf(
+                MatterSetupStage.ReadinessChecking to "Checking setup",
+                MatterSetupStage.CommissioningToPhone to "Connecting to device",
+                MatterSetupStage.CommissioningToPhone to "Adding device to this phone",
+                MatterSetupStage.OpeningCommissioningWindow to "Opening pairing window",
+                MatterSetupStage.SendingCodeToOpenHab to "Sending setup code to openHAB",
+                MatterSetupStage.WatchingOpenHabInbox to "Waiting for openHAB"
+            )
+            val activeIndex = stages.indexOfFirst { it.first == activeStage }.coerceAtLeast(0)
+            return stages.mapIndexed { index, (_, label) ->
+                MatterSetupStep(
+                    label = label,
+                    status = when {
+                        index < activeIndex -> MatterSetupStepStatus.Complete
+                        index == activeIndex -> MatterSetupStepStatus.Active
+                        else -> MatterSetupStepStatus.Pending
+                    }
+                )
+            }
+        }
+    }
+}
