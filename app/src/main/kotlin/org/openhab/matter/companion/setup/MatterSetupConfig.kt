@@ -9,4 +9,14 @@ data class MatterSetupConfig(
 ) {
     val openHabConfigured: Boolean
         get() = openHabBaseUrl.isNotBlank()
+
+    override fun toString(): String {
+        return "MatterSetupConfig(" +
+            "openHabBaseUrl=$openHabBaseUrl, " +
+            "openHabApiToken=<redacted>, " +
+            "threadDataset=<redacted>, " +
+            "otbrBaseUrl=$otbrBaseUrl, " +
+            "attestationBypassEnabled=$attestationBypassEnabled" +
+            ")"
+    }
 }

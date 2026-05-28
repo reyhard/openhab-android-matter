@@ -37,6 +37,79 @@ class MatterSetupWorkflowTest {
         assertFalse(states.joinToString("\n").contains("34970112332"))
     }
 
+    @Test
+    fun scanFailureRedactsSecretsInFailureStateAndDiagnostics() {
+        val ports = FakeMatterSetupPorts().apply {
+            scanStarted = false
+            scanDetails = "scan failed for 34970112332 ohab_secret hex:001122 MT:SECRET"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val failure = states.last().failure!!
+        assertEquals(MatterSetupStage.SendingCodeToOpenHab, failure.step)
+        assertFalse(failure.details.contains("34970112332"))
+        assertFalse(failure.details.contains("ohab_secret"))
+        assertFalse(failure.details.contains("hex:001122"))
+        assertFalse(failure.details.contains("MT:SECRET"))
+        assertEquals(failure, ports.diagnosticsFailure)
+        assertFalse(ports.diagnosticsFailure!!.details.contains("34970112332"))
+        assertFalse(ports.diagnosticsFailure!!.details.contains("ohab_secret"))
+        assertFalse(ports.diagnosticsFailure!!.details.contains("hex:001122"))
+        assertFalse(ports.diagnosticsFailure!!.details.contains("MT:SECRET"))
+    }
+
+    @Test
+    fun exceptionDuringOpenCommissioningWindowKeepsActiveFailureStep() {
+        val ports = FakeMatterSetupPorts().apply {
+            openWindowError = IllegalStateException("OCW failed")
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        assertEquals(MatterSetupStage.Failed, states.last().stage)
+        assertEquals(MatterSetupStage.OpeningCommissioningWindow, states.last().failure!!.step)
+        assertEquals(MatterSetupStage.OpeningCommissioningWindow, ports.diagnosticsFailure!!.step)
+    }
+
+    @Test
+    fun inboxWaitingStateUsesScanTimeout() {
+        val ports = FakeMatterSetupPorts().apply {
+            windowTimeoutSeconds = 300
+            scanTimeoutSeconds = 120
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        val inboxState = states.first { it.stage == MatterSetupStage.WatchingOpenHabInbox }
+        assertEquals(120, inboxState.countdownSeconds)
+        assertEquals(120, ports.waitForInboxTimeoutSeconds)
+    }
+
+    @Test
+    fun configToStringRedactsTokenAndDataset() {
+        val config = MatterSetupConfig(
+            openHabBaseUrl = "http://openhab.local:8080",
+            openHabApiToken = "ohab_secret",
+            threadDataset = "hex:001122",
+            otbrBaseUrl = "http://otbr.local",
+            attestationBypassEnabled = true
+        )
+
+        val text = config.toString()
+
+        assertTrue(text.contains("openHabApiToken=<redacted>"))
+        assertTrue(text.contains("threadDataset=<redacted>"))
+        assertFalse(text.contains("ohab_secret"))
+        assertFalse(text.contains("hex:001122"))
+    }
+
     private class FakeMatterSetupPorts : MatterSetupPorts {
         var loadConfigCalled = false
         var readinessCalled = false
@@ -44,6 +117,13 @@ class MatterSetupWorkflowTest {
         var openWindowCalled = false
         var scanCalled = false
         var inboxCalled = false
+        var scanStarted = true
+        var scanDetails = "scan accepted"
+        var scanTimeoutSeconds = 120
+        var windowTimeoutSeconds = 300
+        var waitForInboxTimeoutSeconds: Int? = null
+        var diagnosticsFailure: MatterSetupFailure? = null
+        var openWindowError: RuntimeException? = null
 
         override fun loadConfig(): MatterSetupConfig {
             loadConfigCalled = true
@@ -74,11 +154,12 @@ class MatterSetupWorkflowTest {
             controllerState: String
         ): MatterSetupPorts.OpenWindowResult {
             openWindowCalled = true
+            openWindowError?.let { throw it }
             return MatterSetupPorts.OpenWindowResult(
                 manualCode = "34970112332",
                 qrCode = "",
                 controllerState = "controller-state-2",
-                timeoutSeconds = 300
+                timeoutSeconds = windowTimeoutSeconds
             )
         }
 
@@ -87,7 +168,11 @@ class MatterSetupWorkflowTest {
             config: MatterSetupConfig
         ): MatterSetupPorts.OpenHabScanResult {
             scanCalled = true
-            return MatterSetupPorts.OpenHabScanResult(started = true, timeoutSeconds = 120, details = "scan accepted")
+            return MatterSetupPorts.OpenHabScanResult(
+                started = scanStarted,
+                timeoutSeconds = scanTimeoutSeconds,
+                details = scanDetails
+            )
         }
 
         override fun waitForOpenHabInbox(
@@ -95,6 +180,7 @@ class MatterSetupWorkflowTest {
             timeoutSeconds: Int
         ): MatterSetupPorts.InboxResult {
             inboxCalled = true
+            waitForInboxTimeoutSeconds = timeoutSeconds
             return MatterSetupPorts.InboxResult(matterEntryDetected = true, details = "Matter Inbox entry detected")
         }
 
@@ -102,6 +188,7 @@ class MatterSetupWorkflowTest {
             failure: MatterSetupFailure,
             config: MatterSetupConfig
         ): MatterSetupDiagnosticsSummary {
+            diagnosticsFailure = failure
             return MatterSetupDiagnosticsSummary.empty()
         }
     }

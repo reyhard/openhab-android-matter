@@ -6,46 +6,66 @@ class MatterSetupWorkflow(
 ) {
     fun startAutomatedSetup(setupPayload: String) {
         val config = ports.loadConfig()
+        var activeStage = MatterSetupStage.ReadyToScan
+        var manualCode = ""
         if (!config.openHabConfigured) {
             emit(MatterSetupUiState.initial(openHabConfigured = false))
             return
         }
 
         runCatching {
-            emit(MatterSetupUiState.progress(MatterSetupStage.ReadinessChecking))
+            activeStage = MatterSetupStage.ReadinessChecking
+            emit(MatterSetupUiState.progress(activeStage))
             val readiness = ports.checkReadiness(config)
             if (!readiness.ready) {
                 fail(
-                    MatterSetupStage.ReadinessChecking,
+                    activeStage,
                     "Setup is not ready yet",
                     readiness.warnings.joinToString("; "),
-                    config
+                    config,
+                    manualCode,
+                    setupPayload
                 )
                 return
             }
 
-            emit(MatterSetupUiState.progress(MatterSetupStage.CommissioningToPhone))
+            activeStage = MatterSetupStage.CommissioningToPhone
+            emit(MatterSetupUiState.progress(activeStage))
             val commission = ports.commissionToPhone(setupPayload, config)
 
-            emit(MatterSetupUiState.progress(MatterSetupStage.OpeningCommissioningWindow))
+            activeStage = MatterSetupStage.OpeningCommissioningWindow
+            emit(MatterSetupUiState.progress(activeStage))
             val window = ports.openCommissioningWindow(commission.nodeId, commission.controllerState)
-            emit(MatterSetupUiState.progress(MatterSetupStage.CommissioningWindowOpen, window.timeoutSeconds))
+            manualCode = window.manualCode
+            activeStage = MatterSetupStage.CommissioningWindowOpen
+            emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
 
-            emit(MatterSetupUiState.progress(MatterSetupStage.SendingCodeToOpenHab, window.timeoutSeconds))
+            activeStage = MatterSetupStage.SendingCodeToOpenHab
+            emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
             val scan = ports.sendCodeToOpenHab(window.manualCode, config)
             if (!scan.started) {
-                fail(MatterSetupStage.SendingCodeToOpenHab, "openHAB could not start pairing", scan.details, config)
+                fail(
+                    activeStage,
+                    "openHAB could not start pairing",
+                    scan.details,
+                    config,
+                    manualCode,
+                    setupPayload
+                )
                 return
             }
 
-            emit(MatterSetupUiState.progress(MatterSetupStage.WatchingOpenHabInbox, window.timeoutSeconds))
+            activeStage = MatterSetupStage.WatchingOpenHabInbox
+            emit(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds))
             val inbox = ports.waitForOpenHabInbox(config, scan.timeoutSeconds)
             if (!inbox.matterEntryDetected) {
                 fail(
-                    MatterSetupStage.WatchingOpenHabInbox,
+                    activeStage,
                     "openHAB did not report the device yet",
                     inbox.details,
-                    config
+                    config,
+                    manualCode,
+                    setupPayload
                 )
                 return
             }
@@ -60,12 +80,41 @@ class MatterSetupWorkflow(
                 )
             )
         }.onFailure { error ->
-            fail(MatterSetupStage.Failed, "Setup could not finish", error.message.orEmpty(), config)
+            fail(activeStage, "Setup could not finish", error.message.orEmpty(), config, manualCode, setupPayload)
         }
     }
 
-    private fun fail(stage: MatterSetupStage, message: String, details: String, config: MatterSetupConfig) {
-        val failure = MatterSetupFailure(step = stage, message = message, details = details)
+    private fun fail(
+        stage: MatterSetupStage,
+        message: String,
+        details: String,
+        config: MatterSetupConfig,
+        manualCode: String,
+        setupPayload: String
+    ) {
+        val sanitizedDetails = sanitizeFailureDetails(details, config, manualCode, setupPayload)
+        val failure = MatterSetupFailure(step = stage, message = message, details = sanitizedDetails)
         emit(MatterSetupUiState.failed(failure, ports.runDiagnostics(failure, config)))
+    }
+
+    private fun sanitizeFailureDetails(
+        details: String,
+        config: MatterSetupConfig,
+        manualCode: String,
+        setupPayload: String
+    ): String {
+        return details
+            .redact(manualCode)
+            .redact(config.openHabApiToken)
+            .redact(config.threadDataset)
+            .redact(setupPayload)
+    }
+
+    private fun String.redact(secret: String): String {
+        return if (secret.isBlank()) {
+            this
+        } else {
+            replace(secret, "<redacted>")
+        }
     }
 }
