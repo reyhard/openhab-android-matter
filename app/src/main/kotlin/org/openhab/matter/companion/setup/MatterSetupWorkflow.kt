@@ -94,7 +94,14 @@ class MatterSetupWorkflow(
     ) {
         val sanitizedDetails = sanitizeFailureDetails(details, config, manualCode, setupPayload)
         val failure = MatterSetupFailure(step = stage, message = message, details = sanitizedDetails)
-        emit(MatterSetupUiState.failed(failure, ports.runDiagnostics(failure, config)))
+        emit(MatterSetupUiState.failed(failure, ports.runDiagnostics(failure, config.toDiagnosticsSafeConfig())))
+    }
+
+    private fun MatterSetupConfig.toDiagnosticsSafeConfig(): MatterSetupConfig {
+        return copy(
+            openHabApiToken = "<redacted>",
+            threadDataset = "<redacted>"
+        )
     }
 
     private fun sanitizeFailureDetails(

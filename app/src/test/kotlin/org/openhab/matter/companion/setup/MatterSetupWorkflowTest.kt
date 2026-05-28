@@ -59,6 +59,13 @@ class MatterSetupWorkflowTest {
         assertFalse(ports.diagnosticsFailure!!.details.contains("ohab_secret"))
         assertFalse(ports.diagnosticsFailure!!.details.contains("hex:001122"))
         assertFalse(ports.diagnosticsFailure!!.details.contains("MT:SECRET"))
+        assertEquals("http://openhab.local:8080", ports.diagnosticsConfig!!.openHabBaseUrl)
+        assertEquals("<redacted>", ports.diagnosticsConfig!!.openHabApiToken)
+        assertEquals("<redacted>", ports.diagnosticsConfig!!.threadDataset)
+        assertEquals("http://otbr.local", ports.diagnosticsConfig!!.otbrBaseUrl)
+        assertFalse(ports.diagnosticsConfig!!.attestationBypassEnabled)
+        assertFalse(ports.diagnosticsConfig!!.toString().contains("ohab_secret"))
+        assertFalse(ports.diagnosticsConfig!!.toString().contains("hex:001122"))
     }
 
     @Test
@@ -123,6 +130,7 @@ class MatterSetupWorkflowTest {
         var windowTimeoutSeconds = 300
         var waitForInboxTimeoutSeconds: Int? = null
         var diagnosticsFailure: MatterSetupFailure? = null
+        var diagnosticsConfig: MatterSetupConfig? = null
         var openWindowError: RuntimeException? = null
 
         override fun loadConfig(): MatterSetupConfig {
@@ -189,6 +197,7 @@ class MatterSetupWorkflowTest {
             config: MatterSetupConfig
         ): MatterSetupDiagnosticsSummary {
             diagnosticsFailure = failure
+            diagnosticsConfig = config
             return MatterSetupDiagnosticsSummary.empty()
         }
     }
