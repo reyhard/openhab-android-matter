@@ -805,13 +805,20 @@ public final class MainActivity extends Activity {
         appendAutoMatterScanMessage(MainActivityPresentation.openHabMatterScanResult(finalScanStatus));
         appendAutoMatterScanMessage(MainActivityPresentation.openHabMatterScanDetails(finalScanStatus));
         if (!scanStatus.started()) {
+            appendManualScanFallback(pairingCode);
             return;
         }
 
         boolean detected = observeOpenHabInboxAfterMatterScan(baseUrl, apiToken, scanStatus.timeoutSeconds());
         if (!detected) {
             appendAutoMatterScanMessage(MainActivityPresentation.openHabMatterScanNoInboxEntry());
+            appendManualScanFallback(pairingCode);
         }
+    }
+
+    private void appendManualScanFallback(String pairingCode) {
+        appendAutoMatterScanMessage("Use openHAB Scan Input manually with the temporary code if automatic pairing did not complete.");
+        appendAutoMatterScanMessage(OpenHabInstructions.scanInputInstructions(pairingCode));
     }
 
     private boolean observeOpenHabInboxAfterMatterScan(String baseUrl, String apiToken, int timeoutSeconds) {
