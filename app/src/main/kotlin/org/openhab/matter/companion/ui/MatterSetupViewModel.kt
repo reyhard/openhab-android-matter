@@ -111,6 +111,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 startOpenHabSetupCheck()
             }
 
+            MatterSetupAction.EditSettings -> {
+                uiState = MatterSetupStateReducer.editSettings(openHabUrl)
+            }
+
             MatterSetupAction.ShowTroubleshooting,
             MatterSetupAction.EnterCodeManually,
             MatterSetupAction.OpenCommissioningWindowAgain,

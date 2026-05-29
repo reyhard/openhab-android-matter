@@ -9,6 +9,10 @@ object MatterSetupStateReducer {
         }
     }
 
+    fun editSettings(openHabUrl: String): MatterSetupUiState {
+        return openHabSetup(openHabUrl)
+    }
+
     fun openHabSetup(openHabUrl: String): MatterSetupUiState {
         return MatterSetupUiState(
             stage = MatterSetupStage.NeedsOpenHabSetup,

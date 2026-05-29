@@ -47,6 +47,15 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
+    fun editSettingsReturnsOpenHabSetupWithCurrentUrlPreserved() {
+        val state = MatterSetupStateReducer.editSettings("http://openhab.local:8080")
+
+        assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
+        assertEquals(MatterSetupAction.TestOpenHab, state.primaryAction)
+        assertTrue(state.primaryActionEnabled)
+    }
+
+    @Test
     fun advancedTroubleshootingPreservesFailureAndDiagnostics() {
         val failure = MatterSetupFailure(
             step = MatterSetupStage.WatchingOpenHabInbox,

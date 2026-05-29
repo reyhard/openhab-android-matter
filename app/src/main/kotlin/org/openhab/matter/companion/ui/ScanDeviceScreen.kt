@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -46,6 +47,13 @@ fun ScanDeviceScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Scan QR code")
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = { onAction(MatterSetupAction.EditSettings) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Settings")
         }
     }
 }

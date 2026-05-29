@@ -3,6 +3,7 @@ package org.openhab.matter.companion.setup
 sealed interface MatterSetupAction {
     data object SaveOpenHab : MatterSetupAction
     data object TestOpenHab : MatterSetupAction
+    data object EditSettings : MatterSetupAction
     data object StartScan : MatterSetupAction
     data object EnterCodeManually : MatterSetupAction
     data object ConfirmPairingMode : MatterSetupAction
