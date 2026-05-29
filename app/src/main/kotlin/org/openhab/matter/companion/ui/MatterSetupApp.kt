@@ -20,11 +20,13 @@ fun MatterSetupApp(
     threadBorderRouters: List<ThreadBorderRouterRecord>,
     threadBorderRouterDiscoveryInProgress: Boolean,
     phoneDevices: List<PhoneMatterDevice>,
+    ipv6DiagnosticAddress: String,
     onOpenHabUrlChange: (String) -> Unit,
     onTokenChange: (String) -> Unit,
     onThreadDatasetChange: (String) -> Unit,
     onOtbrBaseUrlChange: (String) -> Unit,
     onAttestationBypassChange: (Boolean) -> Unit,
+    onIpv6DiagnosticAddressChange: (String) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
     MatterSetupTheme {
@@ -88,6 +90,8 @@ fun MatterSetupApp(
 
             MatterSetupStage.AdvancedTroubleshooting -> AdvancedTroubleshootingScreen(
                 state = state,
+                ipv6DiagnosticAddress = ipv6DiagnosticAddress,
+                onIpv6DiagnosticAddressChange = onIpv6DiagnosticAddressChange,
                 onAction = onAction
             )
         }

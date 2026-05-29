@@ -16,6 +16,8 @@ sealed interface MatterSetupAction {
     data object ConfirmPairingMode : MatterSetupAction
     data object Retry : MatterSetupAction
     data object OpenCommissioningWindowAgain : MatterSetupAction
+    data object BrowseMatterServices : MatterSetupAction
+    data object CheckIpv6Reachability : MatterSetupAction
     data object ShowTroubleshooting : MatterSetupAction
     data object ForgetFromPhone : MatterSetupAction
     data object AddAnotherDevice : MatterSetupAction

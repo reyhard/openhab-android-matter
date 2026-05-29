@@ -15,7 +15,10 @@ import org.openhab.matter.companion.controller.MatterBootstrapState
 import org.openhab.matter.companion.controller.NativeChipControllerSession
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository
 import org.openhab.matter.companion.diagnostics.AndroidReadinessProbe
+import org.openhab.matter.companion.diagnostics.AndroidMatterMdnsBrowser
 import org.openhab.matter.companion.diagnostics.AndroidThreadBorderRouterBrowser
+import org.openhab.matter.companion.diagnostics.DefaultIpv6ReachabilityProbe
+import org.openhab.matter.companion.diagnostics.MatterMdnsRecord
 import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser
 import org.openhab.matter.companion.domain.ThreadDataset
@@ -63,6 +66,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         private set
     var phoneDevices by mutableStateOf<List<PhoneMatterDevice>>(emptyList())
         private set
+    var ipv6DiagnosticAddress by mutableStateOf("")
+        private set
 
     private var scannedPayload = ""
     private val appContext = application.applicationContext
@@ -77,6 +82,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private val openHabInboxClient by lazy { HttpOpenHabInboxClient() }
     private val fakeMatterController by lazy { FakeMatterController() }
     private val readinessProbe by lazy { AndroidReadinessProbe(appContext) }
+    private val matterMdnsBrowser by lazy { AndroidMatterMdnsBrowser(appContext) }
+    private val ipv6ReachabilityProbe by lazy { DefaultIpv6ReachabilityProbe() }
     private val threadBorderRouterBrowser by lazy { AndroidThreadBorderRouterBrowser(appContext) }
     private var openHabConfigured = false
     private val controllerSession by lazy {
@@ -130,6 +137,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
     fun onAttestationBypassChange(value: Boolean) {
         attestationBypassEnabled = value
+    }
+
+    fun onIpv6DiagnosticAddressChange(value: String) {
+        ipv6DiagnosticAddress = value
     }
 
     fun handleAction(action: MatterSetupAction) {
@@ -202,6 +213,14 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             MatterSetupAction.ShowTroubleshooting,
             MatterSetupAction.EnterCodeManually -> {
                 uiState = MatterSetupStateReducer.advancedTroubleshooting(uiState)
+            }
+
+            MatterSetupAction.BrowseMatterServices -> {
+                browseMatterServices()
+            }
+
+            MatterSetupAction.CheckIpv6Reachability -> {
+                checkIpv6Reachability()
             }
 
             MatterSetupAction.OpenCommissioningWindowAgain -> {
@@ -365,6 +384,147 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         phoneDevices = PhoneMatterDevice.fromBootstrapState(bootstrapStateRepository.load())
             ?.let(::listOf)
             .orEmpty()
+    }
+
+    private fun browseMatterServices() {
+        if (!executionGate.tryStart()) {
+            return
+        }
+
+        appendAdvancedDiagnostics(
+            checks = listOf("Matter mDNS browse started from this phone.")
+        )
+        workerThread = Thread({
+            val update = try {
+                val records = matterMdnsBrowser.browseMatterCommissionable(3_000L) +
+                    matterMdnsBrowser.browseMatterOperational(3_000L)
+                val details = formatMatterMdnsRecords(records)
+                val warnings = if (records.isEmpty()) {
+                    listOf(
+                        "No Matter mDNS services were discovered from this phone. The pairing window may have expired, mDNS may be blocked, or this phone may be on the wrong network."
+                    )
+                } else {
+                    emptyList()
+                }
+                {
+                    appendAdvancedDiagnostics(
+                        checks = listOf("Matter mDNS services discovered=${records.size}"),
+                        warnings = warnings,
+                        details = details
+                    )
+                }
+            } catch (error: Exception) {
+                {
+                    appendAdvancedDiagnostics(
+                        warnings = listOf("Matter mDNS browse failed."),
+                        details = listOf(error.message.orEmpty().ifBlank { error.javaClass.simpleName })
+                    )
+                }
+            }
+            mainHandler.post {
+                if (executionGate.canEmit()) {
+                    update()
+                }
+                executionGate.finish()
+            }
+        }, "matter-mdns-browse")
+        workerThread?.start()
+    }
+
+    private fun checkIpv6Reachability() {
+        val address = ipv6DiagnosticAddress.trim()
+        if (address.isBlank()) {
+            appendAdvancedDiagnostics(
+                warnings = listOf("Enter a device IPv6 address before running the reachability check.")
+            )
+            return
+        }
+        if (!DefaultIpv6ReachabilityProbe.isIpv6Literal(address)) {
+            appendAdvancedDiagnostics(
+                warnings = listOf("Enter an IPv6 literal such as fd00::1234. IPv4 addresses and hostnames do not verify Thread IPv6 reachability.")
+            )
+            return
+        }
+        if (!executionGate.tryStart()) {
+            return
+        }
+
+        appendAdvancedDiagnostics(
+            checks = listOf("IPv6 reachability check started for $address.")
+        )
+        workerThread = Thread({
+            val update = try {
+                val reachable = ipv6ReachabilityProbe.isReachable(address, 2_000)
+                val details = listOf(
+                    "IPv6 reachability to $address: ${if (reachable) "reachable" else "not verified"}",
+                    "Android reachability is best-effort. A failed check can mean ICMP is blocked or unavailable, not necessarily that the Matter device is offline."
+                )
+                val warnings = if (reachable) {
+                    emptyList()
+                } else {
+                    listOf("This phone could not verify IPv6 reachability to $address.")
+                }
+                {
+                    appendAdvancedDiagnostics(
+                        checks = listOf("IPv6 reachability verified=$reachable"),
+                        warnings = warnings,
+                        details = details
+                    )
+                }
+            } catch (error: Exception) {
+                {
+                    appendAdvancedDiagnostics(
+                        warnings = listOf("IPv6 reachability check failed."),
+                        details = listOf(error.message.orEmpty().ifBlank { error.javaClass.simpleName })
+                    )
+                }
+            }
+            mainHandler.post {
+                if (executionGate.canEmit()) {
+                    update()
+                }
+                executionGate.finish()
+            }
+        }, "matter-ipv6-reachability")
+        workerThread?.start()
+    }
+
+    private fun formatMatterMdnsRecords(records: List<MatterMdnsRecord>): List<String> {
+        if (records.isEmpty()) {
+            return listOf(MatterMdnsRecord.phoneDiscoveryLimitation)
+        }
+
+        return records.flatMap { record ->
+            buildList {
+                add("${record.serviceType} ${record.instanceName} at ${record.host.ifBlank { "unknown host" }}:${record.port}")
+                add("IPv6 addresses: ${record.ipv6Addresses.ifEmpty { listOf("none resolved") }.joinToString()}")
+                if (record.txt.isNotEmpty()) {
+                    add("TXT keys: ${record.txt.keys.sorted().joinToString()}")
+                }
+                add(record.interpretationTitle)
+            }
+        } + MatterMdnsRecord.phoneDiscoveryLimitation
+    }
+
+    private fun appendAdvancedDiagnostics(
+        checks: List<String> = emptyList(),
+        warnings: List<String> = emptyList(),
+        details: List<String> = emptyList()
+    ) {
+        val current = uiState.diagnostics
+        uiState = uiState.copy(
+            diagnostics = MatterSetupDiagnosticsSummary(
+                checks = (current.checks + checks).dedupeNonBlank(),
+                warnings = (current.warnings + warnings).dedupeNonBlank(),
+                details = (current.details + details).dedupeNonBlank()
+            )
+        )
+    }
+
+    private fun List<String>.dedupeNonBlank(): List<String> {
+        return map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
     }
 
     private fun emitOpenHabSetupFailure(

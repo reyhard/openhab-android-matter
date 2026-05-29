@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -22,6 +23,8 @@ import org.openhab.matter.companion.setup.MatterSetupUiState
 @Composable
 fun AdvancedTroubleshootingScreen(
     state: MatterSetupUiState,
+    ipv6DiagnosticAddress: String,
+    onIpv6DiagnosticAddressChange: (String) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
     val primaryAction = state.primaryAction ?: MatterSetupAction.Retry
@@ -83,11 +86,40 @@ fun AdvancedTroubleshootingScreen(
             )
         }
         Spacer(Modifier.height(16.dp))
-        TroubleshootingSection(title = "Details") {
+        TroubleshootingSection(title = "Captured diagnostics log") {
             TroubleshootingBullets(
                 items = diagnostics.details,
                 emptyText = "No low-level diagnostic details were captured."
             )
+        }
+        Spacer(Modifier.height(16.dp))
+        TroubleshootingSection(title = "Network tools") {
+            Text(
+                text = "These checks run from this phone. openHAB may see different mDNS or IPv6 results depending on Avahi, router, firewall, and Thread Border Router routing.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.BrowseMatterServices) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Browse Matter services")
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = ipv6DiagnosticAddress,
+                onValueChange = onIpv6DiagnosticAddressChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Device IPv6 address") },
+                singleLine = true
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.CheckIpv6Reachability) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Check IPv6 reachability")
+            }
         }
         Spacer(Modifier.height(16.dp))
         TroubleshootingSection(title = "Recovery guidance") {

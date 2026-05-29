@@ -90,6 +90,9 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Advanced troubleshooting").assertIsDisplayed()
         composeRule.onNodeWithText("Back to setup").assertIsDisplayed()
         composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
+        composeRule.onNodeWithText("Browse Matter services").assertIsDisplayed()
+        composeRule.onNodeWithText("Device IPv6 address").assertIsDisplayed()
+        composeRule.onNodeWithText("Check IPv6 reachability").assertIsDisplayed()
     }
 
     @Test
@@ -154,11 +157,13 @@ class MatterSetupAppTest {
                 threadBorderRouters = emptyList(),
                 threadBorderRouterDiscoveryInProgress = false,
                 phoneDevices = phoneDevices,
+                ipv6DiagnosticAddress = "",
                 onOpenHabUrlChange = {},
                 onTokenChange = {},
                 onThreadDatasetChange = {},
                 onOtbrBaseUrlChange = {},
                 onAttestationBypassChange = {},
+                onIpv6DiagnosticAddressChange = {},
                 onAction = {}
             )
         }

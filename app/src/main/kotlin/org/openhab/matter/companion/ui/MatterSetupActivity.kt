@@ -41,11 +41,13 @@ class MatterSetupActivity : ComponentActivity() {
                 threadBorderRouters = viewModel.threadBorderRouters,
                 threadBorderRouterDiscoveryInProgress = viewModel.threadBorderRouterDiscoveryInProgress,
                 phoneDevices = viewModel.phoneDevices,
+                ipv6DiagnosticAddress = viewModel.ipv6DiagnosticAddress,
                 onOpenHabUrlChange = viewModel::onOpenHabUrlChange,
                 onTokenChange = viewModel::onTokenChange,
                 onThreadDatasetChange = viewModel::onThreadDatasetChange,
                 onOtbrBaseUrlChange = viewModel::onOtbrBaseUrlChange,
                 onAttestationBypassChange = viewModel::onAttestationBypassChange,
+                onIpv6DiagnosticAddressChange = viewModel::onIpv6DiagnosticAddressChange,
                 onAction = ::handleAction
             )
         }
