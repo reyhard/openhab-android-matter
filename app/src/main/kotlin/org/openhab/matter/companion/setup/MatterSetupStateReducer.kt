@@ -1,16 +1,64 @@
 package org.openhab.matter.companion.setup
 
 object MatterSetupStateReducer {
-    fun reset(openHabConfigured: Boolean, openHabUrl: String): MatterSetupUiState {
-        return if (openHabConfigured) {
-            MatterSetupUiState.initial(openHabConfigured = true)
+    fun reset(setupComplete: Boolean, openHabUrl: String): MatterSetupUiState {
+        return if (setupComplete) {
+            MatterSetupUiState.addMatterDevice()
         } else {
-            openHabSetup(openHabUrl)
+            MatterSetupUiState.welcome()
         }
     }
 
-    fun editSettings(openHabUrl: String): MatterSetupUiState {
-        return openHabSetup(openHabUrl, showBackToMainMenu = true)
+    fun requiredSetup(openHabUrl: String): MatterSetupUiState {
+        val effectiveUrl = openHabUrl.ifBlank { MatterSetupConfigCompleteness.DefaultOpenHabUrl }
+        return MatterSetupUiState(
+            stage = MatterSetupStage.NeedsOpenHabSetup,
+            title = "Connect to openHAB",
+            message = "Connect to your openHAB home and Thread network before adding Matter devices.",
+            primaryAction = MatterSetupAction.TestSettings,
+            primaryActionLabel = "Test settings",
+            primaryActionEnabled = effectiveUrl.trim().isNotBlank(),
+            secondaryActions = listOf(MatterSetupAction.ShowTroubleshooting),
+            openHabUrlFallback = effectiveUrl
+        )
+    }
+
+    fun settings(): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.Settings,
+            title = "Settings",
+            message = "Manage openHAB, Thread network, and local phone staging for Matter setup."
+        )
+    }
+
+    fun changeToken(): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.ChangeToken,
+            title = "Change token",
+            message = "Enter a new openHAB access token and test it before saving.",
+            primaryAction = MatterSetupAction.SaveChangedToken,
+            primaryActionLabel = "Save token"
+        )
+    }
+
+    fun threadNetworkEditor(): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.ThreadNetworkEditor,
+            title = "Thread network",
+            message = "Used to commission Matter devices to your Thread network before handing them to openHAB.",
+            primaryAction = MatterSetupAction.SaveThreadSettings,
+            primaryActionLabel = "Save"
+        )
+    }
+
+    fun manualCodeEntry(): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.EnteringManualCode,
+            title = "Enter setup code",
+            message = "Type the 11-digit Matter setup code printed on the device or box.",
+            primaryAction = MatterSetupAction.SubmitManualCode,
+            primaryActionLabel = "Continue"
+        )
     }
 
     fun phoneDeviceList(hasDevices: Boolean, message: String = ""): MatterSetupUiState {
@@ -25,44 +73,18 @@ object MatterSetupStateReducer {
                 }
             },
             primaryAction = MatterSetupAction.BackToSettings,
-            primaryActionLabel = "Back to settings",
-            secondaryActions = listOf(MatterSetupAction.BackToMainMenu)
+            primaryActionLabel = "Back to settings"
         )
     }
 
-    fun openHabSetup(
-        openHabUrl: String,
-        showBackToMainMenu: Boolean = false
-    ): MatterSetupUiState {
-        val openHabUrlConfigured = openHabUrl.trim().isNotBlank()
+    fun openHabSetupChecking(): MatterSetupUiState {
         return MatterSetupUiState(
-            stage = MatterSetupStage.NeedsOpenHabSetup,
-            title = "Connect to openHAB",
-            message = "Connect to your openHAB home before adding Matter devices.",
-            primaryAction = MatterSetupAction.TestOpenHab,
-            primaryActionLabel = "Test connection",
-            primaryActionEnabled = openHabUrlConfigured,
-            secondaryActions = buildList {
-                if (showBackToMainMenu) {
-                    add(MatterSetupAction.BackToMainMenu)
-                }
-                add(MatterSetupAction.ShowTroubleshooting)
-            }
-        )
-    }
-
-    fun openHabSetupReady(openHabUrl: String): MatterSetupUiState {
-        return MatterSetupUiState(
-            stage = MatterSetupStage.NeedsOpenHabSetup,
-            title = "Connect to openHAB",
-            message = "openHAB is ready. You can go back and scan a Matter QR code.",
-            primaryAction = MatterSetupAction.TestOpenHab,
-            primaryActionLabel = "Test connection",
-            primaryActionEnabled = openHabUrl.trim().isNotBlank(),
-            secondaryActions = listOf(
-                MatterSetupAction.BackToMainMenu,
-                MatterSetupAction.ShowTroubleshooting
-            )
+            stage = MatterSetupStage.OpenHabSetupChecking,
+            title = "Checking settings",
+            message = "Checking openHAB, Thread dataset, and Border Router settings.",
+            primaryAction = MatterSetupAction.TestSettings,
+            primaryActionLabel = "Checking...",
+            primaryActionEnabled = false
         )
     }
 
@@ -73,39 +95,20 @@ object MatterSetupStateReducer {
         diagnostics: MatterSetupDiagnosticsSummary = MatterSetupDiagnosticsSummary.empty(),
         showBackToMainMenu: Boolean = false
     ): MatterSetupUiState {
-        return MatterSetupUiState(
-            stage = MatterSetupStage.NeedsOpenHabSetup,
-            title = "Connect to openHAB",
-            message = message.ifBlank { "openHAB is not ready yet. Check the details in troubleshooting." },
-            primaryAction = MatterSetupAction.TestOpenHab,
-            primaryActionLabel = "Test connection",
-            primaryActionEnabled = openHabUrl.trim().isNotBlank(),
-            secondaryActions = buildList {
-                if (showBackToMainMenu) {
-                    add(MatterSetupAction.BackToMainMenu)
-                }
-                add(MatterSetupAction.ShowTroubleshooting)
-            },
+        return requiredSetup(openHabUrl).copy(
+            message = message.ifBlank { "Settings are not ready yet. Check the details in troubleshooting." },
             failure = failure,
             diagnostics = diagnostics
-        )
-    }
-
-    fun openHabSetupChecking(): MatterSetupUiState {
-        return MatterSetupUiState(
-            stage = MatterSetupStage.OpenHabSetupChecking,
-            title = "Checking openHAB",
-            message = "Checking the openHAB REST API and Matter controller.",
-            primaryAction = MatterSetupAction.TestOpenHab,
-            primaryActionLabel = "Checking...",
-            primaryActionEnabled = false
         )
     }
 
     fun advancedTroubleshooting(current: MatterSetupUiState): MatterSetupUiState {
         val primaryAction = when (current.stage) {
             MatterSetupStage.NeedsOpenHabSetup,
-            MatterSetupStage.OpenHabSetupChecking -> MatterSetupAction.BackToSettings
+            MatterSetupStage.OpenHabSetupChecking,
+            MatterSetupStage.Settings,
+            MatterSetupStage.ChangeToken,
+            MatterSetupStage.ThreadNetworkEditor -> MatterSetupAction.BackToSettings
             else -> MatterSetupAction.Retry
         }
         return MatterSetupUiState(
@@ -122,4 +125,13 @@ object MatterSetupStateReducer {
             diagnostics = current.diagnostics
         )
     }
+
+    fun editSettings(openHabUrl: String): MatterSetupUiState = settings()
+
+    fun openHabSetup(
+        openHabUrl: String,
+        showBackToMainMenu: Boolean = false
+    ): MatterSetupUiState = requiredSetup(openHabUrl)
+
+    fun openHabSetupReady(openHabUrl: String): MatterSetupUiState = settings()
 }

@@ -13,28 +13,37 @@ data class MatterSetupUiState(
     val primaryActionEnabled: Boolean = true,
     val secondaryActions: List<MatterSetupAction> = emptyList(),
     val failure: MatterSetupFailure? = null,
-    val diagnostics: MatterSetupDiagnosticsSummary = MatterSetupDiagnosticsSummary.empty()
+    val diagnostics: MatterSetupDiagnosticsSummary = MatterSetupDiagnosticsSummary.empty(),
+    val openHabUrlFallback: String = ""
 ) {
     companion object {
         fun initial(openHabConfigured: Boolean): MatterSetupUiState {
             return if (openHabConfigured) {
-                MatterSetupUiState(
-                    stage = MatterSetupStage.ReadyToScan,
-                    title = "Add Matter device",
-                    message = "Scan the Matter QR code to add the device to openHAB.",
-                    primaryAction = MatterSetupAction.StartScan,
-                    primaryActionLabel = "Scan QR code"
-                )
+                addMatterDevice()
             } else {
-                MatterSetupUiState(
-                    stage = MatterSetupStage.NeedsOpenHabSetup,
-                    title = "Connect to openHAB",
-                    message = "Connect to your openHAB home before adding Matter devices.",
-                    primaryAction = MatterSetupAction.TestOpenHab,
-                    primaryActionLabel = "Test connection",
-                    primaryActionEnabled = false
-                )
+                welcome()
             }
+        }
+
+        fun welcome(): MatterSetupUiState {
+            return MatterSetupUiState(
+                stage = MatterSetupStage.Welcome,
+                title = "Set up Matter with openHAB",
+                message = "A guided local setup for adding Matter devices to your openHAB home.",
+                primaryAction = MatterSetupAction.GetStarted,
+                primaryActionLabel = "Get started"
+            )
+        }
+
+        fun addMatterDevice(): MatterSetupUiState {
+            return MatterSetupUiState(
+                stage = MatterSetupStage.ReadyToScan,
+                title = "Add Matter device",
+                message = "Scan the device QR code or enter the setup code manually.",
+                primaryAction = MatterSetupAction.StartScan,
+                primaryActionLabel = "Scan code",
+                secondaryActions = listOf(MatterSetupAction.EditSettings)
+            )
         }
 
         fun progress(

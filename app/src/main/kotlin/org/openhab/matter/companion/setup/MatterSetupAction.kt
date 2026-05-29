@@ -1,9 +1,14 @@
 package org.openhab.matter.companion.setup
 
-sealed interface MatterSetupAction {
+interface MatterSetupAction {
+    data object GetStarted : MatterSetupAction
     data object SaveOpenHab : MatterSetupAction
     data object TestOpenHab : MatterSetupAction
+    data object TestSettings : MatterSetupAction
     data object EditSettings : MatterSetupAction
+    data object ChangeToken : MatterSetupAction
+    data object SaveChangedToken : MatterSetupAction
+    data object EditThreadNetwork : MatterSetupAction
     data object CheckThreadDataset : MatterSetupAction
     data object SaveThreadSettings : MatterSetupAction
     data object DetectThreadBorderRouters : MatterSetupAction

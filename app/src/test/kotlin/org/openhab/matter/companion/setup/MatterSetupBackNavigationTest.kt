@@ -6,19 +6,54 @@ import org.junit.Test
 
 class MatterSetupBackNavigationTest {
     @Test
-    fun settingsBackReturnsToMainMenuWhenSettingsWasOpenedFromMainMenu() {
-        val state = MatterSetupStateReducer.editSettings("http://openhab.local:8080")
-
-        assertEquals(
-            MatterSetupAction.BackToMainMenu,
-            MatterSetupBackNavigation.systemBackAction(state)
+    fun welcomeBackIsNotIntercepted() {
+        val state = MatterSetupStateReducer.reset(
+            setupComplete = false,
+            openHabUrl = "http://openhab:8080"
         )
+
+        assertNull(MatterSetupBackNavigation.systemBackAction(state))
     }
 
     @Test
-    fun firstRunSettingsBackIsNotIntercepted() {
-        val state = MatterSetupUiState.initial(openHabConfigured = false)
+    fun settingsBackReturnsToMainScreen() {
+        val state = MatterSetupStateReducer.settings()
 
-        assertNull(MatterSetupBackNavigation.systemBackAction(state))
+        assertEquals(MatterSetupAction.BackToMainMenu, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
+    fun threadEditorBackReturnsToSettings() {
+        val state = MatterSetupStateReducer.threadNetworkEditor()
+
+        assertEquals(MatterSetupAction.BackToSettings, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
+    fun tokenEditorBackReturnsToSettings() {
+        val state = MatterSetupStateReducer.changeToken()
+
+        assertEquals(MatterSetupAction.BackToSettings, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
+    fun phoneDevicesBackReturnsToSettings() {
+        val state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true)
+
+        assertEquals(MatterSetupAction.BackToSettings, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
+    fun troubleshootingFromSettingsBackReturnsToSettings() {
+        val state = MatterSetupStateReducer.advancedTroubleshooting(MatterSetupStateReducer.settings())
+
+        assertEquals(MatterSetupAction.BackToSettings, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
+    fun manualCodeBackReturnsToMainScreen() {
+        val state = MatterSetupStateReducer.manualCodeEntry()
+
+        assertEquals(MatterSetupAction.BackToMainMenu, MatterSetupBackNavigation.systemBackAction(state))
     }
 }
