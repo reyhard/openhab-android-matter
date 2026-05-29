@@ -225,6 +225,36 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
+    fun diagnosticsContextUrlsAreSafeBeforeDiagnosticsCanEchoThem() {
+        val ports = FakeMatterSetupPorts().apply {
+            openHabBaseUrl = "https://user:password@openhab.local:8443/rest?token=ohab_secret&code=34970112332"
+            otbrBaseUrl = "http://otbr-user:otbr-password@otbr.local/api?dataset=hex:001122"
+            scanStarted = false
+            echoDiagnosticsContext = true
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val diagnosticsText = states.last().diagnostics.toString()
+        assertEquals("https://openhab.local:8443/rest", ports.diagnosticsContext!!.openHabBaseUrl)
+        assertEquals("http://otbr.local/api", ports.diagnosticsContext!!.otbrBaseUrl)
+        assertTrue(diagnosticsText.contains("openHAB https://openhab.local:8443/rest"))
+        assertTrue(diagnosticsText.contains("OTBR http://otbr.local/api"))
+        assertFalse(diagnosticsText.contains("user:password"))
+        assertFalse(diagnosticsText.contains("otbr-user:otbr-password"))
+        assertFalse(diagnosticsText.contains("password"))
+        assertFalse(diagnosticsText.contains("otbr-password"))
+        assertFalse(diagnosticsText.contains("token="))
+        assertFalse(diagnosticsText.contains("code="))
+        assertFalse(diagnosticsText.contains("dataset="))
+        assertFalse(diagnosticsText.contains("ohab_secret"))
+        assertFalse(diagnosticsText.contains("hex:001122"))
+        assertFalse(diagnosticsText.contains("34970112332"))
+    }
+
+    @Test
     fun blankManualCodeFailsBeforeSendingCodeToOpenHab() {
         val ports = FakeMatterSetupPorts().apply {
             manualCode = "   "
@@ -405,8 +435,11 @@ class MatterSetupWorkflowTest {
         var diagnosticsContext: MatterSetupDiagnosticsContext? = null
         var diagnosticsSummary = MatterSetupDiagnosticsSummary.empty()
         var diagnosticsError: RuntimeException? = null
+        var echoDiagnosticsContext = false
         var loadConfigError: RuntimeException? = null
         var openWindowError: RuntimeException? = null
+        var openHabBaseUrl = "http://openhab.local:8080"
+        var otbrBaseUrl = "http://otbr.local"
         var manualCode = "34970112332"
         var qrCode = ""
         var commissionControllerState = "controller-state"
@@ -421,10 +454,10 @@ class MatterSetupWorkflowTest {
             loadConfigCalled = true
             loadConfigError?.let { throw it }
             return MatterSetupConfig(
-                openHabBaseUrl = "http://openhab.local:8080",
+                openHabBaseUrl = openHabBaseUrl,
                 openHabApiToken = "ohab_secret",
                 threadDataset = "hex:001122",
-                otbrBaseUrl = "http://otbr.local",
+                otbrBaseUrl = otbrBaseUrl,
                 attestationBypassEnabled = false
             )
         }
@@ -492,6 +525,13 @@ class MatterSetupWorkflowTest {
             diagnosticsFailure = failure
             diagnosticsContext = context
             diagnosticsError?.let { throw it }
+            if (echoDiagnosticsContext) {
+                return MatterSetupDiagnosticsSummary(
+                    checks = listOf("openHAB ${context.openHabBaseUrl}"),
+                    warnings = emptyList(),
+                    details = listOf("OTBR ${context.otbrBaseUrl}")
+                )
+            }
             return diagnosticsSummary
         }
     }

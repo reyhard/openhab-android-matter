@@ -126,8 +126,8 @@ class MatterSetupWorkflow(
 
     private fun MatterSetupConfig.toDiagnosticsContext(): MatterSetupDiagnosticsContext {
         return MatterSetupDiagnosticsContext(
-            openHabBaseUrl = openHabBaseUrl,
-            otbrBaseUrl = otbrBaseUrl,
+            openHabBaseUrl = openHabBaseUrl.toLogSafeUrl(),
+            otbrBaseUrl = otbrBaseUrl.toLogSafeUrl(),
             attestationBypassEnabled = attestationBypassEnabled
         )
     }
