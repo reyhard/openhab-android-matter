@@ -1,7 +1,7 @@
 package org.openhab.matter.companion.ui
 
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -253,7 +253,8 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Enter setup code").assertIsDisplayed()
         composeRule.onNodeWithText("Pairing code").assertIsDisplayed()
         composeRule.onNodeWithText("Continue").assertIsDisplayed()
-        composeRule.onNodeWithText("Back").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Back").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Back to main menu").assertCountEquals(0)
     }
 
     @Test
@@ -333,7 +334,8 @@ class MatterSetupAppTest {
         )
 
         composeRule.onNodeWithText("Advanced troubleshooting").assertIsDisplayed()
-        composeRule.onNodeWithText("Back to setup").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Back to setup").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Back").assertCountEquals(0)
         composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
         composeRule.onNodeWithText("Browse Matter services").assertIsDisplayed()
         composeRule.onNodeWithText("Device IPv6 address").assertIsDisplayed()
@@ -357,7 +359,8 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("0x4D2").assertIsDisplayed()
         composeRule.onNodeWithText("Open pairing window again").assertIsDisplayed()
         composeRule.onNodeWithText("Forget from this phone").assertIsDisplayed()
-        composeRule.onNodeWithText("Back to settings").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Back to settings").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Back to main menu").assertCountEquals(0)
     }
 
     @Test
@@ -404,7 +407,8 @@ class MatterSetupAppTest {
         render(MatterSetupStateReducer.phoneDeviceList(hasDevices = false))
 
         composeRule.onNodeWithText("No staged Matter devices are stored on this phone.").assertIsDisplayed()
-        composeRule.onNodeWithText("Back to settings").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Back to settings").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Back to main menu").assertCountEquals(0)
     }
 
     private fun render(

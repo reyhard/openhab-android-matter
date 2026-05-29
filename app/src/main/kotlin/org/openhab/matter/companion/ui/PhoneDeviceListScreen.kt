@@ -40,13 +40,6 @@ fun PhoneDeviceListScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(text = state.message)
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.BackToSettings) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back to settings")
-        }
         Spacer(Modifier.height(24.dp))
         Text(
             text = "Stored Matter staging",
