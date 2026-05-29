@@ -195,6 +195,9 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.GetStarted -> {
+                if (openHabUrl.isBlank()) {
+                    openHabUrl = MatterSetupConfigCompleteness.DefaultOpenHabUrl
+                }
                 uiState = MatterSetupStateReducer.requiredSetup(openHabUrl)
             }
 
@@ -237,14 +240,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.EnterCodeManually -> {
-                uiState = MatterSetupUiState(
-                    stage = MatterSetupStage.EnteringManualCode,
-                    title = "Enter setup code",
-                    message = "Type the Matter setup code printed on the device or box.",
-                    primaryAction = MatterSetupAction.SubmitManualCode,
-                    primaryActionLabel = "Continue",
-                    secondaryActions = listOf(MatterSetupAction.BackToMainMenu)
-                )
+                uiState = MatterSetupStateReducer.manualCodeEntry()
             }
 
             MatterSetupAction.SubmitManualCode -> {
@@ -320,11 +316,19 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 val status = openHabClient.checkReadiness(baseUrl, apiToken)
                 if (status.online() && status.restReachable() && status.matterControllerReady()) {
                     saveOpenHabConfig(existingConfig, baseUrl, apiToken)
+                    val savedConfig = configRepository.load()
+                    val setupComplete = MatterSetupConfigCompleteness.isComplete(savedConfig)
                     postState {
-                        openHabUrl = baseUrl
-                        token = apiToken
-                        openHabConfigured = true
-                        uiState = MatterSetupStateReducer.settings()
+                        openHabUrl = savedConfig.openHabBaseUrl()
+                        token = savedConfig.openHabApiToken()
+                        openHabConfigured = setupComplete
+                        uiState = if (setupComplete) {
+                            MatterSetupUiState.addMatterDevice()
+                        } else {
+                            MatterSetupStateReducer.requiredSetup(baseUrl).copy(
+                                message = "openHAB is ready. Complete the Thread dataset and Border Router settings before adding Matter devices."
+                            )
+                        }
                     }
                 } else {
                     emitOpenHabSetupFailure(

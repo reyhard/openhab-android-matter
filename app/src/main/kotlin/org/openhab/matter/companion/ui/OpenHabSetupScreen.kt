@@ -44,6 +44,7 @@ fun OpenHabSetupScreen(
     onAttestationBypassChange: (Boolean) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
+    val effectiveOpenHabUrl = openHabUrl.ifBlank { state.openHabUrlFallback }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -90,7 +91,7 @@ fun OpenHabSetupScreen(
         )
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(
-            value = openHabUrl,
+            value = effectiveOpenHabUrl,
             onValueChange = onUrlChange,
             modifier = Modifier.fillMaxWidth(),
             label = { Text("openHAB address") },

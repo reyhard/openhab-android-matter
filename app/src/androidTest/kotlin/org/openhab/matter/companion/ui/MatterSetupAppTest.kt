@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.openhab.matter.companion.setup.MatterSetupAction
+import org.openhab.matter.companion.setup.MatterSetupConfigCompleteness
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsSummary
 import org.openhab.matter.companion.setup.MatterSetupFailure
 import org.openhab.matter.companion.setup.MatterSetupStage
@@ -22,13 +23,25 @@ class MatterSetupAppTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun firstRunSetupScreenShowsOpenHabSettings() {
+    fun firstRunSetupScreenShowsWelcome() {
         render(MatterSetupUiState.initial(openHabConfigured = false))
+
+        composeRule.onNodeWithText("Set up Matter with openHAB").assertIsDisplayed()
+        composeRule.onNodeWithText("Get started").assertIsDisplayed()
+    }
+
+    @Test
+    fun requiredSetupScreenShowsOpenHabSettingsWithDefaultAddress() {
+        render(
+            state = MatterSetupStateReducer.requiredSetup(""),
+            openHabUrl = ""
+        )
 
         composeRule.onNodeWithText("Connect to openHAB").assertIsDisplayed()
         composeRule.onNodeWithText("openHAB address").assertIsDisplayed()
+        composeRule.onNodeWithText(MatterSetupConfigCompleteness.DefaultOpenHabUrl).assertIsDisplayed()
         composeRule.onNodeWithText("Access token").assertIsDisplayed()
-        composeRule.onNodeWithText("Test connection").assertIsDisplayed()
+        composeRule.onNodeWithText("Test settings").assertIsDisplayed()
         composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
     }
 
@@ -239,12 +252,13 @@ class MatterSetupAppTest {
         state: MatterSetupUiState,
         phoneDevices: List<PhoneMatterDevice> = emptyList(),
         manualSetupCode: String = "",
+        openHabUrl: String = "http://openhab.local:8080",
         onAction: (MatterSetupAction) -> Unit = {}
     ) {
         composeRule.setContent {
             MatterSetupApp(
                 state = state,
-                openHabUrl = "http://openhab.local:8080",
+                openHabUrl = openHabUrl,
                 token = "",
                 threadDataset = "",
                 otbrBaseUrl = "",
