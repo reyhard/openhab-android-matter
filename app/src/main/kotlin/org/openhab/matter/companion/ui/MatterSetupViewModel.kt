@@ -56,6 +56,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private val openHabMatterDiscoveryClient by lazy { HttpOpenHabMatterDiscoveryClient() }
     private val openHabInboxClient by lazy { HttpOpenHabInboxClient() }
     private val fakeMatterController by lazy { FakeMatterController() }
+    private var openHabConfigured = false
     private val controllerSession by lazy {
         newNativeControllerSession(loadMatterSetupConfig().attestationBypassEnabled)
     }
@@ -64,11 +65,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         val config = configRepository.load()
         openHabUrl = config.openHabBaseUrl()
         token = config.openHabApiToken()
-        uiState = if (openHabUrl.isBlank()) {
-            MatterSetupStateReducer.openHabSetup(openHabUrl)
-        } else {
-            MatterSetupUiState.initial(openHabConfigured = true)
-        }
+        openHabConfigured = config.openHabBaseUrl().isNotBlank()
+        uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
     }
 
     fun onOpenHabUrlChange(value: String) {
@@ -105,11 +103,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             MatterSetupAction.Retry,
             MatterSetupAction.AddAnotherDevice -> {
                 scannedPayload = ""
-                uiState = if (openHabUrl.isBlank()) {
-                    MatterSetupStateReducer.openHabSetup(openHabUrl)
-                } else {
-                    MatterSetupUiState.initial(openHabConfigured = true)
-                }
+                uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
             }
 
             MatterSetupAction.SaveOpenHab,
@@ -176,6 +170,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     postState {
                         openHabUrl = baseUrl
                         token = apiToken
+                        openHabConfigured = true
                         uiState = MatterSetupUiState.initial(openHabConfigured = true)
                     }
                 } else {

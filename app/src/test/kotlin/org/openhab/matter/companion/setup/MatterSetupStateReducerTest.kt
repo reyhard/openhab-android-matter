@@ -25,6 +25,28 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
+    fun resetReturnsOpenHabSetupWhenOpenHabIsNotConfigured() {
+        val state = MatterSetupStateReducer.reset(
+            openHabConfigured = false,
+            openHabUrl = "http://openhab.local:8080"
+        )
+
+        assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
+        assertEquals(MatterSetupAction.TestOpenHab, state.primaryAction)
+        assertTrue(state.primaryActionEnabled)
+    }
+
+    @Test
+    fun resetReturnsReadyToScanWhenOpenHabIsConfigured() {
+        val state = MatterSetupStateReducer.reset(
+            openHabConfigured = true,
+            openHabUrl = "http://openhab.local:8080"
+        )
+
+        assertEquals(MatterSetupStage.ReadyToScan, state.stage)
+    }
+
+    @Test
     fun advancedTroubleshootingPreservesFailureAndDiagnostics() {
         val failure = MatterSetupFailure(
             step = MatterSetupStage.WatchingOpenHabInbox,

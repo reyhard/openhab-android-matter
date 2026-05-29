@@ -1,6 +1,14 @@
 package org.openhab.matter.companion.setup
 
 object MatterSetupStateReducer {
+    fun reset(openHabConfigured: Boolean, openHabUrl: String): MatterSetupUiState {
+        return if (openHabConfigured) {
+            MatterSetupUiState.initial(openHabConfigured = true)
+        } else {
+            openHabSetup(openHabUrl)
+        }
+    }
+
     fun openHabSetup(openHabUrl: String): MatterSetupUiState {
         return MatterSetupUiState(
             stage = MatterSetupStage.NeedsOpenHabSetup,
