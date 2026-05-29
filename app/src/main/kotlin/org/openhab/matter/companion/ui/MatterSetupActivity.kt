@@ -34,8 +34,17 @@ class MatterSetupActivity : ComponentActivity() {
                 state = viewModel.uiState,
                 openHabUrl = viewModel.openHabUrl,
                 token = viewModel.token,
+                threadDataset = viewModel.threadDataset,
+                otbrBaseUrl = viewModel.otbrBaseUrl,
+                attestationBypassEnabled = viewModel.attestationBypassEnabled,
+                threadSettingsMessage = viewModel.threadSettingsMessage,
+                threadBorderRouters = viewModel.threadBorderRouters,
+                threadBorderRouterDiscoveryInProgress = viewModel.threadBorderRouterDiscoveryInProgress,
                 onOpenHabUrlChange = viewModel::onOpenHabUrlChange,
                 onTokenChange = viewModel::onTokenChange,
+                onThreadDatasetChange = viewModel::onThreadDatasetChange,
+                onOtbrBaseUrlChange = viewModel::onOtbrBaseUrlChange,
+                onAttestationBypassChange = viewModel::onAttestationBypassChange,
                 onAction = ::handleAction
             )
         }

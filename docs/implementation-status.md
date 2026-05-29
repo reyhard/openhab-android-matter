@@ -6,6 +6,7 @@
 - PowerShell install-readiness helper builds/tests the debug APK, forwards connectedhomeip/native prebuilt Gradle properties, verifies the APK artifact, supports no-device preflight mode, checks ADB devices, and installs only when a target device/emulator is unambiguous.
 - Native Android UI covers Thread, Wi-Fi, and multi-admin handoff flows.
 - Thread dataset validation accepts `hex:` and raw hex input.
+- Compose settings expose Thread dataset manual entry, local dataset validation, encrypted save, OTBR diagnostic target editing, developer attestation bypass, and automatic `_meshcop._udp` Thread Border Router discovery.
 - Explicit setup payload parser accepts `pin=...;disc=...;vendor=...;product=...`.
 - Wi-Fi/multi-admin handoff accepts Matter QR payloads and normalized Verhoeff-validated 11- or 21-digit manual setup or multi-admin codes for openHAB Scan Input.
 - Matter `MT:` QR setup payload parser decodes PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.

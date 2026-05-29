@@ -1,6 +1,7 @@
 package org.openhab.matter.companion.ui
 
 import androidx.compose.runtime.Composable
+import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupStage
 import org.openhab.matter.companion.setup.MatterSetupUiState
@@ -11,8 +12,17 @@ fun MatterSetupApp(
     state: MatterSetupUiState,
     openHabUrl: String,
     token: String,
+    threadDataset: String,
+    otbrBaseUrl: String,
+    attestationBypassEnabled: Boolean,
+    threadSettingsMessage: String,
+    threadBorderRouters: List<ThreadBorderRouterRecord>,
+    threadBorderRouterDiscoveryInProgress: Boolean,
     onOpenHabUrlChange: (String) -> Unit,
     onTokenChange: (String) -> Unit,
+    onThreadDatasetChange: (String) -> Unit,
+    onOtbrBaseUrlChange: (String) -> Unit,
+    onAttestationBypassChange: (Boolean) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
     MatterSetupTheme {
@@ -22,8 +32,17 @@ fun MatterSetupApp(
                 state = state,
                 openHabUrl = openHabUrl,
                 token = token,
+                threadDataset = threadDataset,
+                otbrBaseUrl = otbrBaseUrl,
+                attestationBypassEnabled = attestationBypassEnabled,
+                threadSettingsMessage = threadSettingsMessage,
+                threadBorderRouters = threadBorderRouters,
+                threadBorderRouterDiscoveryInProgress = threadBorderRouterDiscoveryInProgress,
                 onUrlChange = onOpenHabUrlChange,
                 onTokenChange = onTokenChange,
+                onThreadDatasetChange = onThreadDatasetChange,
+                onOtbrBaseUrlChange = onOtbrBaseUrlChange,
+                onAttestationBypassChange = onAttestationBypassChange,
                 onAction = onAction
             )
 

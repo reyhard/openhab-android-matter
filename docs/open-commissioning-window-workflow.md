@@ -8,6 +8,8 @@ The app no longer opens an OpenCommissioningWindow through the simulated control
 
 The Compose automated setup flow treats OpenCommissioningWindow as an internal step after QR scan, pairing-mode confirmation, and BLE Thread commissioning to the phone. When connectedhomeip returns the manual setup code, the app submits that code to openHAB Matter discovery scan input, starts watching the openHAB Inbox, and reports v1 success only when a Matter Inbox entry is detected. The temporary 300-second pairing window is shown as a countdown in the user-facing progress UI.
 
+The Compose settings screen keeps the automated path configurable without making the main flow technical. It exposes openHAB URL/token setup plus advanced Thread settings: manual Active Operational Dataset entry, local dataset validation, encrypted dataset save, OTBR diagnostic target editing, developer attestation bypass, and `_meshcop._udp` Thread Border Router discovery. Border Router discovery only proves that a Thread Border Agent is visible on the current network; it does not extract or infer the Thread dataset.
+
 Important current parameters:
 
 | Parameter | Current value | Where set |
@@ -24,7 +26,7 @@ Important current parameters:
 ```mermaid
 flowchart TD
     A[Open app] --> B{openHAB configured?}
-    B -- No --> B1[Enter openHAB URL/token and run readiness check]
+    B -- No --> B1[Enter openHAB URL/token and optional Thread settings]
     B1 --> B2{openHAB ready?}
     B2 -- No --> B3[Show sanitized failure and troubleshooting]
     B2 -- Yes --> C[Scan Matter QR code]

@@ -10,8 +10,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupUiState
 
@@ -27,8 +31,17 @@ fun OpenHabSetupScreen(
     state: MatterSetupUiState,
     openHabUrl: String,
     token: String,
+    threadDataset: String,
+    otbrBaseUrl: String,
+    attestationBypassEnabled: Boolean,
+    threadSettingsMessage: String,
+    threadBorderRouters: List<ThreadBorderRouterRecord>,
+    threadBorderRouterDiscoveryInProgress: Boolean,
     onUrlChange: (String) -> Unit,
     onTokenChange: (String) -> Unit,
+    onThreadDatasetChange: (String) -> Unit,
+    onOtbrBaseUrlChange: (String) -> Unit,
+    onAttestationBypassChange: (Boolean) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
     Column(
@@ -45,6 +58,12 @@ fun OpenHabSetupScreen(
         Spacer(Modifier.height(8.dp))
         Text(text = state.message)
         Spacer(Modifier.height(24.dp))
+        Text(
+            text = "openHAB",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(8.dp))
         OutlinedTextField(
             value = openHabUrl,
             onValueChange = onUrlChange,
@@ -70,6 +89,88 @@ fun OpenHabSetupScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(state.primaryActionLabel.ifBlank { "Continue" })
+        }
+        Spacer(Modifier.height(32.dp))
+        Text(
+            text = "Thread network",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Use manual mode when the app cannot read the dataset from your Thread Border Router."
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = threadDataset,
+            onValueChange = onThreadDatasetChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(132.dp),
+            label = { Text("Active Operational Dataset") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = otbrBaseUrl,
+            onValueChange = onOtbrBaseUrlChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Thread Border Router address") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
+        )
+        Spacer(Modifier.height(12.dp))
+        androidx.compose.foundation.layout.Row {
+            Checkbox(
+                checked = attestationBypassEnabled,
+                onCheckedChange = onAttestationBypassChange
+            )
+            Text(
+                text = "Developer attestation bypass",
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        }
+        if (threadSettingsMessage.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = threadSettingsMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(
+            onClick = { onAction(MatterSetupAction.CheckThreadDataset) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Check dataset")
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { onAction(MatterSetupAction.SaveThreadSettings) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Save Thread settings")
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            enabled = !threadBorderRouterDiscoveryInProgress,
+            onClick = { onAction(MatterSetupAction.DetectThreadBorderRouters) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (threadBorderRouterDiscoveryInProgress) "Detecting..." else "Detect border routers")
+        }
+        threadBorderRouters.forEach { router ->
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = {
+                    onAction(MatterSetupAction.SelectThreadBorderRouter(router.endpoint))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("${router.displayName} - ${router.endpoint}")
+            }
         }
     }
 }

@@ -14,6 +14,8 @@ import org.openhab.matter.companion.controller.FakeMatterController
 import org.openhab.matter.companion.controller.MatterBootstrapState
 import org.openhab.matter.companion.controller.NativeChipControllerSession
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository
+import org.openhab.matter.companion.diagnostics.AndroidThreadBorderRouterBrowser
+import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser
 import org.openhab.matter.companion.domain.ThreadDataset
 import org.openhab.matter.companion.openhab.HttpOpenHabClient
@@ -32,6 +34,8 @@ import org.openhab.matter.companion.setup.MatterSetupStage
 import org.openhab.matter.companion.setup.MatterSetupStateReducer
 import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.setup.MatterSetupWorkflow
+import org.openhab.matter.companion.setup.ThreadDatasetSettingsStatus
+import org.openhab.matter.companion.setup.ThreadDatasetSettingsValidator
 import org.openhab.matter.companion.setup.WorkflowExecutionGate
 import org.openhab.matter.companion.setup.sanitizeLogUrls
 import org.openhab.matter.companion.setup.toLogSafeUrl
@@ -42,6 +46,18 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     var openHabUrl by mutableStateOf("")
         private set
     var token by mutableStateOf("")
+        private set
+    var threadDataset by mutableStateOf("")
+        private set
+    var otbrBaseUrl by mutableStateOf("")
+        private set
+    var attestationBypassEnabled by mutableStateOf(false)
+        private set
+    var threadSettingsMessage by mutableStateOf("")
+        private set
+    var threadBorderRouters by mutableStateOf<List<ThreadBorderRouterRecord>>(emptyList())
+        private set
+    var threadBorderRouterDiscoveryInProgress by mutableStateOf(false)
         private set
 
     private var scannedPayload = ""
@@ -56,6 +72,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private val openHabMatterDiscoveryClient by lazy { HttpOpenHabMatterDiscoveryClient() }
     private val openHabInboxClient by lazy { HttpOpenHabInboxClient() }
     private val fakeMatterController by lazy { FakeMatterController() }
+    private val threadBorderRouterBrowser by lazy { AndroidThreadBorderRouterBrowser(appContext) }
     private var openHabConfigured = false
     private val controllerSession by lazy {
         newNativeControllerSession(loadMatterSetupConfig().attestationBypassEnabled)
@@ -65,6 +82,13 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         val config = configRepository.load()
         openHabUrl = config.openHabBaseUrl()
         token = config.openHabApiToken()
+        threadDataset = config.threadDataset()
+        otbrBaseUrl = config.otbrBaseUrl()
+        attestationBypassEnabled = config.attestationBypassEnabled()
+        threadSettingsMessage = ThreadDatasetSettingsValidator.validate(
+            threadDataset,
+            config.threadDatasetUnreadable()
+        ).title
         openHabConfigured = config.openHabBaseUrl().isNotBlank()
         uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
     }
@@ -78,6 +102,18 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
     fun onTokenChange(value: String) {
         token = value
+    }
+
+    fun onThreadDatasetChange(value: String) {
+        threadDataset = value
+    }
+
+    fun onOtbrBaseUrlChange(value: String) {
+        otbrBaseUrl = value
+    }
+
+    fun onAttestationBypassChange(value: Boolean) {
+        attestationBypassEnabled = value
     }
 
     fun handleAction(action: MatterSetupAction) {
@@ -113,6 +149,23 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
             MatterSetupAction.EditSettings -> {
                 uiState = MatterSetupStateReducer.editSettings(openHabUrl)
+            }
+
+            MatterSetupAction.CheckThreadDataset -> {
+                updateThreadDatasetValidationMessage()
+            }
+
+            MatterSetupAction.SaveThreadSettings -> {
+                saveThreadSettings()
+            }
+
+            MatterSetupAction.DetectThreadBorderRouters -> {
+                detectThreadBorderRouters()
+            }
+
+            is MatterSetupAction.SelectThreadBorderRouter -> {
+                otbrBaseUrl = action.endpoint
+                threadSettingsMessage = "Selected Thread Border Router: ${action.endpoint}"
             }
 
             MatterSetupAction.ShowTroubleshooting,
@@ -210,6 +263,65 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 existingConfig.attestationBypassEnabled()
             )
         )
+    }
+
+    private fun updateThreadDatasetValidationMessage(): Boolean {
+        val validation = ThreadDatasetSettingsValidator.validate(threadDataset)
+        threadSettingsMessage = "${validation.title} ${validation.message}"
+        return validation.status == ThreadDatasetSettingsStatus.Valid
+    }
+
+    private fun saveThreadSettings() {
+        val parsedDataset = runCatching { ThreadDataset.parse(threadDataset) }.getOrElse {
+            updateThreadDatasetValidationMessage()
+            return
+        }
+        val existingConfig = configRepository.load()
+        val safeDataset = parsedDataset.chipToolValue()
+        configRepository.save(
+            AppConfig(
+                safeDataset,
+                existingConfig.setupPayload(),
+                openHabUrl,
+                token,
+                otbrBaseUrl.trim(),
+                false,
+                existingConfig.setupPayloadUnreadable(),
+                existingConfig.openHabApiTokenUnreadable(),
+                attestationBypassEnabled
+            )
+        )
+        threadDataset = safeDataset
+        controllerSession.syncAttestationBypass(attestationBypassEnabled)
+        threadSettingsMessage = "Saved Thread settings. Dataset value is stored encrypted and not shown in logs."
+    }
+
+    private fun detectThreadBorderRouters() {
+        if (!executionGate.tryStart()) {
+            return
+        }
+        threadBorderRouterDiscoveryInProgress = true
+        threadSettingsMessage = "Looking for Thread Border Routers on the current network..."
+        workerThread = Thread({
+            try {
+                val records = threadBorderRouterBrowser.browse(3_000L)
+                postState {
+                    threadBorderRouters = records
+                    threadSettingsMessage = if (records.isEmpty()) {
+                        "No Thread Border Routers were detected. Check Wi-Fi, VPN, mDNS, and that the Border Router is on this network."
+                    } else {
+                        "Detected ${records.size} Thread Border Router${if (records.size == 1) "" else "s"}. Tap one to use it as the diagnostic target."
+                    }
+                    threadBorderRouterDiscoveryInProgress = false
+                }
+            } finally {
+                postState {
+                    threadBorderRouterDiscoveryInProgress = false
+                }
+                executionGate.finish()
+            }
+        }, "thread-border-router-discovery")
+        workerThread?.start()
     }
 
     private fun emitOpenHabSetupFailure(
