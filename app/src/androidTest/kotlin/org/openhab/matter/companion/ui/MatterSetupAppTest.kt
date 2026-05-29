@@ -56,7 +56,7 @@ class MatterSetupAppTest {
     fun systemBackFromSettingsReturnsToMainMenu() {
         val actions = mutableListOf<MatterSetupAction>()
         render(
-            state = MatterSetupStateReducer.editSettings("http://openhab.local:8080"),
+            state = MatterSetupStateReducer.settings(),
             onAction = actions::add
         )
 
