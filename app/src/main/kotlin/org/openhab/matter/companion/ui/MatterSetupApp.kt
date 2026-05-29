@@ -15,6 +15,7 @@ fun MatterSetupApp(
     state: MatterSetupUiState,
     openHabUrl: String,
     token: String,
+    openHabTokenStored: Boolean,
     threadDataset: String,
     otbrBaseUrl: String,
     attestationBypassEnabled: Boolean,
@@ -66,7 +67,7 @@ fun MatterSetupApp(
             MatterSetupStage.Settings -> SettingsScreen(
                 state = state,
                 openHabUrl = openHabUrl,
-                tokenSet = token.isBlank(),
+                tokenSet = openHabTokenStored,
                 threadDatasetSet = threadDataset.isNotBlank(),
                 otbrBaseUrl = otbrBaseUrl,
                 phoneDeviceCount = phoneDevices.size,

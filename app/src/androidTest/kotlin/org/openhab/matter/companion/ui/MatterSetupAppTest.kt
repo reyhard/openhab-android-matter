@@ -106,7 +106,10 @@ class MatterSetupAppTest {
 
     @Test
     fun settingsScreenShowsOrganizedSections() {
-        render(MatterSetupStateReducer.settings())
+        render(
+            state = MatterSetupStateReducer.settings(),
+            openHabTokenStored = true
+        )
 
         composeRule.onNodeWithText("openHAB connection").assertIsDisplayed()
         composeRule.onNodeWithText("Access token").assertIsDisplayed()
@@ -116,6 +119,33 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Edit").assertIsDisplayed()
         composeRule.onNodeWithText("This phone").assertIsDisplayed()
         composeRule.onNodeWithText("Advanced").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreenShowsMissingWhenEditableTokenBlankWithoutStoredToken() {
+        render(
+            state = MatterSetupStateReducer.settings(),
+            openHabTokenStored = false,
+            threadDataset = "hex:0E080000000000010000",
+            otbrBaseUrl = "fd00::1"
+        )
+
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Missing").assertIsDisplayed()
+        composeRule.onNodeWithText("Not set").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreenShowsSetWhenStoredTokenIsHiddenFromEditableField() {
+        render(
+            state = MatterSetupStateReducer.settings(),
+            token = "",
+            openHabTokenStored = true
+        )
+
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Set").assertIsDisplayed()
+        composeRule.onNodeWithText("Stored securely").assertIsDisplayed()
     }
 
     @Test
@@ -149,6 +179,18 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Change token").assertIsDisplayed()
         composeRule.onNodeWithText("Access token").assertIsDisplayed()
         composeRule.onNodeWithText("Save token").assertIsDisplayed()
+    }
+
+    @Test
+    fun changeTokenScreenCanToggleTokenRevealControl() {
+        render(
+            state = MatterSetupStateReducer.changeToken(),
+            token = "new.secret"
+        )
+
+        composeRule.onNodeWithText("Show").performClick()
+
+        composeRule.onNodeWithText("Hide").assertIsDisplayed()
     }
 
     @Test
@@ -326,15 +368,20 @@ class MatterSetupAppTest {
         phoneDevices: List<PhoneMatterDevice> = emptyList(),
         manualSetupCode: String = "",
         openHabUrl: String = "http://openhab.local:8080",
+        token: String = "",
+        openHabTokenStored: Boolean = false,
+        threadDataset: String = "",
+        otbrBaseUrl: String = "",
         onAction: (MatterSetupAction) -> Unit = {}
     ) {
         composeRule.setContent {
             MatterSetupApp(
                 state = state,
                 openHabUrl = openHabUrl,
-                token = "",
-                threadDataset = "",
-                otbrBaseUrl = "",
+                token = token,
+                openHabTokenStored = openHabTokenStored,
+                threadDataset = threadDataset,
+                otbrBaseUrl = otbrBaseUrl,
                 attestationBypassEnabled = false,
                 threadSettingsMessage = "",
                 threadBorderRouters = emptyList(),

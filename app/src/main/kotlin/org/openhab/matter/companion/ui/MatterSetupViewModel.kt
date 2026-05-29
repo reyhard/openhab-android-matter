@@ -80,6 +80,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         private set
     var token by mutableStateOf("")
         private set
+    var openHabTokenStored by mutableStateOf(false)
+        private set
     var threadDataset by mutableStateOf("")
         private set
     var otbrBaseUrl by mutableStateOf("")
@@ -358,6 +360,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     postState {
                         openHabUrl = baseUrl
                         token = ""
+                        openHabTokenStored = true
                         threadDataset = safeDataset
                         otbrBaseUrl = otbrTarget
                         openHabConfigured = true
@@ -418,6 +421,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     postState {
                         openHabUrl = baseUrl
                         token = ""
+                        openHabTokenStored = true
                         openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
                         uiState = MatterSetupStateReducer.settings()
                     }
@@ -824,6 +828,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         val config = configRepository.load()
         openHabUrl = config.openHabBaseUrl().trim().ifBlank { MatterSetupConfigCompleteness.DefaultOpenHabUrl }
         token = if (maskToken) "" else config.openHabApiToken()
+        openHabTokenStored = config.openHabApiToken().isNotBlank()
         threadDataset = config.threadDataset()
         otbrBaseUrl = config.otbrBaseUrl()
         attestationBypassEnabled = config.attestationBypassEnabled()

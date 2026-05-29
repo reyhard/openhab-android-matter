@@ -9,9 +9,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupUiState
@@ -25,6 +30,7 @@ fun ChangeTokenScreen(
     onTokenChange: (String) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
+    var tokenVisible by remember { mutableStateOf(false) }
     MatterSetupScaffold(
         title = state.title,
         message = state.message,
@@ -39,11 +45,15 @@ fun ChangeTokenScreen(
                 label = { Text("Access token") },
                 supportingText = { Text("Create one in openHAB under Profile / API tokens.") },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (tokenVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
-                    TextButton(onClick = {}) {
-                        Text("Show")
+                    TextButton(onClick = { tokenVisible = !tokenVisible }) {
+                        Text(if (tokenVisible) "Hide" else "Show")
                     }
                 }
             )

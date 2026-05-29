@@ -10,9 +10,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.setup.MatterSetupAction
@@ -40,6 +45,8 @@ fun OpenHabSetupScreen(
     onAction: (MatterSetupAction) -> Unit
 ) {
     val effectiveOpenHabUrl = openHabUrl.ifBlank { state.openHabUrlFallback }
+    var tokenVisible by remember { mutableStateOf(false) }
+    var threadDatasetVisible by remember { mutableStateOf(false) }
     MatterSetupScaffold(
         title = state.title,
         message = state.message,
@@ -63,11 +70,15 @@ fun OpenHabSetupScreen(
                 label = { Text("Access token") },
                 supportingText = { Text("Create one in openHAB under Profile / API tokens.") },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (tokenVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
-                    TextButton(onClick = {}) {
-                        Text("Show")
+                    TextButton(onClick = { tokenVisible = !tokenVisible }) {
+                        Text(if (tokenVisible) "Hide" else "Show")
                     }
                 }
             )
@@ -82,11 +93,15 @@ fun OpenHabSetupScreen(
                     .fillMaxWidth()
                     .height(132.dp),
                 label = { Text("Active Operational Dataset") },
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (threadDatasetVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                 trailingIcon = {
-                    TextButton(onClick = {}) {
-                        Text("Show")
+                    TextButton(onClick = { threadDatasetVisible = !threadDatasetVisible }) {
+                        Text(if (threadDatasetVisible) "Hide" else "Show")
                     }
                 }
             )

@@ -48,6 +48,7 @@ class MatterSetupActivity : ComponentActivity() {
                 state = viewModel.uiState,
                 openHabUrl = viewModel.openHabUrl,
                 token = viewModel.token,
+                openHabTokenStored = viewModel.openHabTokenStored,
                 threadDataset = viewModel.threadDataset,
                 otbrBaseUrl = viewModel.otbrBaseUrl,
                 attestationBypassEnabled = viewModel.attestationBypassEnabled,
