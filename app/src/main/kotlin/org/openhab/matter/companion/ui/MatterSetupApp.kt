@@ -39,8 +39,12 @@ fun MatterSetupApp(
             systemBackAction?.let(onAction)
         }
         when (state.stage) {
+            MatterSetupStage.Welcome,
             MatterSetupStage.NeedsOpenHabSetup,
-            MatterSetupStage.OpenHabSetupChecking -> OpenHabSetupScreen(
+            MatterSetupStage.OpenHabSetupChecking,
+            MatterSetupStage.Settings,
+            MatterSetupStage.ChangeToken,
+            MatterSetupStage.ThreadNetworkEditor -> OpenHabSetupScreen(
                 state = state,
                 openHabUrl = openHabUrl,
                 token = token,

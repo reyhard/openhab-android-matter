@@ -27,8 +27,6 @@ object MatterSetupBackNavigation {
             MatterSetupStage.WatchingOpenHabInbox,
             MatterSetupStage.SuccessInboxDetected,
             MatterSetupStage.Failed -> null
-
-            else -> null
         }
     }
 }

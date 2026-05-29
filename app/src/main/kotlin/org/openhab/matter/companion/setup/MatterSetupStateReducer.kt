@@ -92,8 +92,7 @@ object MatterSetupStateReducer {
         openHabUrl: String,
         message: String,
         failure: MatterSetupFailure? = null,
-        diagnostics: MatterSetupDiagnosticsSummary = MatterSetupDiagnosticsSummary.empty(),
-        showBackToMainMenu: Boolean = false
+        diagnostics: MatterSetupDiagnosticsSummary = MatterSetupDiagnosticsSummary.empty()
     ): MatterSetupUiState {
         return requiredSetup(openHabUrl).copy(
             message = message.ifBlank { "Settings are not ready yet. Check the details in troubleshooting." },
@@ -125,13 +124,4 @@ object MatterSetupStateReducer {
             diagnostics = current.diagnostics
         )
     }
-
-    fun editSettings(openHabUrl: String): MatterSetupUiState = settings()
-
-    fun openHabSetup(
-        openHabUrl: String,
-        showBackToMainMenu: Boolean = false
-    ): MatterSetupUiState = requiredSetup(openHabUrl)
-
-    fun openHabSetupReady(openHabUrl: String): MatterSetupUiState = settings()
 }

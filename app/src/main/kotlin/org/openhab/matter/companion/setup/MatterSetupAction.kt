@@ -1,6 +1,6 @@
 package org.openhab.matter.companion.setup
 
-interface MatterSetupAction {
+sealed interface MatterSetupAction {
     data object GetStarted : MatterSetupAction
     data object SaveOpenHab : MatterSetupAction
     data object TestOpenHab : MatterSetupAction

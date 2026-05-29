@@ -8,12 +8,12 @@ import org.junit.Test
 
 class MatterSetupUiStateTest {
     @Test
-    fun initialStateRequiresOpenHabSetupWhenNotConfigured() {
+    fun initialStateShowsWelcomeWhenSetupIsIncomplete() {
         val state = MatterSetupUiState.initial(openHabConfigured = false)
 
-        assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
-        assertEquals("Connect to openHAB", state.title)
-        assertFalse(state.primaryActionEnabled)
+        assertEquals(MatterSetupStage.Welcome, state.stage)
+        assertEquals("Set up Matter with openHAB", state.title)
+        assertEquals(MatterSetupAction.GetStarted, state.primaryAction)
         assertNull(state.countdownSeconds)
     }
 

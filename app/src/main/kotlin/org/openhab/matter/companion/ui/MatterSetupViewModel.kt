@@ -113,14 +113,13 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         if (uiState.stage == MatterSetupStage.NeedsOpenHabSetup) {
             val failure = uiState.failure
             uiState = if (failure == null) {
-                MatterSetupStateReducer.openHabSetup(value, showBackToMainMenu = openHabConfigured)
+                MatterSetupStateReducer.requiredSetup(value)
             } else {
                 MatterSetupStateReducer.openHabSetupNotReady(
                     value,
                     uiState.message,
                     failure,
-                    uiState.diagnostics,
-                    showBackToMainMenu = openHabConfigured
+                    uiState.diagnostics
                 )
             }
         }
@@ -185,16 +184,33 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.BackToSettings -> {
-                uiState = MatterSetupStateReducer.editSettings(openHabUrl)
+                uiState = MatterSetupStateReducer.settings()
             }
 
             MatterSetupAction.SaveOpenHab,
-            MatterSetupAction.TestOpenHab -> {
+            MatterSetupAction.TestOpenHab,
+            MatterSetupAction.TestSettings -> {
                 startOpenHabSetupCheck()
             }
 
+            MatterSetupAction.GetStarted -> {
+                uiState = MatterSetupStateReducer.requiredSetup(openHabUrl)
+            }
+
             MatterSetupAction.EditSettings -> {
-                uiState = MatterSetupStateReducer.editSettings(openHabUrl)
+                uiState = MatterSetupStateReducer.settings()
+            }
+
+            MatterSetupAction.ChangeToken -> {
+                uiState = MatterSetupStateReducer.changeToken()
+            }
+
+            MatterSetupAction.SaveChangedToken -> {
+                startOpenHabSetupCheck()
+            }
+
+            MatterSetupAction.EditThreadNetwork -> {
+                uiState = MatterSetupStateReducer.threadNetworkEditor()
             }
 
             MatterSetupAction.ShowPhoneDevices -> {
@@ -289,7 +305,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         val baseUrl = openHabUrl.trim()
         val apiToken = token
         if (baseUrl.isBlank()) {
-            uiState = MatterSetupStateReducer.openHabSetup(openHabUrl)
+            uiState = MatterSetupStateReducer.requiredSetup(openHabUrl)
             return
         }
         if (!executionGate.tryStart()) {
@@ -307,7 +323,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                         openHabUrl = baseUrl
                         token = apiToken
                         openHabConfigured = true
-                        uiState = MatterSetupStateReducer.openHabSetupReady(baseUrl)
+                        uiState = MatterSetupStateReducer.settings()
                     }
                 } else {
                     emitOpenHabSetupFailure(
@@ -585,8 +601,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     ),
                     warnings = listOf(status.message().orEmpty()).sanitizeWith(sanitizer),
                     details = listOf(status.details().orEmpty()).sanitizeWith(sanitizer)
-                ),
-                showBackToMainMenu = openHabConfigured
+                )
             )
         )
     }
@@ -616,8 +631,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     checks = listOf("openHAB URL configured=true"),
                     warnings = listOf("openHAB readiness check failed"),
                     details = listOf(detail)
-                ),
-                showBackToMainMenu = openHabConfigured
+                )
             )
         )
     }
