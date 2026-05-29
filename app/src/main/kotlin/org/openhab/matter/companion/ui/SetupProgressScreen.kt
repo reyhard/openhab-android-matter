@@ -3,22 +3,28 @@ package org.openhab.matter.companion.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.openhab.matter.companion.setup.CommissioningWindowCountdown
+import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.ui.components.SetupStepList
 
 @Composable
-fun SetupProgressScreen(state: MatterSetupUiState) {
+fun SetupProgressScreen(
+    state: MatterSetupUiState,
+    onAction: (MatterSetupAction) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -42,5 +48,14 @@ fun SetupProgressScreen(state: MatterSetupUiState) {
         }
         Spacer(Modifier.height(24.dp))
         SetupStepList(steps = state.steps)
+        if (MatterSetupAction.ShowTroubleshooting in state.secondaryActions) {
+            Spacer(Modifier.height(24.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.ShowTroubleshooting) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Show troubleshooting")
+            }
+        }
     }
 }

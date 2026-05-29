@@ -23,14 +23,19 @@ fun SetupStepList(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         steps.forEach { step ->
-            Row(modifier = Modifier.padding(vertical = 8.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
                 Text(
                     text = statusGlyph(step.status),
                     color = statusColor(step.status),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(20.dp)
                 )
                 Spacer(Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = step.label,
                         fontWeight = if (step.status == MatterSetupStepStatus.Active) {
@@ -38,6 +43,11 @@ fun SetupStepList(
                         } else {
                             FontWeight.Normal
                         }
+                    )
+                    Text(
+                        text = statusLabel(step.status),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = statusColor(step.status)
                     )
                     if (step.detail.isNotBlank()) {
                         Text(
@@ -65,4 +75,11 @@ private fun statusGlyph(status: MatterSetupStepStatus): String = when (status) {
     MatterSetupStepStatus.Active -> "●"
     MatterSetupStepStatus.Failed -> "!"
     MatterSetupStepStatus.Pending -> "○"
+}
+
+private fun statusLabel(status: MatterSetupStepStatus): String = when (status) {
+    MatterSetupStepStatus.Complete -> "Complete"
+    MatterSetupStepStatus.Active -> "Active"
+    MatterSetupStepStatus.Failed -> "Failed"
+    MatterSetupStepStatus.Pending -> "Pending"
 }

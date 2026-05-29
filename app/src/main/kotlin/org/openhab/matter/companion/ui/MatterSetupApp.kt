@@ -44,7 +44,10 @@ fun MatterSetupApp(
             MatterSetupStage.OpeningCommissioningWindow,
             MatterSetupStage.CommissioningWindowOpen,
             MatterSetupStage.SendingCodeToOpenHab,
-            MatterSetupStage.WatchingOpenHabInbox -> SetupProgressScreen(state = state)
+            MatterSetupStage.WatchingOpenHabInbox -> SetupProgressScreen(
+                state = state,
+                onAction = onAction
+            )
 
             MatterSetupStage.SuccessInboxDetected -> SetupSuccessScreen(
                 state = state,
