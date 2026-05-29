@@ -195,9 +195,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.GetStarted -> {
-                if (openHabUrl.isBlank()) {
-                    openHabUrl = MatterSetupConfigCompleteness.DefaultOpenHabUrl
-                }
+                openHabUrl = effectiveOpenHabUrl()
                 uiState = MatterSetupStateReducer.requiredSetup(openHabUrl)
             }
 
@@ -299,12 +297,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun startOpenHabSetupCheck() {
-        val baseUrl = openHabUrl.trim()
+        val baseUrl = effectiveOpenHabUrl()
         val apiToken = token
-        if (baseUrl.isBlank()) {
-            uiState = MatterSetupStateReducer.requiredSetup(openHabUrl)
-            return
-        }
         if (!executionGate.tryStart()) {
             return
         }
@@ -347,6 +341,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
         }, "openhab-setup-check")
         workerThread?.start()
+    }
+
+    private fun effectiveOpenHabUrl(): String {
+        return openHabUrl.trim().ifBlank { MatterSetupConfigCompleteness.DefaultOpenHabUrl }
     }
 
     private fun saveOpenHabConfig(existingConfig: AppConfig, baseUrl: String, apiToken: String) {
