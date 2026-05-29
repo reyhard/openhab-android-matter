@@ -1,41 +1,128 @@
 # openhab-android-matter
 
-Android companion app for openHAB Matter pairing.
+Android companion app for adding Matter-over-Thread devices to openHAB.
 
-## Current MVP
+The app is meant to guide a user through the practical handoff that openHAB
+currently needs: commission the device to the phone first, open a temporary
+Matter commissioning window from the phone, send that temporary setup code to
+openHAB Matter discovery, and wait for the device to appear in the openHAB
+Inbox.
 
-This branch builds an installable Android APK with:
+## Current State
 
-- Thread dataset validation.
-- Matter setup payload validation for explicit `pin=...;disc=...` input.
-- Wi-Fi/multi-admin openHAB handoff validation for Matter QR payloads and Verhoeff-validated 11- or 21-digit manual setup codes.
-- Local Matter `MT:` QR setup payload decoding for PIN, discriminator, vendor/product IDs, commissioning flow, and discovery capabilities.
-- openHAB readiness checking via `/rest/` plus `/rest/things` Matter controller detection, with optional REST API bearer-token authentication.
-- openHAB Inbox observation via `/rest/inbox` to report whether a Matter Inbox entry is visible, with optional REST API bearer-token authentication.
-- openHAB Inbox SSE observation via `/rest/events?topics=openhab/inbox/*`, with optional REST API bearer-token authentication.
-- OTBR connectivity diagnostics via a configured IP/host address or optional HTTP diagnostic URL.
-- Runtime commissioning permission readiness checks for the current Android SDK version.
-- Encrypted app-private storage for the OTBR Thread dataset using Android Keystore-backed AES-GCM.
-- App-private persistence for the openHAB base URL and encrypted openHAB REST API token.
-- App-private persistence for the OTBR address or diagnostic URL.
-- Persisted developer attestation bypass setting for connectedhomeip commissioning; it defaults off and is passed to the selectable native Matter controller only when explicitly enabled.
-- Encrypted app-private bootstrap controller state repository for future native Matter fabric/controller state.
-- Legacy native bridge command contract carries attestation-bypass intent and opaque controller state through commissioning and OpenCommissioningWindow results.
-- Native in-app Matter QR scanning using CameraX and ML Kit barcode scanning.
-- External QR scanner handoff can populate the Matter setup payload field when a compatible scanner app is installed.
-- Camera and location hardware features are marked optional so manual-entry and non-camera flows can install on headless emulators or devices without those features.
-- Native Matter controller readiness diagnostics check the selectable connectedhomeip Java controller path and keep the simulated controller selected when artifacts or initialization are not ready.
-- A packaged JNI stub verifies Android native-library packaging, but it reports `production=false` and is never selected for real commissioning.
-- Runtime controller selection can switch from the simulated controller to the reflection-backed connectedhomeip Java controller when official connectedhomeip Android artifacts are bundled and readiness passes.
-- A deterministic fake Matter controller that simulates BLE Thread commissioning and OpenCommissioningWindow.
-- A native Android UI that displays the temporary manual code, renders a temporary Matter setup QR code when one is returned, and shows openHAB Matter Scan Input instructions.
-- A standalone troubleshooting guide for openHAB Matter binding readiness, REST token authentication, OTBR address expectations, IPv6 routing, mDNS/Avahi, connectedhomeip artifact packaging, and Scan Input handoff.
+- Real connectedhomeip commissioning has been validated on one Android phone
+  and one Thread Matter device, including the Compose automated setup path from
+  QR scan through openHAB Inbox success.
+- The current validated handoff uses the manual setup code returned by
+  OpenCommissioningWindow and submits it to openHAB Matter Scan Input.
+- The app fails closed when connectedhomeip artifacts or runtime readiness are
+  missing. Real Thread commissioning and OpenCommissioningWindow are not
+  silently routed through the fake controller.
+- Broader hardware validation, long-run fabric persistence hardening, and full
+  phone-side Matter fabric inventory are still future work.
 
-The real connectedhomeip controller path is isolated behind `MatterController`. The debug APK keeps a deterministic simulated controller as the safe fallback and exposes a connectedhomeip controller selection path for builds that include the official Android controller artifacts.
+For detailed implementation status, see
+[docs/implementation-status.md](docs/implementation-status.md). For the
+OpenCommissioningWindow internals, see
+[docs/open-commissioning-window-workflow.md](docs/open-commissioning-window-workflow.md).
 
-This MVP does not perform real BLE discovery, Thread provisioning, Matter PASE/CASE commissioning, attestation, or real OpenCommissioningWindow calls yet.
-Setup payloads, setup PINs, QR payloads, and device credentials are not persisted. The optional openHAB REST API token is stored encrypted in app-private storage and is never printed in logs.
-The bootstrap controller state repository persists the bootstrap node id and provides an encrypted opaque state slot; the Java/native command contract can carry updated controller state, but the packaged JNI stub does not emit real connectedhomeip fabric material.
+## What You Need
+
+- An Android phone with Bluetooth, location services, and network access
+  enabled.
+- openHAB with the Matter binding installed and an online Matter controller.
+- A Thread Border Router for the same Thread network the device should join.
+- The Thread Active Operational Dataset. The app can store it encrypted after
+  manual entry; Thread Border Router discovery only detects visible border
+  routers and does not extract the dataset.
+- A Matter-over-Thread device in factory-new state or pairing mode.
+- The Matter QR code or manual setup code from the device or its packaging.
+- Optional: an openHAB REST API token if your openHAB REST API requires
+  authentication.
+
+Keep the phone, Thread Border Router, and openHAB host on networks where IPv6
+Matter traffic can work. IPv4 reachability to the Thread Border Router is not
+enough for openHAB Matter pairing.
+
+## User Inputs
+
+```mermaid
+flowchart TD
+    A[User opens app] --> B[openHAB address]
+    B --> C{REST authentication required?}
+    C -- Yes --> D[openHAB access token]
+    C -- No --> E[No token]
+    D --> F[Thread settings]
+    E --> F
+    F --> G[Active Operational Dataset]
+    F --> H[Optional Thread Border Router diagnostic address]
+    G --> I[Matter setup code]
+    H --> I
+    I --> J{Input method}
+    J -- Camera --> K[Scan Matter QR code]
+    J -- Manual --> L[Enter manual setup code]
+```
+
+The access token and Thread dataset are stored in app-private encrypted storage.
+Setup payloads, setup PINs, QR payloads, and temporary OpenCommissioningWindow
+codes are not persisted as permanent app configuration.
+
+## Guided Setup Flow
+
+```mermaid
+flowchart TD
+    A[Connect to openHAB] --> B[Save or verify Thread settings]
+    B --> C[Scan QR code or enter manual code]
+    C --> D[Confirm device is in pairing mode]
+    D --> E[Check phone, network, permissions, and openHAB]
+    E --> F{Ready?}
+    F -- No --> G[Show diagnostics and recovery guidance]
+    F -- Yes --> H[Commission device to this phone over BLE Thread]
+    H --> I[Open a 300 second commissioning window]
+    I --> J[Send returned manual setup code to openHAB Scan Input]
+    J --> K[Watch openHAB Inbox]
+    K --> L{Matter Inbox entry found?}
+    L -- Yes --> M[Setup complete]
+    L -- No --> N[Show troubleshooting for IPv6, mDNS, OTBR, and retry]
+```
+
+During setup, the app shows progress for:
+
+- Checking setup.
+- Adding the device to this phone.
+- Opening the pairing window.
+- Sending the setup code to openHAB.
+- Waiting for openHAB.
+
+When connectedhomeip returns a temporary commissioning window, the app shows a
+300-second countdown. openHAB must discover the device before that window
+expires.
+
+## Troubleshooting in the App
+
+The app includes advanced troubleshooting screens for:
+
+- openHAB Matter binding/controller readiness.
+- Bluetooth, location service, runtime permission, Wi-Fi/mobile-data, and VPN
+  checks on the phone.
+- Phone-side Matter mDNS browsing for `_matterc._udp` and `_matter._tcp`.
+- Best-effort phone-side IPv6 reachability to a user-entered device address.
+- Retrying OpenCommissioningWindow for the currently staged phone-side device.
+- Forgetting this app's stored bootstrap device state on the phone.
+
+Phone-side mDNS and IPv6 checks are useful diagnostics, but they do not prove
+what openHAB, Avahi, the router, or the Thread Border Router can see. If openHAB
+pairing fails after the phone succeeds, compare phone logs with openHAB-side
+mDNS/Avahi output and check for stale `_matterc._udp` records.
+
+## Current Limitations
+
+- Real-device validation has only covered a limited hardware set so far.
+- The **Devices on this phone** screen shows this app's stored staging state,
+  not a full connectedhomeip fabric inventory.
+- The app cannot clear stale Avahi/router mDNS records from the openHAB host.
+- connectedhomeip fabric persistence still needs broader reboot, upgrade, and
+  reinstall validation.
 
 ## Build Configuration
 
@@ -53,12 +140,26 @@ This workspace uses:
 Build and test the debug APK:
 
 ```powershell
+$env:ANDROID_HOME='D:\Tools\Android\SDK'
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --offline
 ```
 
-By default, the APK packages the non-production JNI stub. To package a prebuilt production bridge, pass `-PopenhabMatterChipNativeMode=prebuilt "-PopenhabMatterChipPrebuiltDir=<dir>"` where `<dir>` contains ABI subdirectories with `libopenhab_matter_chip.so`.
+The APK is written to:
 
-To package the official connectedhomeip Android controller artifacts used by the selectable Java controller path, pass `"-PopenhabMatterChipControllerArtifactsDir=<dir>"` where `<dir>` contains the CHIPTool-style jars and native libraries:
+```text
+app\build\outputs\apk\debug\app-debug.apk
+```
+
+The default source build packages a non-production JNI stub and is useful for
+offline tests and diagnostics. To pair real Matter devices, package official
+connectedhomeip Android controller artifacts as described below.
+
+## connectedhomeip Artifacts for Real Pairing
+
+Real commissioning uses the reflection-backed connectedhomeip Java controller
+path. To package the official connectedhomeip Android controller artifacts used
+by that path, pass `-PopenhabMatterChipControllerArtifactsDir=<dir>` where
+`<dir>` contains CHIPTool-style jars and native libraries:
 
 ```text
 CHIPController.jar
@@ -79,8 +180,16 @@ jniLibs\x86_64\libCHIPController.so
 jniLibs\x86_64\libc++_shared.so
 ```
 
-This local connectedhomeip checkout does not include those prebuilt binaries under `D:\Source\connectedhomeip\examples\android\CHIPTool\app\libs`; it contains README placeholders only. Build the artifacts from connectedhomeip or supply them from a trusted connectedhomeip Android build output.
-The Gradle verifier rejects missing native libraries, empty files, corrupt controller jars, and controller jar sets that do not contain the class entries required by runtime readiness, so placeholders cannot pass the packaging gate.
+Example build for an arm64 device:
+
+```powershell
+$env:ANDROID_HOME='D:\Tools\Android\SDK'
+.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug -PopenhabMatterChipControllerArtifactsDir=<artifact-dir> -PopenhabMatterChipControllerAbis=arm64-v8a
+```
+
+The Gradle verifier rejects missing native libraries, empty files, corrupt
+controller jars, and controller jar sets that do not contain the class entries
+required by runtime readiness. Placeholder files cannot pass the packaging gate.
 
 Run the synthetic artifact validation smoke test with:
 
@@ -88,17 +197,12 @@ Run the synthetic artifact validation smoke test with:
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\test_connectedhomeip_artifacts.ps1
 ```
 
-Run the APK badging smoke test with:
-
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\test_apk_badging.ps1
-```
-
-The APK is written to:
-
-```text
-app\build\outputs\apk\debug\app-debug.apk
-```
+The legacy native bridge can also package a prebuilt
+`libopenhab_matter_chip.so` by passing
+`-PopenhabMatterChipNativeMode=prebuilt "-PopenhabMatterChipPrebuiltDir=<dir>"`
+where `<dir>` contains ABI subdirectories with `libopenhab_matter_chip.so`.
+Current real commissioning uses the Java/JNI connectedhomeip controller
+artifacts above, not the bundled JNI stub.
 
 ## Install
 
@@ -108,7 +212,11 @@ Connect an Android device with USB debugging enabled, then run:
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1
 ```
 
-The helper runs the offline unit tests and debug APK build, verifies `app\build\outputs\apk\debug\app-debug.apk`, lists ready ADB devices, and installs only when exactly one device/emulator is attached. If multiple devices are attached, pass `-Serial <device-id>`. If the APK is already built and you only want the ADB check/install step, pass `-SkipBuild`.
+The helper runs the offline unit tests and debug APK build, verifies
+`app\build\outputs\apk\debug\app-debug.apk`, lists ready ADB devices, and
+installs only when exactly one device or emulator is attached. If multiple
+devices are attached, pass `-Serial <device-id>`. If the APK is already built
+and you only want the ADB check/install step, pass `-SkipBuild`.
 
 To verify package readiness without an attached device, stop before ADB with:
 
@@ -116,20 +224,26 @@ To verify package readiness without an attached device, stop before ADB with:
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1 -PreflightOnly
 ```
 
-The same helper can build artifact-specific variants by forwarding Gradle properties:
+The same helper can build artifact-specific variants by forwarding Gradle
+properties:
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1 -PreflightOnly -ChipControllerArtifactsDir <artifact-dir>
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1 -PreflightOnly -ChipNativeMode prebuilt -ChipPrebuiltDir <prebuilt-dir>
 ```
 
-## Real connectedhomeip Controller Work
+Run the APK badging smoke test with:
 
-The selectable connectedhomeip Java controller path now wires the app to reflection-backed equivalents of:
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\test_apk_badging.ps1
+```
 
-- `commissionBleThread(datasetHex, pin, discriminator)`
-- `openCommissioningWindow(nodeId, timeout, discriminator)`
+## Developer References
 
-The bundled `libopenhab_matter_chip.so` is still a JNI packaging stub for the legacy native bridge seam. Real commissioning through the current selectable path requires official valid connectedhomeip Android controller jars containing the required controller/platform class entries plus ABI-specific `libCHIPController.so` and `libc++_shared.so` to be packaged with the APK.
-Until those connectedhomeip artifacts are bundled and verified on hardware, the app is installable and validates the openHAB user flow, but it falls back to simulation and does not actually provision Matter devices.
-Real-device validation still needs a Matter-over-Thread device, OTBR dataset, Android BLE commissioning, OpenCommissioningWindow, and openHAB Inbox confirmation.
+- [docs/implementation-status.md](docs/implementation-status.md): current
+  capability and validation status.
+- [docs/open-commissioning-window-workflow.md](docs/open-commissioning-window-workflow.md):
+  OCW control flow, parameters, source map, and failure paths.
+- [docs/research.md](docs/research.md): architecture and research background.
+- [docs/chip-jni-integration.md](docs/chip-jni-integration.md): native bridge
+  notes.
