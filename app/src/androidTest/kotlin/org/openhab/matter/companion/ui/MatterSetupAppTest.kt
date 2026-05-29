@@ -9,7 +9,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.openhab.matter.companion.setup.MatterSetupAction
-import org.openhab.matter.companion.setup.MatterSetupConfigCompleteness
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsSummary
 import org.openhab.matter.companion.setup.MatterSetupFailure
 import org.openhab.matter.companion.setup.MatterSetupStage
@@ -32,18 +31,20 @@ class MatterSetupAppTest {
     }
 
     @Test
-    fun requiredSetupScreenShowsOpenHabSettingsWithDefaultAddress() {
+    fun requiredSetupScreenShowsAllRequiredFields() {
         render(
-            state = MatterSetupStateReducer.requiredSetup(""),
-            openHabUrl = ""
+            state = MatterSetupStateReducer.requiredSetup("http://openhab:8080"),
+            openHabUrl = "http://openhab:8080"
         )
 
         composeRule.onNodeWithText("Connect to openHAB").assertIsDisplayed()
         composeRule.onNodeWithText("openHAB address").assertIsDisplayed()
-        composeRule.onNodeWithText(MatterSetupConfigCompleteness.DefaultOpenHabUrl).assertIsDisplayed()
+        composeRule.onNodeWithText("Address of your openHAB instance.").assertIsDisplayed()
         composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Active Operational Dataset").assertIsDisplayed()
+        composeRule.onNodeWithText("Thread Border Router address").assertIsDisplayed()
+        composeRule.onNodeWithText("Detect border router").assertIsDisplayed()
         composeRule.onNodeWithText("Test settings").assertIsDisplayed()
-        composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
     }
 
     @Test
@@ -101,6 +102,53 @@ class MatterSetupAppTest {
         pressBack()
 
         assertTrue(actions.contains(MatterSetupAction.BackToMainMenu))
+    }
+
+    @Test
+    fun settingsScreenShowsOrganizedSections() {
+        render(MatterSetupStateReducer.settings())
+
+        composeRule.onNodeWithText("openHAB connection").assertIsDisplayed()
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Set").assertIsDisplayed()
+        composeRule.onNodeWithText("Change token").assertIsDisplayed()
+        composeRule.onNodeWithText("Thread network").assertIsDisplayed()
+        composeRule.onNodeWithText("Edit").assertIsDisplayed()
+        composeRule.onNodeWithText("This phone").assertIsDisplayed()
+        composeRule.onNodeWithText("Advanced").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsEditThreadDispatchesAction() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.settings(),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Edit").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.EditThreadNetwork))
+    }
+
+    @Test
+    fun threadNetworkEditorShowsDatasetRouterAndSave() {
+        render(MatterSetupStateReducer.threadNetworkEditor())
+
+        composeRule.onNodeWithText("Thread network").assertIsDisplayed()
+        composeRule.onNodeWithText("Active Operational Dataset").assertIsDisplayed()
+        composeRule.onNodeWithText("Thread Border Router address").assertIsDisplayed()
+        composeRule.onNodeWithText("Detect border router").assertIsDisplayed()
+        composeRule.onNodeWithText("Save").assertIsDisplayed()
+    }
+
+    @Test
+    fun changeTokenScreenShowsTokenReplacementControls() {
+        render(MatterSetupStateReducer.changeToken())
+
+        composeRule.onNodeWithText("Change token").assertIsDisplayed()
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Save token").assertIsDisplayed()
     }
 
     @Test

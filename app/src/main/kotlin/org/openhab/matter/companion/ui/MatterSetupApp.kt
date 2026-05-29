@@ -45,10 +45,7 @@ fun MatterSetupApp(
             )
 
             MatterSetupStage.NeedsOpenHabSetup,
-            MatterSetupStage.OpenHabSetupChecking,
-            MatterSetupStage.Settings,
-            MatterSetupStage.ChangeToken,
-            MatterSetupStage.ThreadNetworkEditor -> OpenHabSetupScreen(
+            MatterSetupStage.OpenHabSetupChecking -> OpenHabSetupScreen(
                 state = state,
                 openHabUrl = openHabUrl,
                 token = token,
@@ -63,6 +60,36 @@ fun MatterSetupApp(
                 onThreadDatasetChange = onThreadDatasetChange,
                 onOtbrBaseUrlChange = onOtbrBaseUrlChange,
                 onAttestationBypassChange = onAttestationBypassChange,
+                onAction = onAction
+            )
+
+            MatterSetupStage.Settings -> SettingsScreen(
+                state = state,
+                openHabUrl = openHabUrl,
+                tokenSet = token.isBlank(),
+                threadDatasetSet = threadDataset.isNotBlank(),
+                otbrBaseUrl = otbrBaseUrl,
+                phoneDeviceCount = phoneDevices.size,
+                attestationBypassEnabled = attestationBypassEnabled,
+                onAction = onAction
+            )
+
+            MatterSetupStage.ChangeToken -> ChangeTokenScreen(
+                state = state,
+                token = token,
+                onTokenChange = onTokenChange,
+                onAction = onAction
+            )
+
+            MatterSetupStage.ThreadNetworkEditor -> ThreadNetworkEditorScreen(
+                state = state,
+                threadDataset = threadDataset,
+                otbrBaseUrl = otbrBaseUrl,
+                threadSettingsMessage = threadSettingsMessage,
+                threadBorderRouters = threadBorderRouters,
+                threadBorderRouterDiscoveryInProgress = threadBorderRouterDiscoveryInProgress,
+                onThreadDatasetChange = onThreadDatasetChange,
+                onOtbrBaseUrlChange = onOtbrBaseUrlChange,
                 onAction = onAction
             )
 

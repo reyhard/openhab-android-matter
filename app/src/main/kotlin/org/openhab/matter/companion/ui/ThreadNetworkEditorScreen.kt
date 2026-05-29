@@ -1,10 +1,13 @@
 package org.openhab.matter.companion.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -18,63 +21,27 @@ import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.ui.components.MatterSetupScaffold
-import org.openhab.matter.companion.ui.components.SectionLabel
 import org.openhab.matter.companion.ui.components.SettingsCard
 
 @Composable
-fun OpenHabSetupScreen(
+fun ThreadNetworkEditorScreen(
     state: MatterSetupUiState,
-    openHabUrl: String,
-    token: String,
     threadDataset: String,
     otbrBaseUrl: String,
-    attestationBypassEnabled: Boolean,
     threadSettingsMessage: String,
     threadBorderRouters: List<ThreadBorderRouterRecord>,
     threadBorderRouterDiscoveryInProgress: Boolean,
-    onUrlChange: (String) -> Unit,
-    onTokenChange: (String) -> Unit,
     onThreadDatasetChange: (String) -> Unit,
     onOtbrBaseUrlChange: (String) -> Unit,
-    onAttestationBypassChange: (Boolean) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
-    val effectiveOpenHabUrl = openHabUrl.ifBlank { state.openHabUrlFallback }
     MatterSetupScaffold(
         title = state.title,
         message = state.message,
-        showBack = false
+        showBack = true,
+        onBack = { onAction(MatterSetupAction.BackToSettings) }
     ) {
         SettingsCard {
-            SectionLabel("openHAB connection")
-            OutlinedTextField(
-                value = effectiveOpenHabUrl,
-                onValueChange = onUrlChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("openHAB address") },
-                supportingText = { Text("Address of your openHAB instance.") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
-            )
-            OutlinedTextField(
-                value = token,
-                onValueChange = onTokenChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Access token") },
-                supportingText = { Text("Create one in openHAB under Profile / API tokens.") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    TextButton(onClick = {}) {
-                        Text("Show")
-                    }
-                }
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        SettingsCard {
-            SectionLabel("Thread network")
             OutlinedTextField(
                 value = threadDataset,
                 onValueChange = onThreadDatasetChange,
@@ -114,16 +81,37 @@ fun OpenHabSetupScreen(
                 }
             }
             if (threadSettingsMessage.isNotBlank()) {
-                Text(threadSettingsMessage)
+                Text(
+                    text = threadSettingsMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.CheckThreadDataset) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Check dataset")
             }
         }
         Spacer(Modifier.height(24.dp))
-        Button(
-            enabled = state.primaryActionEnabled,
-            onClick = { onAction(MatterSetupAction.TestSettings) },
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(state.primaryActionLabel.ifBlank { "Test settings" })
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.BackToSettings) },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Cancel")
+            }
+            Button(
+                enabled = state.primaryActionEnabled,
+                onClick = { onAction(MatterSetupAction.SaveThreadSettings) },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(state.primaryActionLabel.ifBlank { "Save" })
+            }
         }
     }
 }
