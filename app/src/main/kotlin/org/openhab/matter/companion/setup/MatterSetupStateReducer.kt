@@ -41,6 +41,14 @@ object MatterSetupStateReducer {
         )
     }
 
+    fun changeTokenChecking(): MatterSetupUiState {
+        return changeToken().copy(
+            message = "Checking openHAB access token.",
+            primaryActionLabel = "Checking...",
+            primaryActionEnabled = false
+        )
+    }
+
     fun threadNetworkEditor(): MatterSetupUiState {
         return MatterSetupUiState(
             stage = MatterSetupStage.ThreadNetworkEditor,

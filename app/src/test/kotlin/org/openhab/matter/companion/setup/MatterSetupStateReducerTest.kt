@@ -70,6 +70,16 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
+    fun changeTokenCheckingUsesChangeTokenStageAndDisablesSave() {
+        val state = MatterSetupStateReducer.changeTokenChecking()
+
+        assertEquals(MatterSetupStage.ChangeToken, state.stage)
+        assertEquals(MatterSetupAction.SaveChangedToken, state.primaryAction)
+        assertEquals("Checking...", state.primaryActionLabel)
+        assertFalse(state.primaryActionEnabled)
+    }
+
+    @Test
     fun openHabSetupReadyKeepsUserInSettingsWithTroubleshootingAction() {
         val state = MatterSetupStateReducer.requiredSetup("http://openhab.local:8080")
 

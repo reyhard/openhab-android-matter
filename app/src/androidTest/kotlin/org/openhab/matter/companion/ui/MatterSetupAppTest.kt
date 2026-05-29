@@ -1,7 +1,9 @@
 package org.openhab.matter.companion.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBack
@@ -45,6 +47,20 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Thread Border Router address").assertIsDisplayed()
         composeRule.onNodeWithText("Detect border router").assertIsDisplayed()
         composeRule.onNodeWithText("Test settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun requiredSetupTroubleshootingDispatchesAction() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.requiredSetup("http://openhab:8080"),
+            openHabUrl = "http://openhab:8080",
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Advanced troubleshooting").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.ShowTroubleshooting))
     }
 
     @Test
@@ -179,6 +195,21 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Change token").assertIsDisplayed()
         composeRule.onNodeWithText("Access token").assertIsDisplayed()
         composeRule.onNodeWithText("Save token").assertIsDisplayed()
+    }
+
+    @Test
+    fun changeTokenCheckingDoesNotExposeThreadFields() {
+        render(
+            state = MatterSetupStateReducer.changeTokenChecking(),
+            token = "new.secret",
+            threadDataset = "hex:0E080000000000010000",
+            otbrBaseUrl = "fd00::1"
+        )
+
+        composeRule.onNodeWithText("Change token").assertIsDisplayed()
+        composeRule.onNodeWithText("Checking...").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Active Operational Dataset").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Thread Border Router address").assertCountEquals(0)
     }
 
     @Test

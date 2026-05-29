@@ -140,5 +140,14 @@ fun OpenHabSetupScreen(
         ) {
             Text(state.primaryActionLabel.ifBlank { "Test settings" })
         }
+        if (MatterSetupAction.ShowTroubleshooting in state.secondaryActions) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.ShowTroubleshooting) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Advanced troubleshooting")
+            }
+        }
     }
 }

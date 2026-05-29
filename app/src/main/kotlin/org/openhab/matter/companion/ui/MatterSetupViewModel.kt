@@ -399,7 +399,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
 
-        uiState = MatterSetupStateReducer.openHabSetupChecking()
+        uiState = MatterSetupStateReducer.changeTokenChecking()
         workerThread = Thread({
             try {
                 val existingConfig = configRepository.load()
