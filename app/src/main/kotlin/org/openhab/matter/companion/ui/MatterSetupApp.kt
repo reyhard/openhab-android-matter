@@ -54,8 +54,12 @@ fun MatterSetupApp(
                 onAction = onAction
             )
 
-            MatterSetupStage.Failed,
-            MatterSetupStage.AdvancedTroubleshooting -> SetupFailureScreen(
+            MatterSetupStage.Failed -> SetupFailureScreen(
+                state = state,
+                onAction = onAction
+            )
+
+            MatterSetupStage.AdvancedTroubleshooting -> AdvancedTroubleshootingScreen(
                 state = state,
                 onAction = onAction
             )
