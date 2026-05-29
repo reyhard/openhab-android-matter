@@ -61,8 +61,8 @@ private fun statusColor(status: MatterSetupStepStatus): Color = when (status) {
 }
 
 private fun statusGlyph(status: MatterSetupStepStatus): String = when (status) {
-    MatterSetupStepStatus.Complete -> "OK"
-    MatterSetupStepStatus.Active -> ">"
+    MatterSetupStepStatus.Complete -> "✓"
+    MatterSetupStepStatus.Active -> "●"
     MatterSetupStepStatus.Failed -> "!"
-    MatterSetupStepStatus.Pending -> "-"
+    MatterSetupStepStatus.Pending -> "○"
 }
