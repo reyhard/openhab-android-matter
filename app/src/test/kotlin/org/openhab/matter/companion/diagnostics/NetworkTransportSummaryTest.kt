@@ -24,6 +24,13 @@ class NetworkTransportSummaryTest {
     }
 
     @Test
+    fun noWifiWithoutCellularDoesNotWarn() {
+        val summary = NetworkTransportSummary(wifi = false, cellular = false, vpn = false)
+
+        assertTrue(summary.warnings.isEmpty())
+    }
+
+    @Test
     fun activeVpnWarnsAboutLocalRouting() {
         val summary = NetworkTransportSummary(wifi = true, cellular = false, vpn = true)
 

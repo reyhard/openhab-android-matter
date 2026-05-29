@@ -7,7 +7,7 @@ data class NetworkTransportSummary(
 ) {
     val localNetworkPreferred: Boolean = wifi && !vpn
     val warnings: List<String> = buildList {
-        if (!wifi) {
+        if (!wifi && cellular) {
             add("Connect to Wi-Fi before adding local Matter devices.")
         }
         if (vpn) {
