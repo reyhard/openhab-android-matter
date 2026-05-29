@@ -68,7 +68,7 @@ class MatterSetupWorkflowTest {
         val ports = FakeMatterSetupPorts().apply {
             scanStarted = false
             scanDetails =
-                "scan failed for 34970112332 ohab_secret hex:001122 MT:SECRET controller-state controller-state-2"
+                "HTTP 401 while scanning 34970112332 with ohab_secret hex:001122 MT:SECRET controller-state controller-state-2"
             diagnosticsSummary = MatterSetupDiagnosticsSummary(
                 checks = listOf("check MT:SECRET"),
                 warnings = listOf("warning 34970112332 controller-state"),
@@ -82,7 +82,10 @@ class MatterSetupWorkflowTest {
 
         val state = states.last()
         val failure = states.last().failure!!
+        assertEquals(MatterSetupStage.Failed, state.stage)
         assertEquals(MatterSetupStage.SendingCodeToOpenHab, failure.step)
+        assertTrue(failure.suggestions.contains("Check the openHAB address and access token."))
+        assertTrue(ports.diagnosticsCalled)
         assertFalse(failure.details.contains("34970112332"))
         assertFalse(failure.details.contains("ohab_secret"))
         assertFalse(failure.details.contains("hex:001122"))
@@ -100,6 +103,8 @@ class MatterSetupWorkflowTest {
         assertFalse(state.diagnostics.toString().contains("MT:SECRET"))
         assertFalse(state.diagnostics.toString().contains("controller-state"))
         assertFalse(state.diagnostics.toString().contains("controller-state-2"))
+        assertFalse(state.toString().contains("ohab_secret"))
+        assertFalse(state.toString().contains("34970112332"))
         assertEquals("http://openhab.local:8080", ports.diagnosticsContext!!.openHabBaseUrl)
         assertEquals("http://otbr.local", ports.diagnosticsContext!!.otbrBaseUrl)
         assertFalse(ports.diagnosticsContext!!.attestationBypassEnabled)
@@ -459,7 +464,7 @@ class MatterSetupWorkflowTest {
             qrCode = "MT:QRSECRET"
             inboxMatterEntryDetected = false
             inboxDetails =
-                "inbox missing for 34970112332 MT:SECRET ohab_secret hex:001122 controller-state controller-state-2 MT:QRSECRET"
+                "No Matter Inbox entry before timeout for 34970112332 MT:SECRET ohab_secret hex:001122 controller-state controller-state-2 MT:QRSECRET"
             diagnosticsSummary = MatterSetupDiagnosticsSummary(
                 checks = listOf("inbox check MT:SECRET"),
                 warnings = listOf("manual 34970112332 qr MT:QRSECRET"),
@@ -479,7 +484,10 @@ class MatterSetupWorkflowTest {
         assertEquals("openHAB did not report the device yet", failure.message)
         assertTrue(ports.inboxCalled)
         assertEquals(failure, ports.diagnosticsFailure)
+        assertTrue(ports.diagnosticsCalled)
         assertEquals("http://openhab.local:8080", ports.diagnosticsContext!!.openHabBaseUrl)
+        assertTrue(failure.suggestions.contains("Check IPv6 routing between openHAB and the Thread network."))
+        assertTrue(failure.suggestions.contains("Check mDNS or Avahi on the openHAB side."))
         assertFalse(states.any { it.stage == MatterSetupStage.SuccessInboxDetected })
         assertFalse(failure.details.contains("34970112332"))
         assertFalse(failure.details.contains("MT:SECRET"))
@@ -573,6 +581,7 @@ class MatterSetupWorkflowTest {
         var openWindowControllerState: String? = null
         var scanManualCode: String? = null
         var waitForInboxTimeoutSeconds: Int? = null
+        var diagnosticsCalled = false
         var diagnosticsFailure: MatterSetupFailure? = null
         var diagnosticsContext: MatterSetupDiagnosticsContext? = null
         var diagnosticsSummary = MatterSetupDiagnosticsSummary.empty()
@@ -664,6 +673,7 @@ class MatterSetupWorkflowTest {
             failure: MatterSetupFailure,
             context: MatterSetupDiagnosticsContext
         ): MatterSetupDiagnosticsSummary {
+            diagnosticsCalled = true
             diagnosticsFailure = failure
             diagnosticsContext = context
             diagnosticsError?.let { throw it }
