@@ -10,17 +10,67 @@ object MatterSetupStateReducer {
     }
 
     fun editSettings(openHabUrl: String): MatterSetupUiState {
-        return openHabSetup(openHabUrl)
+        return openHabSetup(openHabUrl, showBackToMainMenu = true)
     }
 
-    fun openHabSetup(openHabUrl: String): MatterSetupUiState {
+    fun openHabSetup(
+        openHabUrl: String,
+        showBackToMainMenu: Boolean = false
+    ): MatterSetupUiState {
+        val openHabUrlConfigured = openHabUrl.trim().isNotBlank()
         return MatterSetupUiState(
             stage = MatterSetupStage.NeedsOpenHabSetup,
             title = "Connect to openHAB",
             message = "Connect to your openHAB home before adding Matter devices.",
             primaryAction = MatterSetupAction.TestOpenHab,
             primaryActionLabel = "Test connection",
-            primaryActionEnabled = openHabUrl.trim().isNotBlank()
+            primaryActionEnabled = openHabUrlConfigured,
+            secondaryActions = buildList {
+                if (showBackToMainMenu) {
+                    add(MatterSetupAction.BackToMainMenu)
+                }
+                add(MatterSetupAction.ShowTroubleshooting)
+            }
+        )
+    }
+
+    fun openHabSetupReady(openHabUrl: String): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.NeedsOpenHabSetup,
+            title = "Connect to openHAB",
+            message = "openHAB is ready. You can go back and scan a Matter QR code.",
+            primaryAction = MatterSetupAction.TestOpenHab,
+            primaryActionLabel = "Test connection",
+            primaryActionEnabled = openHabUrl.trim().isNotBlank(),
+            secondaryActions = listOf(
+                MatterSetupAction.BackToMainMenu,
+                MatterSetupAction.ShowTroubleshooting
+            )
+        )
+    }
+
+    fun openHabSetupNotReady(
+        openHabUrl: String,
+        message: String,
+        failure: MatterSetupFailure? = null,
+        diagnostics: MatterSetupDiagnosticsSummary = MatterSetupDiagnosticsSummary.empty(),
+        showBackToMainMenu: Boolean = false
+    ): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.NeedsOpenHabSetup,
+            title = "Connect to openHAB",
+            message = message.ifBlank { "openHAB is not ready yet. Check the details in troubleshooting." },
+            primaryAction = MatterSetupAction.TestOpenHab,
+            primaryActionLabel = "Test connection",
+            primaryActionEnabled = openHabUrl.trim().isNotBlank(),
+            secondaryActions = buildList {
+                if (showBackToMainMenu) {
+                    add(MatterSetupAction.BackToMainMenu)
+                }
+                add(MatterSetupAction.ShowTroubleshooting)
+            },
+            failure = failure,
+            diagnostics = diagnostics
         )
     }
 

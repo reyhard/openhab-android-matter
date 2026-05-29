@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -92,6 +93,20 @@ fun AdvancedTroubleshootingScreen(
         ) {
             Text(primaryActionLabel)
         }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = { onAction(MatterSetupAction.OpenCommissioningWindowAgain) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Open pairing window again")
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = { onAction(MatterSetupAction.ForgetFromPhone) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Forget from this phone")
+        }
     }
 }
 
@@ -136,8 +151,8 @@ private fun TroubleshootingBullets(
 private fun buildRecoveryGuidance(state: MatterSetupUiState): List<String> {
     return (
         state.failure?.suggestions.orEmpty() + listOf(
-            "Confirm IPv6 routing works between openHAB, the Thread border router, and the Matter device.",
-            "Check that openHAB or its host can see current _matterc._udp mDNS records through Avahi.",
+            "Confirm IPv6 routing works between openHAB, the OTBR or Thread border router, and the Matter device.",
+            "Check that openHAB or its host can see current _matterc._udp mDNS records through Avahi, and clear stale records if needed.",
             "Disable VPNs that isolate local traffic, stay on the correct Wi-Fi, and keep Bluetooth and location enabled for commissioning.",
             "Confirm the device is still in pairing mode before retrying.",
             "If the openHAB pairing window expired, retry setup to request a fresh commissioning window before sending the code."

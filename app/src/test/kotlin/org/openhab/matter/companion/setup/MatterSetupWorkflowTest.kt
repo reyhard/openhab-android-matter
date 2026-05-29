@@ -43,6 +43,35 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
+    fun commissioningProgressUpdatesCurrentPhoneCommissioningDetail() {
+        val ports = FakeMatterSetupPorts().apply {
+            commissionProgressMessages = listOf(
+                "Matter BLE scan round 1 of 2 for discriminator 3840",
+                "Bluetooth GATT connected; discovering Matter services",
+                "Device attestation completed; continuing commissioning with attestation bypass disabled",
+                "connectedhomeip commissioning stage started: FindOperational"
+            )
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        val commissioningDetails = states
+            .filter { it.stage == MatterSetupStage.CommissioningToPhone }
+            .mapNotNull { it.activeDetail }
+        assertEquals(
+            listOf(
+                "Seeking Bluetooth device",
+                "Sending setup data over BLE",
+                "Connecting device to Thread network",
+                "Waiting for device on the Thread network"
+            ),
+            commissioningDetails
+        )
+    }
+
+    @Test
     fun readinessFailureIncludesWarningsThenDetailsAndOmitsBlanks() {
         val ports = FakeMatterSetupPorts().apply {
             readinessReady = false
@@ -487,7 +516,8 @@ class MatterSetupWorkflowTest {
         assertTrue(ports.diagnosticsCalled)
         assertEquals("http://openhab.local:8080", ports.diagnosticsContext!!.openHabBaseUrl)
         assertTrue(failure.suggestions.contains("Check IPv6 routing between openHAB and the Thread network."))
-        assertTrue(failure.suggestions.contains("Check mDNS or Avahi on the openHAB side."))
+        assertTrue(failure.suggestions.contains("Check OTBR reachability from openHAB."))
+        assertTrue(failure.suggestions.contains("Check mDNS or Avahi on the openHAB side, including stale _matterc._udp records."))
         assertFalse(states.any { it.stage == MatterSetupStage.SuccessInboxDetected })
         assertFalse(failure.details.contains("34970112332"))
         assertFalse(failure.details.contains("MT:SECRET"))
@@ -600,6 +630,7 @@ class MatterSetupWorkflowTest {
         var readinessWarnings = emptyList<String>()
         var inboxMatterEntryDetected = true
         var inboxDetails = "Matter Inbox entry detected"
+        var commissionProgressMessages = emptyList<String>()
 
         override fun loadConfig(): MatterSetupConfig {
             loadConfigCalled = true
@@ -624,10 +655,12 @@ class MatterSetupWorkflowTest {
 
         override fun commissionToPhone(
             setupPayload: String,
-            config: MatterSetupConfig
+            config: MatterSetupConfig,
+            progress: (String) -> Unit
         ): MatterSetupPorts.CommissionResult {
             commissionCalled = true
             commissionSetupPayload = setupPayload
+            commissionProgressMessages.forEach(progress)
             return MatterSetupPorts.CommissionResult(nodeId = 1234L, controllerState = commissionControllerState)
         }
 

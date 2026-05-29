@@ -14,6 +14,7 @@ import org.openhab.matter.companion.controller.FakeMatterController
 import org.openhab.matter.companion.controller.MatterBootstrapState
 import org.openhab.matter.companion.controller.NativeChipControllerSession
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository
+import org.openhab.matter.companion.diagnostics.AndroidReadinessProbe
 import org.openhab.matter.companion.diagnostics.AndroidThreadBorderRouterBrowser
 import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.domain.MatterSetupPayloadParser
@@ -72,6 +73,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private val openHabMatterDiscoveryClient by lazy { HttpOpenHabMatterDiscoveryClient() }
     private val openHabInboxClient by lazy { HttpOpenHabInboxClient() }
     private val fakeMatterController by lazy { FakeMatterController() }
+    private val readinessProbe by lazy { AndroidReadinessProbe(appContext) }
     private val threadBorderRouterBrowser by lazy { AndroidThreadBorderRouterBrowser(appContext) }
     private var openHabConfigured = false
     private val controllerSession by lazy {
@@ -96,7 +98,18 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     fun onOpenHabUrlChange(value: String) {
         openHabUrl = value
         if (uiState.stage == MatterSetupStage.NeedsOpenHabSetup) {
-            uiState = MatterSetupStateReducer.openHabSetup(value)
+            val failure = uiState.failure
+            uiState = if (failure == null) {
+                MatterSetupStateReducer.openHabSetup(value, showBackToMainMenu = openHabConfigured)
+            } else {
+                MatterSetupStateReducer.openHabSetupNotReady(
+                    value,
+                    uiState.message,
+                    failure,
+                    uiState.diagnostics,
+                    showBackToMainMenu = openHabConfigured
+                )
+            }
         }
     }
 
@@ -142,6 +155,12 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
             }
 
+            MatterSetupAction.BackToMainMenu -> {
+                scannedPayload = ""
+                restorePersistedConfig()
+                uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
+            }
+
             MatterSetupAction.SaveOpenHab,
             MatterSetupAction.TestOpenHab -> {
                 startOpenHabSetupCheck()
@@ -169,10 +188,16 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.ShowTroubleshooting,
-            MatterSetupAction.EnterCodeManually,
-            MatterSetupAction.OpenCommissioningWindowAgain,
-            MatterSetupAction.ForgetFromPhone -> {
+            MatterSetupAction.EnterCodeManually -> {
                 uiState = MatterSetupStateReducer.advancedTroubleshooting(uiState)
+            }
+
+            MatterSetupAction.OpenCommissioningWindowAgain -> {
+                startOpenCommissioningWindowAgain()
+            }
+
+            MatterSetupAction.ForgetFromPhone -> {
+                forgetStagedDeviceFromPhone()
             }
         }
     }
@@ -228,7 +253,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                         openHabUrl = baseUrl
                         token = apiToken
                         openHabConfigured = true
-                        uiState = MatterSetupUiState.initial(openHabConfigured = true)
+                        uiState = MatterSetupStateReducer.openHabSetupReady(baseUrl)
                     }
                 } else {
                     emitOpenHabSetupFailure(
@@ -344,7 +369,12 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             details = details
         )
         emitState(
-            MatterSetupUiState.failed(
+            MatterSetupStateReducer.openHabSetupNotReady(
+                baseUrl,
+                listOf(message, details)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .joinToString(". "),
                 failure,
                 MatterSetupDiagnosticsSummary(
                     checks = listOf(
@@ -354,7 +384,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     ),
                     warnings = listOf(status.message().orEmpty()).sanitizeWith(sanitizer),
                     details = listOf(status.details().orEmpty()).sanitizeWith(sanitizer)
-                )
+                ),
+                showBackToMainMenu = openHabConfigured
             )
         )
     }
@@ -373,13 +404,19 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             details = detail
         )
         emitState(
-            MatterSetupUiState.failed(
+            MatterSetupStateReducer.openHabSetupNotReady(
+                baseUrl,
+                listOf("openHAB connection check failed", detail)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .joinToString(". "),
                 failure,
                 MatterSetupDiagnosticsSummary(
                     checks = listOf("openHAB URL configured=true"),
                     warnings = listOf("openHAB readiness check failed"),
                     details = listOf(detail)
-                )
+                ),
+                showBackToMainMenu = openHabConfigured
             )
         )
     }
@@ -401,6 +438,20 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         )
     }
 
+    private fun restorePersistedConfig() {
+        val config = configRepository.load()
+        openHabUrl = config.openHabBaseUrl()
+        token = config.openHabApiToken()
+        threadDataset = config.threadDataset()
+        otbrBaseUrl = config.otbrBaseUrl()
+        attestationBypassEnabled = config.attestationBypassEnabled()
+        openHabConfigured = config.openHabBaseUrl().isNotBlank()
+        threadSettingsMessage = ThreadDatasetSettingsValidator.validate(
+            threadDataset,
+            config.threadDatasetUnreadable()
+        ).title
+    }
+
     private fun startRealWorkflow(setupPayload: String) {
         if (!executionGate.tryStart()) {
             return
@@ -415,6 +466,145 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
         }, "matter-automated-setup")
         workerThread?.start()
+    }
+
+    private fun startOpenCommissioningWindowAgain() {
+        if (!executionGate.tryStart()) {
+            return
+        }
+        workerThread = Thread({
+            var activeStage = MatterSetupStage.OpeningCommissioningWindow
+            val existingConfig = runCatching { configRepository.load() }.getOrDefault(AppConfig("", ""))
+            val sanitizer = SetupFailureSanitizer(existingConfig, openHabUrl, token)
+            val workflowConfig = loadMatterSetupConfig()
+            val diagnosticsContext = MatterSetupDiagnosticsContext(
+                openHabBaseUrl = workflowConfig.openHabBaseUrl.toLogSafeUrl(),
+                otbrBaseUrl = workflowConfig.otbrBaseUrl.toLogSafeUrl(),
+                attestationBypassEnabled = workflowConfig.attestationBypassEnabled
+            )
+            try {
+                val bootstrap = bootstrapStateRepository.load()
+                if (bootstrap.stateUnreadable()) {
+                    throw IllegalStateException(
+                        "Stored Matter bootstrap controller state could not be read. Re-run Thread commissioning."
+                    )
+                }
+                if (bootstrap.bootstrapNodeId() < 0L || bootstrap.controllerState().isBlank()) {
+                    throw IllegalStateException("No staged Matter device is stored on this phone.")
+                }
+
+                emitState(MatterSetupUiState.progress(activeStage))
+                val ports = createRealPorts()
+                val window = ports.openCommissioningWindow(bootstrap.bootstrapNodeId(), bootstrap.controllerState())
+                if (window.manualCode.isBlank()) {
+                    emitWorkflowFailure(
+                        activeStage,
+                        "OpenCommissioningWindow did not return a manual setup code",
+                        "Blank manual setup code returned by Matter controller",
+                        diagnosticsContext,
+                        sanitizer
+                    )
+                    return@Thread
+                }
+
+                activeStage = MatterSetupStage.CommissioningWindowOpen
+                emitState(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
+
+                activeStage = MatterSetupStage.SendingCodeToOpenHab
+                emitState(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
+                val scan = ports.sendCodeToOpenHab(window.manualCode, workflowConfig)
+                if (!scan.started) {
+                    emitWorkflowFailure(
+                        activeStage,
+                        "openHAB could not start pairing",
+                        scan.details,
+                        diagnosticsContext,
+                        sanitizer
+                    )
+                    return@Thread
+                }
+
+                activeStage = MatterSetupStage.WatchingOpenHabInbox
+                emitState(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds))
+                val inbox = ports.waitForOpenHabInbox(workflowConfig, scan.timeoutSeconds)
+                if (!inbox.matterEntryDetected) {
+                    emitWorkflowFailure(
+                        activeStage,
+                        "openHAB did not report the device yet",
+                        inbox.details,
+                        diagnosticsContext,
+                        sanitizer
+                    )
+                    return@Thread
+                }
+
+                emitState(
+                    MatterSetupUiState(
+                        stage = MatterSetupStage.SuccessInboxDetected,
+                        title = "Device found by openHAB",
+                        message = "openHAB reported a Matter Inbox entry for this device.",
+                        primaryAction = MatterSetupAction.AddAnotherDevice,
+                        primaryActionLabel = "Add another device"
+                    )
+                )
+            } catch (error: Exception) {
+                emitWorkflowFailure(
+                    activeStage,
+                    "Setup could not open the pairing window again",
+                    error.message.orEmpty(),
+                    diagnosticsContext,
+                    sanitizer
+                )
+            } finally {
+                executionGate.finish()
+            }
+        }, "matter-open-commissioning-window-again")
+        workerThread?.start()
+    }
+
+    private fun forgetStagedDeviceFromPhone() {
+        runCatching { bootstrapStateRepository.clear() }
+            .onSuccess {
+                uiState = MatterSetupUiState(
+                    stage = MatterSetupStage.AdvancedTroubleshooting,
+                    title = "Staged device removed",
+                    message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems.",
+                    primaryAction = MatterSetupAction.BackToMainMenu,
+                    primaryActionLabel = "Back to main menu",
+                    diagnostics = MatterSetupDiagnosticsSummary(
+                        checks = listOf("Stored Matter bootstrap state cleared from this phone."),
+                        warnings = listOf(
+                            "If the device still reports too many administrators, remove this fabric from the device or factory reset it."
+                        ),
+                        details = emptyList()
+                    )
+                )
+            }
+            .onFailure { error ->
+                uiState = MatterSetupUiState.failed(
+                    MatterSetupFailure(
+                        step = MatterSetupStage.AdvancedTroubleshooting,
+                        message = "Staged device could not be removed from this phone.",
+                        details = error.message.orEmpty()
+                    ),
+                    MatterSetupDiagnosticsSummary.empty()
+                )
+            }
+    }
+
+    private fun emitWorkflowFailure(
+        step: MatterSetupStage,
+        message: String,
+        details: String,
+        diagnosticsContext: MatterSetupDiagnosticsContext,
+        sanitizer: SetupFailureSanitizer
+    ) {
+        val failure = MatterSetupFailure(
+            step = step,
+            message = message,
+            details = sanitizer.sanitize(details)
+        )
+        emitState(MatterSetupUiState.failed(failure, runBasicDiagnostics(failure, diagnosticsContext)))
     }
 
     private fun emitState(state: MatterSetupUiState) {
@@ -443,7 +633,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             matterRunner = object : AndroidMatterSetupPorts.MatterRunner {
                 override fun commissionToPhone(
                     setupPayload: String,
-                    config: MatterSetupConfig
+                    config: MatterSetupConfig,
+                    progress: (String) -> Unit
                 ): MatterSetupPorts.CommissionResult {
                     val dataset = ThreadDataset.parse(config.threadDataset)
                     val payload = MatterSetupPayloadParser.parse(setupPayload)
@@ -456,7 +647,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                         dataset,
                         payload,
                         bootstrapStateRepository.load().controllerState(),
-                        null
+                        { step -> progress(step.message()) }
                     )
                     bootstrapStateRepository.save(MatterBootstrapState(result.nodeId(), result.controllerState(), false))
                     return MatterSetupPorts.CommissionResult(result.nodeId(), result.controllerState())
@@ -491,7 +682,12 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 openHabMatterDiscoveryClient.startMatterScan(baseUrl, manualCode, apiToken)
             },
             inboxWaiter = ::waitForOpenHabInbox,
-            diagnosticsRunner = ::runBasicDiagnostics
+            diagnosticsRunner = ::runBasicDiagnostics,
+            readinessDiagnostics = {
+                listOf(readinessProbe.bluetoothDiagnostic(), readinessProbe.locationServicesDiagnostic()) +
+                    readinessProbe.permissionDiagnostics()
+            },
+            networkTransportSummary = readinessProbe::networkTransportSummary
         )
     }
 

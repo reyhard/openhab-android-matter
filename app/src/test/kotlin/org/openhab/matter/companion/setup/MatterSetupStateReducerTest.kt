@@ -53,6 +53,32 @@ class MatterSetupStateReducerTest {
         assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
         assertEquals(MatterSetupAction.TestOpenHab, state.primaryAction)
         assertTrue(state.primaryActionEnabled)
+        assertTrue(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+    }
+
+    @Test
+    fun firstRunOpenHabSetupDoesNotExposeBackToMainMenu() {
+        val state = MatterSetupStateReducer.openHabSetup("http://openhab.local:8080")
+
+        assertFalse(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+    }
+
+    @Test
+    fun openHabSetupReadyKeepsUserInSettingsWithBackAndTroubleshootingActions() {
+        val state = MatterSetupStateReducer.openHabSetupReady("http://openhab.local:8080")
+
+        assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
+        assertEquals("openHAB is ready. You can go back and scan a Matter QR code.", state.message)
+        assertEquals(MatterSetupAction.TestOpenHab, state.primaryAction)
+        assertTrue(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+        assertTrue(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
+    }
+
+    @Test
+    fun openHabSetupIncludesTroubleshootingAction() {
+        val state = MatterSetupStateReducer.openHabSetup("http://openhab.local:8080")
+
+        assertTrue(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
     }
 
     @Test

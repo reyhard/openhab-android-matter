@@ -1,5 +1,7 @@
 package org.openhab.matter.companion.setup
 
+import org.openhab.matter.companion.diagnostics.NetworkTransportSummary
+import org.openhab.matter.companion.diagnostics.ReadinessDiagnostic
 import org.openhab.matter.companion.openhab.OpenHabMatterDiscoveryScanStatus
 import org.openhab.matter.companion.openhab.OpenHabStatus
 
@@ -9,12 +11,15 @@ class AndroidMatterSetupPorts(
     private val matterRunner: MatterRunner,
     private val discoveryScan: (String, String, String) -> OpenHabMatterDiscoveryScanStatus,
     private val inboxWaiter: (String, String, Int) -> MatterSetupPorts.InboxResult,
-    private val diagnosticsRunner: (MatterSetupFailure, MatterSetupDiagnosticsContext) -> MatterSetupDiagnosticsSummary
+    private val diagnosticsRunner: (MatterSetupFailure, MatterSetupDiagnosticsContext) -> MatterSetupDiagnosticsSummary,
+    private val readinessDiagnostics: () -> List<ReadinessDiagnostic> = { emptyList() },
+    private val networkTransportSummary: () -> NetworkTransportSummary? = { null }
 ) : MatterSetupPorts {
     interface MatterRunner {
         fun commissionToPhone(
             setupPayload: String,
-            config: MatterSetupConfig
+            config: MatterSetupConfig,
+            progress: (String) -> Unit
         ): MatterSetupPorts.CommissionResult
 
         fun openCommissioningWindow(
@@ -29,13 +34,20 @@ class AndroidMatterSetupPorts(
 
     override fun checkReadiness(config: MatterSetupConfig): MatterSetupPorts.ReadinessResult {
         val status = readinessChecker(config.openHabBaseUrl, config.openHabApiToken)
-        val ready = status.online() && status.restReachable() && status.matterControllerReady()
+        val androidDiagnostics = readinessDiagnostics()
+        val networkWarnings = networkTransportSummary()?.warnings.orEmpty()
+        val ready = status.online() &&
+            status.restReachable() &&
+            status.matterControllerReady() &&
+            androidDiagnostics.all { it.ok }
         val sanitizer = DetailSanitizer(config)
         val details = listOf(
             "openHAB REST reachable=${status.restReachable()}",
             "openHAB Matter controller ready=${status.matterControllerReady()}",
             status.message().orEmpty(),
             status.details().orEmpty()
+        ).plus(
+            androidDiagnostics.map { "${it.name}: ${it.message}" }
         ).sanitizeWith(sanitizer)
         val warnings = buildList {
             if (!status.restReachable()) {
@@ -44,6 +56,10 @@ class AndroidMatterSetupPorts(
             if (!status.matterControllerReady()) {
                 add(status.message().orEmpty().ifBlank { "openHAB Matter controller is not ready" })
             }
+            androidDiagnostics.filterNot { it.ok }.forEach { diagnostic ->
+                add(diagnostic.message)
+            }
+            addAll(networkWarnings)
         }.sanitizeWith(sanitizer)
 
         return MatterSetupPorts.ReadinessResult(
@@ -55,9 +71,10 @@ class AndroidMatterSetupPorts(
 
     override fun commissionToPhone(
         setupPayload: String,
-        config: MatterSetupConfig
+        config: MatterSetupConfig,
+        progress: (String) -> Unit
     ): MatterSetupPorts.CommissionResult {
-        return matterRunner.commissionToPhone(setupPayload, config)
+        return matterRunner.commissionToPhone(setupPayload, config, progress)
     }
 
     override fun openCommissioningWindow(

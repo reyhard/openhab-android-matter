@@ -8,6 +8,7 @@ sealed interface MatterSetupAction {
     data object SaveThreadSettings : MatterSetupAction
     data object DetectThreadBorderRouters : MatterSetupAction
     data class SelectThreadBorderRouter(val endpoint: String) : MatterSetupAction
+    data object BackToMainMenu : MatterSetupAction
     data object StartScan : MatterSetupAction
     data object EnterCodeManually : MatterSetupAction
     data object ConfirmPairingMode : MatterSetupAction

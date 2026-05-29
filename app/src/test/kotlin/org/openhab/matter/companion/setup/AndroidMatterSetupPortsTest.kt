@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.openhab.matter.companion.diagnostics.NetworkTransportSummary
+import org.openhab.matter.companion.diagnostics.ReadinessDiagnostic
 import org.openhab.matter.companion.openhab.OpenHabMatterDiscoveryScanStatus
 import org.openhab.matter.companion.openhab.OpenHabStatus
 
@@ -80,6 +82,37 @@ class AndroidMatterSetupPortsTest {
     }
 
     @Test
+    fun readinessFailsWhenRequiredAndroidDiagnosticsFailAndReportsNetworkWarnings() {
+        val config = testConfig()
+        val ports = AndroidMatterSetupPorts(
+            configLoader = { config },
+            readinessChecker = { _, _ -> readyStatus() },
+            matterRunner = FakeMatterRunner(),
+            discoveryScan = { _, _, _ -> OpenHabMatterDiscoveryScanStatus(true, true, "started", "started", 60) },
+            inboxWaiter = { _, _, _ -> MatterSetupPorts.InboxResult(true, "detected") },
+            diagnosticsRunner = { _, _ -> MatterSetupDiagnosticsSummary.empty() },
+            readinessDiagnostics = {
+                listOf(
+                    ReadinessDiagnostic("Bluetooth", false, "Turn on Bluetooth before adding Matter devices."),
+                    ReadinessDiagnostic("Location services", true, "Location services are enabled.")
+                )
+            },
+            networkTransportSummary = {
+                NetworkTransportSummary(wifi = false, cellular = true, vpn = true)
+            }
+        )
+
+        val result = ports.checkReadiness(config)
+
+        assertFalse(result.ready)
+        assertTrue(result.details.contains("Bluetooth: Turn on Bluetooth before adding Matter devices."))
+        assertTrue(result.details.contains("Location services: Location services are enabled."))
+        assertTrue(result.warnings.contains("Turn on Bluetooth before adding Matter devices."))
+        assertTrue(result.warnings.contains("Connect to Wi-Fi before adding local Matter devices."))
+        assertTrue(result.warnings.contains("VPN is active and may block openHAB, mDNS, or IPv6 routing."))
+    }
+
+    @Test
     fun delegatesConfigMatterInboxAndDiagnosticsDependencies() {
         val config = testConfig()
         val runner = FakeMatterRunner()
@@ -116,7 +149,7 @@ class AndroidMatterSetupPortsTest {
         assertSame(config, ports.loadConfig())
         assertEquals(
             MatterSetupPorts.CommissionResult(1234L, "commissioned-controller-state"),
-            ports.commissionToPhone("MT:TEST", config)
+            ports.commissionToPhone("MT:TEST", config) {}
         )
         assertEquals("MT:TEST", runner.setupPayload)
         assertSame(config, runner.config)
@@ -160,7 +193,8 @@ class AndroidMatterSetupPortsTest {
 
         override fun commissionToPhone(
             setupPayload: String,
-            config: MatterSetupConfig
+            config: MatterSetupConfig,
+            progress: (String) -> Unit
         ): MatterSetupPorts.CommissionResult {
             this.setupPayload = setupPayload
             this.config = config

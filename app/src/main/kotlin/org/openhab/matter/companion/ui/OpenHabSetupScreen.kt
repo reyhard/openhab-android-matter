@@ -90,6 +90,24 @@ fun OpenHabSetupScreen(
         ) {
             Text(state.primaryActionLabel.ifBlank { "Continue" })
         }
+        if (MatterSetupAction.BackToMainMenu in state.secondaryActions) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.BackToMainMenu) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Back to main menu")
+            }
+        }
+        if (MatterSetupAction.ShowTroubleshooting in state.secondaryActions) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.ShowTroubleshooting) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Advanced troubleshooting")
+            }
+        }
         Spacer(Modifier.height(32.dp))
         Text(
             text = "Thread network",

@@ -57,14 +57,15 @@
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
 - Kotlin/Jetpack Compose automated Matter setup UI guides users through openHAB setup, QR scan, pairing-mode confirmation, Thread commissioning, OpenCommissioningWindow, openHAB scan submission, and Inbox detection.
 - The automated setup workflow exposes user-facing progress states and a 300-second commissioning-window countdown while preserving the connectedhomeip fail-closed readiness gate.
-- Failure recovery keeps sanitized diagnostics and links to advanced troubleshooting guidance for openHAB readiness, network/VPN hints, mDNS/Avahi visibility, IPv6 reachability, expired pairing windows, and pairing-mode checks.
+- The Compose automated readiness gate includes Android Bluetooth, location-service, runtime permission, Wi-Fi/mobile-data, and VPN diagnostics before BLE Thread commissioning.
+- Failure recovery keeps sanitized diagnostics and links to advanced troubleshooting guidance for openHAB readiness, network/VPN hints, OTBR reachability, mDNS/Avahi visibility including stale `_matterc._udp` records, IPv6 reachability, expired pairing windows, and pairing-mode checks.
+- The Compose advanced troubleshooting screen exposes one-tap OpenCommissioningWindow retry for the currently staged bootstrap device and a forget-from-phone cleanup action that clears this app's stored bootstrap state without claiming to factory reset the device.
 
 ## Not Implemented Yet
 
 - Broader hardware validation across multiple Matter/Thread devices, Android versions, and OTBR/router combinations.
 - Real-device validation of the new Compose automated setup entry point across QR scan, BLE Thread commissioning, OpenCommissioningWindow, openHAB scan submission, and Inbox success.
 - Production-grade diagnostics for stale or conflicting `_matterc._udp` mDNS/Avahi records; the issue is currently diagnosable through logs and the troubleshooting guide, but not automatically remediated by the app.
-- Advanced in-app recovery actions such as one-tap OpenCommissioningWindow retry for an already staged device and forget-from-phone cleanup are not wired into the Compose troubleshooting screen yet.
 - Long-run connectedhomeip fabric persistence hardening across app restarts, phone reboots, and upgrade/reinstall scenarios. The current real-device flow restores enough controller state to open the commissioning window, but broader lifecycle coverage is still needed.
 
 ## Production Controller Seam

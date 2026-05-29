@@ -206,7 +206,7 @@ flowchart TD
 ```
 
 - In the Compose automated flow, if the openHAB scan starts but no Inbox entry is detected before timeout, the app shows recovery guidance for IPv6 routing, OTBR reachability, mDNS/Avahi visibility, stale Matter records, and retrying setup to request a fresh commissioning window.
-- The Compose advanced troubleshooting screen is guidance-only for OCW retry and forget-from-phone cleanup today. It does not expose one-tap OCW retry or device removal until those actions are wired to real operations.
+- The Compose advanced troubleshooting screen can retry OpenCommissioningWindow for the currently staged bootstrap device and continue the openHAB scan/Inbox handoff. Its forget-from-phone cleanup clears this app's stored bootstrap state; it does not claim to factory reset the device or remove fabrics from other ecosystems.
 
 ## Source Map
 

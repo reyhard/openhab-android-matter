@@ -30,7 +30,8 @@ data class MatterSetupFailure(
 
             MatterSetupStage.WatchingOpenHabInbox -> listOf(
                 "Check IPv6 routing between openHAB and the Thread network.",
-                "Check mDNS or Avahi on the openHAB side.",
+                "Check OTBR reachability from openHAB.",
+                "Check mDNS or Avahi on the openHAB side, including stale _matterc._udp records.",
                 "Open the pairing window again if the countdown expired."
             )
 

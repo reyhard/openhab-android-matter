@@ -37,7 +37,12 @@ class MatterSetupWorkflow(
 
             activeStage = MatterSetupStage.CommissioningToPhone
             emit(MatterSetupUiState.progress(activeStage))
-            val commission = ports.commissionToPhone(setupPayload, config)
+            val commission = ports.commissionToPhone(setupPayload, config) { progressMessage ->
+                val detail = commissioningProgressDetail(redactor.sanitize(progressMessage))
+                if (detail != null) {
+                    emit(MatterSetupUiState.progress(activeStage, activeDetail = detail))
+                }
+            }
             redactor.add(commission.controllerState)
 
             activeStage = MatterSetupStage.OpeningCommissioningWindow
@@ -132,6 +137,41 @@ class MatterSetupWorkflow(
             otbrBaseUrl = otbrBaseUrl.toLogSafeUrl(),
             attestationBypassEnabled = attestationBypassEnabled
         )
+    }
+
+    private fun commissioningProgressDetail(message: String): String? {
+        val value = message.trim()
+        if (value.isBlank()) {
+            return null
+        }
+        return when {
+            value.contains("BLE scan", ignoreCase = true) ||
+                value.contains("advertisement", ignoreCase = true) ||
+                value.contains("discriminator", ignoreCase = true) -> "Seeking Bluetooth device"
+
+            value.contains("GATT", ignoreCase = true) ||
+                value.contains("Matter services", ignoreCase = true) ||
+                value.contains("MTU", ignoreCase = true) -> "Sending setup data over BLE"
+
+            value.contains("attestation", ignoreCase = true) ||
+                value.contains("PASE", ignoreCase = true) ||
+                value.contains("Thread dataset", ignoreCase = true) ||
+                value.contains("commissioning stage started", ignoreCase = true) -> {
+                if (value.contains("FindOperational", ignoreCase = true)) {
+                    "Waiting for device on the Thread network"
+                } else {
+                    "Connecting device to Thread network"
+                }
+            }
+
+            value.contains("FindOperational", ignoreCase = true) ||
+                value.contains("operational", ignoreCase = true) ||
+                value.contains("commissioning complete", ignoreCase = true) -> {
+                "Waiting for device on the Thread network"
+            }
+
+            else -> value.take(120)
+        }
     }
 
     private fun emptyDiagnosticsContext(): MatterSetupDiagnosticsContext {

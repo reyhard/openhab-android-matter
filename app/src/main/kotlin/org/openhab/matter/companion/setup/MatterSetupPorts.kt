@@ -5,7 +5,11 @@ interface MatterSetupPorts {
 
     fun checkReadiness(config: MatterSetupConfig): ReadinessResult
 
-    fun commissionToPhone(setupPayload: String, config: MatterSetupConfig): CommissionResult
+    fun commissionToPhone(
+        setupPayload: String,
+        config: MatterSetupConfig,
+        progress: (String) -> Unit
+    ): CommissionResult
 
     fun openCommissioningWindow(nodeId: Long, controllerState: String): OpenWindowResult
 

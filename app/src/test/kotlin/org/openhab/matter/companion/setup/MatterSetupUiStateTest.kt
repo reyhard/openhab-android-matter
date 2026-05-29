@@ -31,10 +31,14 @@ class MatterSetupUiStateTest {
 
     @Test
     fun commissioningToPhoneStateHighlightsSinglePhoneCommissioningStep() {
-        val state = MatterSetupUiState.progress(MatterSetupStage.CommissioningToPhone)
+        val state = MatterSetupUiState.progress(
+            MatterSetupStage.CommissioningToPhone,
+            activeDetail = "Seeking Bluetooth device"
+        )
 
         assertEquals("Adding device to this phone", state.steps[1].label)
         assertEquals(MatterSetupStepStatus.Active, state.steps[1].status)
+        assertEquals("Seeking Bluetooth device", state.activeDetail)
         assertFalse(state.steps.any { it.label == "Connecting to device" })
     }
 
