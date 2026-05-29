@@ -53,6 +53,26 @@ internal fun resolveEffectiveSetupToken(editableToken: String, persistedToken: S
     return editableToken.trim().ifBlank { persistedToken }
 }
 
+internal fun threadSettingsConfigForSave(
+    existingConfig: AppConfig,
+    safeDataset: String,
+    openHabBaseUrl: String,
+    otbrBaseUrl: String,
+    attestationBypassEnabled: Boolean
+): AppConfig {
+    return AppConfig(
+        safeDataset,
+        existingConfig.setupPayload(),
+        openHabBaseUrl,
+        existingConfig.openHabApiToken(),
+        otbrBaseUrl,
+        false,
+        existingConfig.setupPayloadUnreadable(),
+        existingConfig.openHabApiTokenUnreadable(),
+        attestationBypassEnabled
+    )
+}
+
 class MatterSetupViewModel(application: Application) : AndroidViewModel(application) {
     var uiState by mutableStateOf(MatterSetupUiState.initial(openHabConfigured = false))
         private set
@@ -298,9 +318,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun startFirstRunSettingsCheck() {
         val baseUrl = effectiveOpenHabUrl()
-        var apiToken = token.trim()
         val datasetInput = threadDataset
         val otbrTarget = otbrBaseUrl.trim()
+        val existingConfig = configRepository.load()
+        val apiToken = resolveEffectiveSetupToken(token, existingConfig.openHabApiToken())
         if (!executionGate.tryStart()) {
             return
         }
@@ -308,8 +329,6 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         uiState = MatterSetupStateReducer.openHabSetupChecking()
         workerThread = Thread({
             try {
-                val existingConfig = configRepository.load()
-                apiToken = resolveEffectiveSetupToken(token, existingConfig.openHabApiToken())
                 val openHabStatus = openHabClient.checkReadiness(baseUrl, apiToken)
                 val otbrStatus = otbrClient.checkReadiness(otbrTarget)
                 val validation = FirstRunSettingsValidator.validate(
@@ -432,18 +451,13 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         }
         val existingConfig = configRepository.load()
         val safeDataset = parsedDataset.chipToolValue()
-        val savedToken = resolveEffectiveSetupToken(token, existingConfig.openHabApiToken())
         configRepository.save(
-            AppConfig(
-                safeDataset,
-                existingConfig.setupPayload(),
-                effectiveOpenHabUrl(),
-                savedToken,
-                otbrBaseUrl.trim(),
-                false,
-                existingConfig.setupPayloadUnreadable(),
-                existingConfig.openHabApiTokenUnreadable(),
-                attestationBypassEnabled
+            threadSettingsConfigForSave(
+                existingConfig = existingConfig,
+                safeDataset = safeDataset,
+                openHabBaseUrl = effectiveOpenHabUrl(),
+                otbrBaseUrl = otbrBaseUrl.trim(),
+                attestationBypassEnabled = attestationBypassEnabled
             )
         )
         threadDataset = safeDataset
