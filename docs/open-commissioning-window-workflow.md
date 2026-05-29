@@ -4,18 +4,46 @@ This documents the current Android app flow for opening a Matter commissioning w
 
 ## Summary
 
-The app no longer opens an OpenCommissioningWindow through the simulated controller. The user must first run Thread commissioning successfully so the app has a bootstrap Matter node id and connectedhomeip controller state. When the user taps **Open commissioning window**, the app reloads the persisted bootstrap state, selects the connectedhomeip Java controller only if packaged artifacts and runtime preflight are ready, asks connectedhomeip for a connected-device pointer, invokes `openPairingWindowWithPINCallback`, waits for the callback, then displays the temporary manual setup code and QR code when one is returned. When an openHAB base URL is configured, the app automatically posts the returned manual setup code to openHAB Matter discovery scan input and then observes the openHAB Inbox for a Matter entry. If no openHAB URL is configured, the app keeps the manual Scan Input instructions.
+The app no longer opens an OpenCommissioningWindow through the simulated controller. The user must first run Thread commissioning successfully so the app has a bootstrap Matter node id and connectedhomeip controller state. When the user taps **Open commissioning window** in the legacy UI, the app reloads the persisted bootstrap state, selects the connectedhomeip Java controller only if packaged artifacts and runtime preflight are ready, asks connectedhomeip for a connected-device pointer, invokes `openPairingWindowWithPINCallback`, waits for the callback, then displays the temporary manual setup code and QR code when one is returned. When an openHAB base URL is configured, the app automatically posts the returned manual setup code to openHAB Matter discovery scan input and then observes the openHAB Inbox for a Matter entry. If no openHAB URL is configured, the app keeps the manual Scan Input instructions.
+
+The Compose automated setup flow treats OpenCommissioningWindow as an internal step after QR scan, pairing-mode confirmation, and BLE Thread commissioning to the phone. When connectedhomeip returns the manual setup code, the app submits that code to openHAB Matter discovery scan input, starts watching the openHAB Inbox, and reports v1 success only when a Matter Inbox entry is detected. The temporary 300-second pairing window is shown as a countdown in the user-facing progress UI.
 
 Important current parameters:
 
 | Parameter | Current value | Where set |
 | --- | ---: | --- |
-| Window timeout | `300` seconds | `MainActivity.runOpenCommissioningWindow()` |
-| Discriminator | `3840` | `MainActivity.runOpenCommissioningWindow()` |
+| Window timeout | `300` seconds | `MainActivity.runOpenCommissioningWindow()`, `MatterSetupViewModel` |
+| Discriminator | `3840` | `MainActivity.runOpenCommissioningWindow()`, `MatterSetupViewModel` |
 | Enhanced commissioning iteration | `1000` | `ConnectedHomeIpMatterController` |
 | Setup PIN passed to CHIP API | `null` | `ConnectedHomeIpReflectionGateway` |
 | Device-pointer wait timeout | `300_000` ms | `ConnectedHomeIpMatterControllerFactory` |
 | OCW callback wait timeout | `300_000` ms | `ConnectedHomeIpReflectionGateway` |
+
+## Compose Automated Setup Flow
+
+```mermaid
+flowchart TD
+    A[Open app] --> B{openHAB configured?}
+    B -- No --> B1[Enter openHAB URL/token and run readiness check]
+    B1 --> B2{openHAB ready?}
+    B2 -- No --> B3[Show sanitized failure and troubleshooting]
+    B2 -- Yes --> C[Scan Matter QR code]
+    B -- Yes --> C
+    C --> D[Confirm device is in pairing mode]
+    D --> E[Check openHAB readiness]
+    E --> F{Ready?}
+    F -- No --> F1[Show failure diagnostics]
+    F -- Yes --> G[Commission device to phone over BLE Thread]
+    G --> H[Open CommissioningWindow through connectedhomeip]
+    H --> I[Show 300-second countdown]
+    I --> J[Send returned manual code to openHAB discovery scan]
+    J --> K[Poll openHAB Inbox]
+    K --> L{Matter Inbox entry detected?}
+    L -- Yes --> M[Show success]
+    L -- No --> N[Show troubleshooting guidance]
+```
+
+The Compose path is owned by `MatterSetupViewModel`. It uses `MatterSetupWorkflow` and `AndroidMatterSetupPorts` to keep connectedhomeip, REST, storage, and diagnostics outside Compose UI code. `WorkflowExecutionGate` prevents duplicate workflow starts from repeated taps, and the ViewModel suppresses state emissions after it is cleared.
 
 ## High-Level Flow
 
@@ -175,11 +203,16 @@ flowchart TD
     G -- onSuccess code returned --> H[Save state and display code/QR]
 ```
 
+- In the Compose automated flow, if the openHAB scan starts but no Inbox entry is detected before timeout, the app shows recovery guidance for IPv6 routing, OTBR reachability, mDNS/Avahi visibility, stale Matter records, and retrying setup to request a fresh commissioning window.
+- The Compose advanced troubleshooting screen is guidance-only for OCW retry and forget-from-phone cleanup today. It does not expose one-tap OCW retry or device removal until those actions are wired to real operations.
+
 ## Source Map
 
 | Area | Main classes |
 | --- | --- |
 | UI entry point and result display | `MainActivity.runOpenCommissioningWindow()`, `MainActivity.showTemporaryQrCode()` |
+| Compose automated setup entry point | `MatterSetupActivity`, `MatterSetupViewModel`, `MatterSetupApp` |
+| Compose workflow state and ports | `MatterSetupWorkflow`, `MatterSetupStateReducer`, `WorkflowExecutionGate`, `AndroidMatterSetupPorts` |
 | Bootstrap state resolution | `MatterBootstrapStateRepository`, `MatterBootstrapStateResolver`, `MatterBootstrapState` |
 | Native-controller gate | `NativeChipControllerSession`, `MatterControllerSelector`, `ConnectedHomeIpMatterControllerFactory` |
 | connectedhomeip controller facade | `ConnectedHomeIpMatterController` |

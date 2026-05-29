@@ -54,11 +54,16 @@
 - connectedhomeip `v1.5.1.0` Android arm64 controller artifacts were built, packaged into the debug APK, installed on Android device `62311e26`, and observed in logcat loading `libCHIPController.so` plus AndroidChipPlatform JNI.
 - Real Android/Thread device validation succeeded on device `62311e26`: BLE Thread commissioning completed through connectedhomeip, the app restored the commissioned node id, acquired an operational device pointer over IPv6, opened the commissioning window, displayed/copy-ready the returned manual setup code and QR code, and openHAB pairing worked after stale mDNS/Avahi records were cleared.
 - Deterministic fake Matter controller simulates BLE Thread commissioning and OCW.
+- Kotlin/Jetpack Compose automated Matter setup UI guides users through openHAB setup, QR scan, pairing-mode confirmation, Thread commissioning, OpenCommissioningWindow, openHAB scan submission, and Inbox detection.
+- The automated setup workflow exposes user-facing progress states and a 300-second commissioning-window countdown while preserving the connectedhomeip fail-closed readiness gate.
+- Failure recovery keeps sanitized diagnostics and links to advanced troubleshooting guidance for openHAB readiness, network/VPN hints, mDNS/Avahi visibility, IPv6 reachability, expired pairing windows, and pairing-mode checks.
 
 ## Not Implemented Yet
 
 - Broader hardware validation across multiple Matter/Thread devices, Android versions, and OTBR/router combinations.
+- Real-device validation of the new Compose automated setup entry point across QR scan, BLE Thread commissioning, OpenCommissioningWindow, openHAB scan submission, and Inbox success.
 - Production-grade diagnostics for stale or conflicting `_matterc._udp` mDNS/Avahi records; the issue is currently diagnosable through logs and the troubleshooting guide, but not automatically remediated by the app.
+- Advanced in-app recovery actions such as one-tap OpenCommissioningWindow retry for an already staged device and forget-from-phone cleanup are not wired into the Compose troubleshooting screen yet.
 - Long-run connectedhomeip fabric persistence hardening across app restarts, phone reboots, and upgrade/reinstall scenarios. The current real-device flow restores enough controller state to open the commissioning window, but broader lifecycle coverage is still needed.
 
 ## Production Controller Seam
