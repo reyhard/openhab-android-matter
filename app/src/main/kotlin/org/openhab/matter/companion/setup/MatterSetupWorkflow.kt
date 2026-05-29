@@ -6,12 +6,12 @@ class MatterSetupWorkflow(
 ) {
     fun startAutomatedSetup(setupPayload: String) {
         var activeStage = MatterSetupStage.ReadyToScan
-        var diagnosticsConfig = emptyDiagnosticsConfig()
+        var diagnosticsContext = emptyDiagnosticsContext()
         val redactor = SensitiveValueRedactor(setupPayload)
 
         runCatching {
             val config = ports.loadConfig()
-            diagnosticsConfig = config
+            diagnosticsContext = config.toDiagnosticsContext()
             redactor.add(config.openHabApiToken)
             redactor.add(config.threadDataset)
             if (!config.openHabConfigured) {
@@ -27,7 +27,7 @@ class MatterSetupWorkflow(
                     activeStage,
                     "Setup is not ready yet",
                     readiness.failureDetails(),
-                    config,
+                    diagnosticsContext,
                     redactor
                 )
                 return
@@ -49,7 +49,7 @@ class MatterSetupWorkflow(
                     activeStage,
                     "OpenCommissioningWindow did not return a manual setup code",
                     "Blank manual setup code returned by Matter controller",
-                    config,
+                    diagnosticsContext,
                     redactor
                 )
                 return
@@ -66,7 +66,7 @@ class MatterSetupWorkflow(
                     activeStage,
                     "openHAB could not start pairing",
                     scan.details,
-                    config,
+                    diagnosticsContext,
                     redactor
                 )
                 return
@@ -80,7 +80,7 @@ class MatterSetupWorkflow(
                     activeStage,
                     "openHAB did not report the device yet",
                     inbox.details,
-                    config,
+                    diagnosticsContext,
                     redactor
                 )
                 return
@@ -96,7 +96,7 @@ class MatterSetupWorkflow(
                 )
             )
         }.onFailure { error ->
-            fail(activeStage, "Setup could not finish", error.message.orEmpty(), diagnosticsConfig, redactor)
+            fail(activeStage, "Setup could not finish", error.message.orEmpty(), diagnosticsContext, redactor)
         }
     }
 
@@ -104,13 +104,13 @@ class MatterSetupWorkflow(
         stage: MatterSetupStage,
         message: String,
         details: String,
-        config: MatterSetupConfig,
+        diagnosticsContext: MatterSetupDiagnosticsContext,
         redactor: SensitiveValueRedactor
     ) {
         val sanitizedDetails = redactor.sanitize(details)
         val failure = MatterSetupFailure(step = stage, message = message, details = sanitizedDetails)
         val diagnostics = runCatching {
-            ports.runDiagnostics(failure, config.toDiagnosticsSafeConfig()).sanitize(redactor)
+            ports.runDiagnostics(failure, diagnosticsContext).sanitize(redactor)
         }.getOrElse {
             MatterSetupDiagnosticsSummary.empty()
         }
@@ -124,18 +124,17 @@ class MatterSetupWorkflow(
             .joinToString("; ")
     }
 
-    private fun MatterSetupConfig.toDiagnosticsSafeConfig(): MatterSetupConfig {
-        return copy(
-            openHabApiToken = "<redacted>",
-            threadDataset = "<redacted>"
+    private fun MatterSetupConfig.toDiagnosticsContext(): MatterSetupDiagnosticsContext {
+        return MatterSetupDiagnosticsContext(
+            openHabBaseUrl = openHabBaseUrl,
+            otbrBaseUrl = otbrBaseUrl,
+            attestationBypassEnabled = attestationBypassEnabled
         )
     }
 
-    private fun emptyDiagnosticsConfig(): MatterSetupConfig {
-        return MatterSetupConfig(
+    private fun emptyDiagnosticsContext(): MatterSetupDiagnosticsContext {
+        return MatterSetupDiagnosticsContext(
             openHabBaseUrl = "",
-            openHabApiToken = "<redacted>",
-            threadDataset = "<redacted>",
             otbrBaseUrl = "",
             attestationBypassEnabled = false
         )

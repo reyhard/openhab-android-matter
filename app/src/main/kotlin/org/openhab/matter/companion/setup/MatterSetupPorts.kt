@@ -13,13 +13,24 @@ interface MatterSetupPorts {
 
     fun waitForOpenHabInbox(config: MatterSetupConfig, timeoutSeconds: Int): InboxResult
 
-    fun runDiagnostics(failure: MatterSetupFailure, config: MatterSetupConfig): MatterSetupDiagnosticsSummary
+    fun runDiagnostics(
+        failure: MatterSetupFailure,
+        context: MatterSetupDiagnosticsContext
+    ): MatterSetupDiagnosticsSummary
 
     data class ReadinessResult(
         val ready: Boolean,
         val details: List<String>,
         val warnings: List<String> = emptyList()
-    )
+    ) {
+        override fun toString(): String {
+            return "ReadinessResult(" +
+                "ready=$ready, " +
+                "details=<redacted>, " +
+                "warnings=<redacted>" +
+                ")"
+        }
+    }
 
     data class CommissionResult(
         val nodeId: Long,
@@ -70,5 +81,19 @@ interface MatterSetupPorts {
                 "details=<redacted>" +
                 ")"
         }
+    }
+}
+
+data class MatterSetupDiagnosticsContext(
+    val openHabBaseUrl: String,
+    val otbrBaseUrl: String,
+    val attestationBypassEnabled: Boolean
+) {
+    override fun toString(): String {
+        return "MatterSetupDiagnosticsContext(" +
+            "openHabBaseUrl=${openHabBaseUrl.toLogSafeUrl()}, " +
+            "otbrBaseUrl=${otbrBaseUrl.toLogSafeUrl()}, " +
+            "attestationBypassEnabled=$attestationBypassEnabled" +
+            ")"
     }
 }

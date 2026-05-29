@@ -100,13 +100,11 @@ class MatterSetupWorkflowTest {
         assertFalse(state.diagnostics.toString().contains("MT:SECRET"))
         assertFalse(state.diagnostics.toString().contains("controller-state"))
         assertFalse(state.diagnostics.toString().contains("controller-state-2"))
-        assertEquals("http://openhab.local:8080", ports.diagnosticsConfig!!.openHabBaseUrl)
-        assertEquals("<redacted>", ports.diagnosticsConfig!!.openHabApiToken)
-        assertEquals("<redacted>", ports.diagnosticsConfig!!.threadDataset)
-        assertEquals("http://otbr.local", ports.diagnosticsConfig!!.otbrBaseUrl)
-        assertFalse(ports.diagnosticsConfig!!.attestationBypassEnabled)
-        assertFalse(ports.diagnosticsConfig!!.toString().contains("ohab_secret"))
-        assertFalse(ports.diagnosticsConfig!!.toString().contains("hex:001122"))
+        assertEquals("http://openhab.local:8080", ports.diagnosticsContext!!.openHabBaseUrl)
+        assertEquals("http://otbr.local", ports.diagnosticsContext!!.otbrBaseUrl)
+        assertFalse(ports.diagnosticsContext!!.attestationBypassEnabled)
+        assertFalse(ports.diagnosticsContext!!.toString().contains("ohab_secret"))
+        assertFalse(ports.diagnosticsContext!!.toString().contains("hex:001122"))
     }
 
     @Test
@@ -175,11 +173,9 @@ class MatterSetupWorkflowTest {
         assertEquals(MatterSetupStage.ReadyToScan, state.failure!!.step)
         assertFalse(state.failure.details.contains("MT:SECRET"))
         assertEquals(state.failure, ports.diagnosticsFailure)
-        assertEquals("", ports.diagnosticsConfig!!.openHabBaseUrl)
-        assertEquals("<redacted>", ports.diagnosticsConfig!!.openHabApiToken)
-        assertEquals("<redacted>", ports.diagnosticsConfig!!.threadDataset)
-        assertEquals("", ports.diagnosticsConfig!!.otbrBaseUrl)
-        assertFalse(ports.diagnosticsConfig!!.attestationBypassEnabled)
+        assertEquals("", ports.diagnosticsContext!!.openHabBaseUrl)
+        assertEquals("", ports.diagnosticsContext!!.otbrBaseUrl)
+        assertFalse(ports.diagnosticsContext!!.attestationBypassEnabled)
     }
 
     @Test
@@ -286,21 +282,107 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
-    fun configToStringRedactsTokenAndDataset() {
+    fun inboxFailureFailsAtInboxStepAndSanitizesDetailsAndDiagnostics() {
+        val ports = FakeMatterSetupPorts().apply {
+            qrCode = "MT:QRSECRET"
+            inboxMatterEntryDetected = false
+            inboxDetails =
+                "inbox missing for 34970112332 MT:SECRET ohab_secret hex:001122 controller-state controller-state-2 MT:QRSECRET"
+            diagnosticsSummary = MatterSetupDiagnosticsSummary(
+                checks = listOf("inbox check MT:SECRET"),
+                warnings = listOf("manual 34970112332 qr MT:QRSECRET"),
+                details = listOf("token ohab_secret dataset hex:001122 controller-state-2")
+            )
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val state = states.last()
+        val failure = state.failure!!
+        val diagnosticsText = state.diagnostics.toString()
+        assertEquals(MatterSetupStage.Failed, state.stage)
+        assertEquals(MatterSetupStage.WatchingOpenHabInbox, failure.step)
+        assertEquals("openHAB did not report the device yet", failure.message)
+        assertTrue(ports.inboxCalled)
+        assertEquals(failure, ports.diagnosticsFailure)
+        assertEquals("http://openhab.local:8080", ports.diagnosticsContext!!.openHabBaseUrl)
+        assertFalse(states.any { it.stage == MatterSetupStage.SuccessInboxDetected })
+        assertFalse(failure.details.contains("34970112332"))
+        assertFalse(failure.details.contains("MT:SECRET"))
+        assertFalse(failure.details.contains("ohab_secret"))
+        assertFalse(failure.details.contains("hex:001122"))
+        assertFalse(failure.details.contains("controller-state"))
+        assertFalse(failure.details.contains("controller-state-2"))
+        assertFalse(failure.details.contains("MT:QRSECRET"))
+        assertFalse(diagnosticsText.contains("34970112332"))
+        assertFalse(diagnosticsText.contains("MT:SECRET"))
+        assertFalse(diagnosticsText.contains("ohab_secret"))
+        assertFalse(diagnosticsText.contains("hex:001122"))
+        assertFalse(diagnosticsText.contains("controller-state"))
+        assertFalse(diagnosticsText.contains("controller-state-2"))
+        assertFalse(diagnosticsText.contains("MT:QRSECRET"))
+    }
+
+    @Test
+    fun configAndDiagnosticsContextToStringUseSafeUrls() {
         val config = MatterSetupConfig(
-            openHabBaseUrl = "http://openhab.local:8080",
+            openHabBaseUrl = "https://user:password@openhab.local:8443/rest?token=ohab_secret&code=34970112332",
             openHabApiToken = "ohab_secret",
             threadDataset = "hex:001122",
-            otbrBaseUrl = "http://otbr.local",
+            otbrBaseUrl = "http://otbr-user:otbr-password@otbr.local/api?dataset=hex:001122",
             attestationBypassEnabled = true
         )
+        val context = MatterSetupDiagnosticsContext(
+            openHabBaseUrl = config.openHabBaseUrl,
+            otbrBaseUrl = config.otbrBaseUrl,
+            attestationBypassEnabled = config.attestationBypassEnabled
+        )
 
-        val text = config.toString()
+        val configText = config.toString()
+        val contextText = context.toString()
 
-        assertTrue(text.contains("openHabApiToken=<redacted>"))
-        assertTrue(text.contains("threadDataset=<redacted>"))
+        assertTrue(configText.contains("openHabBaseUrl=https://openhab.local:8443/rest"))
+        assertTrue(configText.contains("otbrBaseUrl=http://otbr.local/api"))
+        assertTrue(configText.contains("openHabApiToken=<redacted>"))
+        assertTrue(configText.contains("threadDataset=<redacted>"))
+        assertTrue(contextText.contains("openHabBaseUrl=https://openhab.local:8443/rest"))
+        assertTrue(contextText.contains("otbrBaseUrl=http://otbr.local/api"))
+        assertTrue(contextText.contains("attestationBypassEnabled=true"))
+        assertFalse(configText.contains("user:password"))
+        assertFalse(configText.contains("otbr-user:otbr-password"))
+        assertFalse(configText.contains("token="))
+        assertFalse(configText.contains("dataset="))
+        assertFalse(configText.contains("ohab_secret"))
+        assertFalse(configText.contains("hex:001122"))
+        assertFalse(configText.contains("34970112332"))
+        assertFalse(contextText.contains("user:password"))
+        assertFalse(contextText.contains("otbr-user:otbr-password"))
+        assertFalse(contextText.contains("token="))
+        assertFalse(contextText.contains("dataset="))
+        assertFalse(contextText.contains("ohab_secret"))
+        assertFalse(contextText.contains("hex:001122"))
+        assertFalse(contextText.contains("34970112332"))
+    }
+
+    @Test
+    fun readinessResultToStringRedactsDetailsAndWarningsButPreservesReady() {
+        val result = MatterSetupPorts.ReadinessResult(
+            ready = true,
+            details = listOf("connectedhomeip detail ohab_secret hex:001122"),
+            warnings = listOf("warning MT:SECRET 34970112332")
+        )
+
+        val text = result.toString()
+
+        assertTrue(text.contains("ready=true"))
+        assertTrue(text.contains("details=<redacted>"))
+        assertTrue(text.contains("warnings=<redacted>"))
         assertFalse(text.contains("ohab_secret"))
         assertFalse(text.contains("hex:001122"))
+        assertFalse(text.contains("MT:SECRET"))
+        assertFalse(text.contains("34970112332"))
     }
 
     private class FakeMatterSetupPorts : MatterSetupPorts {
@@ -320,7 +402,7 @@ class MatterSetupWorkflowTest {
         var scanManualCode: String? = null
         var waitForInboxTimeoutSeconds: Int? = null
         var diagnosticsFailure: MatterSetupFailure? = null
-        var diagnosticsConfig: MatterSetupConfig? = null
+        var diagnosticsContext: MatterSetupDiagnosticsContext? = null
         var diagnosticsSummary = MatterSetupDiagnosticsSummary.empty()
         var diagnosticsError: RuntimeException? = null
         var loadConfigError: RuntimeException? = null
@@ -332,6 +414,8 @@ class MatterSetupWorkflowTest {
         var readinessReady = true
         var readinessDetails = listOf("openHAB connected")
         var readinessWarnings = emptyList<String>()
+        var inboxMatterEntryDetected = true
+        var inboxDetails = "Matter Inbox entry detected"
 
         override fun loadConfig(): MatterSetupConfig {
             loadConfigCalled = true
@@ -398,15 +482,15 @@ class MatterSetupWorkflowTest {
         ): MatterSetupPorts.InboxResult {
             inboxCalled = true
             waitForInboxTimeoutSeconds = timeoutSeconds
-            return MatterSetupPorts.InboxResult(matterEntryDetected = true, details = "Matter Inbox entry detected")
+            return MatterSetupPorts.InboxResult(matterEntryDetected = inboxMatterEntryDetected, details = inboxDetails)
         }
 
         override fun runDiagnostics(
             failure: MatterSetupFailure,
-            config: MatterSetupConfig
+            context: MatterSetupDiagnosticsContext
         ): MatterSetupDiagnosticsSummary {
             diagnosticsFailure = failure
-            diagnosticsConfig = config
+            diagnosticsContext = context
             diagnosticsError?.let { throw it }
             return diagnosticsSummary
         }
