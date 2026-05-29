@@ -7,6 +7,7 @@ data class MatterSetupUiState(
     val steps: List<MatterSetupStep> = emptyList(),
     val activeDetail: String? = null,
     val countdownSeconds: Int? = null,
+    val deviceIdentity: MatterSetupDeviceIdentity? = null,
     val primaryAction: MatterSetupAction? = null,
     val primaryActionLabel: String = "",
     val primaryActionEnabled: Boolean = true,
@@ -39,7 +40,8 @@ data class MatterSetupUiState(
         fun progress(
             stage: MatterSetupStage,
             countdownSeconds: Int? = null,
-            activeDetail: String? = null
+            activeDetail: String? = null,
+            deviceIdentity: MatterSetupDeviceIdentity? = null
         ): MatterSetupUiState {
             return MatterSetupUiState(
                 stage = stage,
@@ -48,6 +50,7 @@ data class MatterSetupUiState(
                 steps = progressSteps(stage, activeDetail.orEmpty()),
                 activeDetail = activeDetail?.takeIf { it.isNotBlank() },
                 countdownSeconds = countdownSeconds,
+                deviceIdentity = deviceIdentity?.takeIf { it.visible() },
                 secondaryActions = listOf(MatterSetupAction.ShowTroubleshooting)
             )
         }

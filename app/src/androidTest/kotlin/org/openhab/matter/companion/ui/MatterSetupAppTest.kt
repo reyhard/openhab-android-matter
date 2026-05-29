@@ -14,6 +14,7 @@ import org.openhab.matter.companion.setup.MatterSetupFailure
 import org.openhab.matter.companion.setup.MatterSetupStage
 import org.openhab.matter.companion.setup.MatterSetupStateReducer
 import org.openhab.matter.companion.setup.MatterSetupUiState
+import org.openhab.matter.companion.setup.MatterSetupDeviceIdentity
 import org.openhab.matter.companion.setup.PhoneMatterDevice
 
 class MatterSetupAppTest {
@@ -110,7 +111,8 @@ class MatterSetupAppTest {
             MatterSetupUiState.progress(
                 MatterSetupStage.CommissioningWindowOpen,
                 countdownSeconds = 300,
-                activeDetail = "Waiting for device on the Thread network"
+                activeDetail = "Waiting for device on the Thread network",
+                deviceIdentity = MatterSetupDeviceIdentity(vendorName = "Aqara", productName = "U200")
             )
         )
 
@@ -118,6 +120,10 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Opening pairing window").assertIsDisplayed()
         composeRule.onNodeWithText("Waiting for device on the Thread network").assertIsDisplayed()
         composeRule.onNodeWithText("Pairing window open for 5:00").assertIsDisplayed()
+        composeRule.onNodeWithText("Vendor").assertIsDisplayed()
+        composeRule.onNodeWithText("Aqara").assertIsDisplayed()
+        composeRule.onNodeWithText("Product").assertIsDisplayed()
+        composeRule.onNodeWithText("U200").assertIsDisplayed()
     }
 
     @Test

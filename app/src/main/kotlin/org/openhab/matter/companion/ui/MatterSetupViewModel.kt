@@ -32,6 +32,7 @@ import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupConfig
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsContext
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsSummary
+import org.openhab.matter.companion.setup.MatterSetupDeviceIdentity
 import org.openhab.matter.companion.setup.MatterSetupFailure
 import org.openhab.matter.companion.setup.MatterSetupPorts
 import org.openhab.matter.companion.setup.MatterSetupStage
@@ -696,6 +697,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 emitState(MatterSetupUiState.progress(activeStage))
                 val ports = createRealPorts()
                 val window = ports.openCommissioningWindow(bootstrap.bootstrapNodeId(), bootstrap.controllerState())
+                val windowIdentity = MatterSetupDeviceIdentity(window.vendorName, window.productName)
                 if (window.manualCode.isBlank()) {
                     emitWorkflowFailure(
                         activeStage,
@@ -708,10 +710,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 }
 
                 activeStage = MatterSetupStage.CommissioningWindowOpen
-                emitState(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
+                emitState(MatterSetupUiState.progress(activeStage, window.timeoutSeconds, deviceIdentity = windowIdentity))
 
                 activeStage = MatterSetupStage.SendingCodeToOpenHab
-                emitState(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
+                emitState(MatterSetupUiState.progress(activeStage, window.timeoutSeconds, deviceIdentity = windowIdentity))
                 val scan = ports.sendCodeToOpenHab(window.manualCode, workflowConfig)
                 if (!scan.started) {
                     emitWorkflowFailure(
@@ -887,7 +889,9 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                         manualCode = result.manualCode(),
                         qrCode = result.qrCode(),
                         controllerState = result.controllerState(),
-                        timeoutSeconds = 300
+                        timeoutSeconds = 300,
+                        vendorName = currentState.vendorName(),
+                        productName = currentState.productName()
                     )
                 }
             },

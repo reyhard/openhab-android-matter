@@ -43,11 +43,14 @@ class MatterSetupWorkflow(
                     emit(MatterSetupUiState.progress(activeStage, activeDetail = detail))
                 }
             }
+            val commissionedIdentity = MatterSetupDeviceIdentity(commission.vendorName, commission.productName)
             redactor.add(commission.controllerState)
 
             activeStage = MatterSetupStage.OpeningCommissioningWindow
             emit(MatterSetupUiState.progress(activeStage))
             val window = ports.openCommissioningWindow(commission.nodeId, commission.controllerState)
+            val windowIdentity = MatterSetupDeviceIdentity(window.vendorName, window.productName)
+                .takeIf { it.visible() } ?: commissionedIdentity
             redactor.add(window.manualCode)
             redactor.add(window.qrCode)
             redactor.add(window.controllerState)
@@ -63,10 +66,10 @@ class MatterSetupWorkflow(
             }
 
             activeStage = MatterSetupStage.CommissioningWindowOpen
-            emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
+            emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds, deviceIdentity = windowIdentity))
 
             activeStage = MatterSetupStage.SendingCodeToOpenHab
-            emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds))
+            emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds, deviceIdentity = windowIdentity))
             val scan = ports.sendCodeToOpenHab(window.manualCode, config)
             if (!scan.started) {
                 fail(

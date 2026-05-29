@@ -51,7 +51,9 @@ interface MatterSetupPorts {
         val manualCode: String,
         val qrCode: String,
         val controllerState: String,
-        val timeoutSeconds: Int
+        val timeoutSeconds: Int,
+        val vendorName: String = "",
+        val productName: String = ""
     ) {
         override fun toString(): String {
             return "OpenWindowResult(" +

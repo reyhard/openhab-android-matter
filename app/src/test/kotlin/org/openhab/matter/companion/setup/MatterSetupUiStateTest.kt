@@ -46,12 +46,19 @@ class MatterSetupUiStateTest {
 
     @Test
     fun commissioningWindowOpenStateMarksPairingWindowStepComplete() {
-        val state = MatterSetupUiState.progress(MatterSetupStage.CommissioningWindowOpen, countdownSeconds = 300)
+        val state = MatterSetupUiState.progress(
+            MatterSetupStage.CommissioningWindowOpen,
+            countdownSeconds = 300,
+            deviceIdentity = MatterSetupDeviceIdentity(vendorName = "Aqara", productName = "U200")
+        )
 
         assertEquals("Opening pairing window", state.steps[2].label)
         assertEquals(MatterSetupStepStatus.Complete, state.steps[2].status)
         assertFalse(state.steps.any { it.status == MatterSetupStepStatus.Active })
         assertEquals(300, state.countdownSeconds)
+        assertEquals("Aqara", state.deviceIdentity?.vendorName)
+        assertEquals("U200", state.deviceIdentity?.productName)
+        assertEquals("Aqara U200", state.deviceIdentity?.displayName)
     }
 
     @Test

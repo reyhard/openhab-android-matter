@@ -43,6 +43,25 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
+    fun openPairingWindowStatesIncludeCommissionedDeviceIdentity() {
+        val ports = FakeMatterSetupPorts().apply {
+            vendorName = "Aqara"
+            productName = "U200"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("pin=20202021;disc=3840;vendor=Aqara;product=U200")
+
+        val windowOpenState = states.first { it.stage == MatterSetupStage.CommissioningWindowOpen }
+        val sendingState = states.first { it.stage == MatterSetupStage.SendingCodeToOpenHab }
+        assertEquals("Aqara", windowOpenState.deviceIdentity?.vendorName)
+        assertEquals("U200", windowOpenState.deviceIdentity?.productName)
+        assertEquals("Aqara U200", windowOpenState.deviceIdentity?.displayName)
+        assertEquals(windowOpenState.deviceIdentity, sendingState.deviceIdentity)
+    }
+
+    @Test
     fun commissioningProgressUpdatesCurrentPhoneCommissioningDetail() {
         val ports = FakeMatterSetupPorts().apply {
             commissionProgressMessages = listOf(
@@ -625,6 +644,8 @@ class MatterSetupWorkflowTest {
         var qrCode = ""
         var commissionControllerState = "controller-state"
         var windowControllerState = "controller-state-2"
+        var vendorName = ""
+        var productName = ""
         var readinessReady = true
         var readinessDetails = listOf("openHAB connected")
         var readinessWarnings = emptyList<String>()
@@ -661,7 +682,12 @@ class MatterSetupWorkflowTest {
             commissionCalled = true
             commissionSetupPayload = setupPayload
             commissionProgressMessages.forEach(progress)
-            return MatterSetupPorts.CommissionResult(nodeId = 1234L, controllerState = commissionControllerState)
+            return MatterSetupPorts.CommissionResult(
+                nodeId = 1234L,
+                controllerState = commissionControllerState,
+                vendorName = vendorName,
+                productName = productName
+            )
         }
 
         override fun openCommissioningWindow(
