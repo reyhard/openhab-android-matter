@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import java.nio.charset.StandardCharsets
-import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -24,18 +23,87 @@ class AndroidMatterMdnsBrowser(
 
     private fun browse(serviceType: String, timeoutMillis: Long): List<MatterMdnsRecord> {
         val manager = nsdManager ?: return emptyList()
-        val records = Collections.synchronizedList(mutableListOf<MatterMdnsRecord>())
-        val seenServices = Collections.synchronizedSet(mutableSetOf<String>())
+        val stateLock = Object()
+        val records = mutableListOf<MatterMdnsRecord>()
+        val seenServices = mutableSetOf<String>()
+        val pendingServices = ArrayDeque<NsdServiceInfo>()
+        var resolveInProgress = false
+        var acceptingResolveResults = true
         val discoveryFinished = CountDownLatch(1)
+        val timeout = timeoutMillis.coerceAtLeast(0L)
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout)
+
+        lateinit var startResolve: (NsdServiceInfo) -> Unit
+
+        fun completeResolve(record: MatterMdnsRecord?) {
+            val nextService = synchronized(stateLock) {
+                if (record != null && acceptingResolveResults) {
+                    records.add(record)
+                }
+
+                val next = pendingServices.removeFirstOrNull()
+                resolveInProgress = next != null
+                if (!resolveInProgress) {
+                    stateLock.notifyAll()
+                }
+                next
+            }
+
+            if (nextService != null) {
+                startResolve(nextService)
+            }
+        }
+
+        startResolve = { serviceInfo ->
+            resolve(
+                manager = manager,
+                requestedServiceType = serviceType,
+                serviceInfo = serviceInfo,
+                onComplete = ::completeResolve
+            )
+        }
+
+        fun enqueueResolve(serviceInfo: NsdServiceInfo) {
+            val serviceToResolve = synchronized(stateLock) {
+                val key = "${serviceInfo.serviceType}/${serviceInfo.serviceName}"
+                if (!acceptingResolveResults || !seenServices.add(key)) {
+                    return
+                }
+
+                if (resolveInProgress) {
+                    pendingServices.addLast(serviceInfo)
+                    null
+                } else {
+                    resolveInProgress = true
+                    serviceInfo
+                }
+            }
+
+            if (serviceToResolve != null) {
+                startResolve(serviceToResolve)
+            }
+        }
+
+        fun waitForResolveIdle(timeoutMillis: Long) {
+            if (timeoutMillis <= 0L) {
+                return
+            }
+
+            val resolveDeadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+            synchronized(stateLock) {
+                var remainingNanos = resolveDeadlineNanos - System.nanoTime()
+                while (resolveInProgress && remainingNanos > 0L) {
+                    stateLock.wait(TimeUnit.NANOSECONDS.toMillis(remainingNanos).coerceAtLeast(1L))
+                    remainingNanos = resolveDeadlineNanos - System.nanoTime()
+                }
+            }
+        }
+
         val listener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(regType: String) = Unit
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
-                val key = "${serviceInfo.serviceType}/${serviceInfo.serviceName}"
-                if (!seenServices.add(key)) {
-                    return
-                }
-                resolve(manager, serviceType, serviceInfo, records)
+                enqueueResolve(serviceInfo)
             }
 
             override fun onServiceLost(serviceInfo: NsdServiceInfo) = Unit
@@ -55,9 +123,14 @@ class AndroidMatterMdnsBrowser(
 
         return try {
             manager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, listener)
-            discoveryFinished.await(timeoutMillis.coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+            discoveryFinished.await(timeout, TimeUnit.MILLISECONDS)
             stopDiscovery(manager, listener)
-            records.toList()
+            waitForResolveIdle(remainingMillis(deadlineNanos))
+            synchronized(stateLock) {
+                acceptingResolveResults = false
+                pendingServices.clear()
+                records.toList()
+            }
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
             emptyList()
@@ -74,24 +147,26 @@ class AndroidMatterMdnsBrowser(
         manager: NsdManager,
         requestedServiceType: String,
         serviceInfo: NsdServiceInfo,
-        records: MutableList<MatterMdnsRecord>
+        onComplete: (MatterMdnsRecord?) -> Unit
     ) {
         val listener = object : NsdManager.ResolveListener {
-            override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) = Unit
+            override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+                onComplete(null)
+            }
 
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-                records.add(serviceInfo.toMatterMdnsRecord(requestedServiceType))
+                onComplete(serviceInfo.toMatterMdnsRecord(requestedServiceType))
             }
         }
 
         try {
             manager.resolveService(serviceInfo, listener)
         } catch (e: SecurityException) {
-            return
+            onComplete(null)
         } catch (e: IllegalArgumentException) {
-            return
+            onComplete(null)
         } catch (e: RuntimeException) {
-            return
+            onComplete(null)
         }
     }
 
@@ -123,6 +198,14 @@ class AndroidMatterMdnsBrowser(
                 value.toString(StandardCharsets.UTF_8)
             }
         )
+    }
+
+    private fun remainingMillis(deadlineNanos: Long): Long {
+        val remainingNanos = deadlineNanos - System.nanoTime()
+        if (remainingNanos <= 0L) {
+            return 0L
+        }
+        return TimeUnit.NANOSECONDS.toMillis(remainingNanos).coerceAtLeast(1L)
     }
 
     private companion object {
