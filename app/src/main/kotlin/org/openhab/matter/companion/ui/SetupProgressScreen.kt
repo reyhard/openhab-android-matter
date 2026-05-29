@@ -12,9 +12,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import org.openhab.matter.companion.setup.CommissioningWindowCountdown
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupUiState
@@ -25,6 +31,20 @@ fun SetupProgressScreen(
     state: MatterSetupUiState,
     onAction: (MatterSetupAction) -> Unit
 ) {
+    val countdownSeconds = state.countdownSeconds
+    var displayedCountdownSeconds by remember(countdownSeconds) {
+        mutableIntStateOf(countdownSeconds ?: 0)
+    }
+    LaunchedEffect(countdownSeconds) {
+        if (countdownSeconds != null) {
+            displayedCountdownSeconds = countdownSeconds
+            while (displayedCountdownSeconds > 0) {
+                delay(1_000L)
+                displayedCountdownSeconds -= 1
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -38,10 +58,10 @@ fun SetupProgressScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(text = state.message)
-        state.countdownSeconds?.let { remainingSeconds ->
+        countdownSeconds?.let {
             Spacer(Modifier.height(12.dp))
             Text(
-                text = CommissioningWindowCountdown.displayText(remainingSeconds),
+                text = CommissioningWindowCountdown.displayText(displayedCountdownSeconds),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
