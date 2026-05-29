@@ -112,10 +112,12 @@ object MatterSetupStateReducer {
     fun advancedTroubleshooting(current: MatterSetupUiState): MatterSetupUiState {
         val primaryAction = when (current.stage) {
             MatterSetupStage.NeedsOpenHabSetup,
-            MatterSetupStage.OpenHabSetupChecking,
+            MatterSetupStage.OpenHabSetupChecking -> MatterSetupAction.BackToRequiredSetup
+
             MatterSetupStage.Settings,
             MatterSetupStage.ChangeToken,
             MatterSetupStage.ThreadNetworkEditor -> MatterSetupAction.BackToSettings
+
             else -> MatterSetupAction.Retry
         }
         return MatterSetupUiState(
@@ -123,10 +125,9 @@ object MatterSetupStateReducer {
             title = "Advanced troubleshooting",
             message = current.failure?.message ?: "Review setup diagnostics before trying again.",
             primaryAction = primaryAction,
-            primaryActionLabel = if (primaryAction == MatterSetupAction.BackToSettings) {
-                "Back to settings"
-            } else {
-                "Back to setup"
+            primaryActionLabel = when (primaryAction) {
+                MatterSetupAction.BackToSettings -> "Back to settings"
+                else -> "Back to setup"
             },
             failure = current.failure,
             diagnostics = current.diagnostics

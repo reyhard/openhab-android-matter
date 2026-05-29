@@ -141,4 +141,14 @@ class MatterSetupStateReducerTest {
         assertEquals(MatterSetupAction.BackToSettings, state.primaryAction)
         assertEquals("Back to settings", state.primaryActionLabel)
     }
+
+    @Test
+    fun advancedTroubleshootingFromRequiredSetupReturnsToRequiredSetup() {
+        val state = MatterSetupStateReducer.advancedTroubleshooting(
+            MatterSetupStateReducer.requiredSetup("http://openhab:8080")
+        )
+
+        assertEquals(MatterSetupAction.BackToRequiredSetup, state.primaryAction)
+        assertEquals("Back to setup", state.primaryActionLabel)
+    }
 }

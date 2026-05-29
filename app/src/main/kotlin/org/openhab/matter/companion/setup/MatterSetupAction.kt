@@ -15,6 +15,7 @@ sealed interface MatterSetupAction {
     data class SelectThreadBorderRouter(val endpoint: String) : MatterSetupAction
     data object BackToMainMenu : MatterSetupAction
     data object BackToSettings : MatterSetupAction
+    data object BackToRequiredSetup : MatterSetupAction
     data object ShowPhoneDevices : MatterSetupAction
     data object StartScan : MatterSetupAction
     data object EnterCodeManually : MatterSetupAction

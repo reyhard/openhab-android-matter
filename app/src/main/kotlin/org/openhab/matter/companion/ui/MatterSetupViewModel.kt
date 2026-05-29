@@ -208,6 +208,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 uiState = MatterSetupStateReducer.settings()
             }
 
+            MatterSetupAction.BackToRequiredSetup -> {
+                uiState = MatterSetupStateReducer.requiredSetup(openHabUrl)
+            }
+
             MatterSetupAction.SaveOpenHab,
             MatterSetupAction.TestOpenHab,
             MatterSetupAction.TestSettings -> {

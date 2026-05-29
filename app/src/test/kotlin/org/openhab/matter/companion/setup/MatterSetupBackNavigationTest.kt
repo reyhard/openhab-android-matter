@@ -51,6 +51,15 @@ class MatterSetupBackNavigationTest {
     }
 
     @Test
+    fun troubleshootingFromRequiredSetupBackReturnsToRequiredSetup() {
+        val state = MatterSetupStateReducer.advancedTroubleshooting(
+            MatterSetupStateReducer.requiredSetup("http://openhab:8080")
+        )
+
+        assertEquals(MatterSetupAction.BackToRequiredSetup, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
     fun manualCodeBackReturnsToMainScreen() {
         val state = MatterSetupStateReducer.manualCodeEntry()
 
