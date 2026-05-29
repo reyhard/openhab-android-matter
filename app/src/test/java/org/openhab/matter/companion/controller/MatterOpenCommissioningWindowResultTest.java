@@ -14,6 +14,7 @@ public class MatterOpenCommissioningWindowResultTest {
                 "updated-controller-state");
 
         assertEquals("3497-0112-332", result.temporaryCode());
+        assertEquals("3497-0112-332", result.manualCode());
         assertEquals("MT:Y.K9042C00KA0648G00", result.qrCode());
         assertEquals(true, result.hasQrCode());
         assertEquals("updated-controller-state", result.controllerState());
@@ -26,7 +27,8 @@ public class MatterOpenCommissioningWindowResultTest {
                 "MT:Y.K9042C00KA0648G00",
                 "updated-controller-state");
 
-        assertEquals("MT:Y.K9042C00KA0648G00", result.temporaryCode());
+        assertEquals("", result.temporaryCode());
+        assertEquals("", result.manualCode());
         assertEquals("MT:Y.K9042C00KA0648G00", result.qrCode());
         assertEquals(true, result.hasQrCode());
     }

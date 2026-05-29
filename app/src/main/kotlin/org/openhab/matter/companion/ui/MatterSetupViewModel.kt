@@ -364,7 +364,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     )
                     bootstrapStateRepository.save(MatterBootstrapState(nodeId, result.controllerState(), false))
                     return MatterSetupPorts.OpenWindowResult(
-                        manualCode = result.temporaryCode(),
+                        manualCode = result.manualCode(),
                         qrCode = result.qrCode(),
                         controllerState = result.controllerState(),
                         timeoutSeconds = 300

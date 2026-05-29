@@ -15,12 +15,16 @@ public final class MatterOpenCommissioningWindowResult {
         if (safeTemporaryCode.isEmpty() && safeQrCode.isEmpty()) {
             throw new IllegalArgumentException("temporaryCode or qrCode is required");
         }
-        this.temporaryCode = safeTemporaryCode.isEmpty() ? safeQrCode : safeTemporaryCode;
+        this.temporaryCode = safeTemporaryCode;
         this.qrCode = safeQrCode;
         this.controllerState = nullToEmpty(controllerState);
     }
 
     public String temporaryCode() {
+        return temporaryCode;
+    }
+
+    public String manualCode() {
         return temporaryCode;
     }
 
