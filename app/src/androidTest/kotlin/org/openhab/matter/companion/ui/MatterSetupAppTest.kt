@@ -280,4 +280,8 @@ class MatterSetupAppTest {
             )
         }
     }
+
+    private fun assertOpenHabLogoAndMatterVisualsCanRender() {
+        composeRule.onNodeWithText("Set up Matter with openHAB").assertIsDisplayed()
+    }
 }
