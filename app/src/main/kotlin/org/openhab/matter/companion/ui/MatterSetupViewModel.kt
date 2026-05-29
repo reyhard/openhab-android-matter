@@ -30,6 +30,7 @@ import org.openhab.matter.companion.openhab.OpenHabStatus
 import org.openhab.matter.companion.setup.AndroidMatterSetupPorts
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupConfig
+import org.openhab.matter.companion.setup.MatterSetupConfigCompleteness
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsContext
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsSummary
 import org.openhab.matter.companion.setup.MatterSetupDeviceIdentity
@@ -104,7 +105,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             threadDataset,
             config.threadDatasetUnreadable()
         ).title
-        openHabConfigured = config.openHabBaseUrl().isNotBlank()
+        openHabConfigured = MatterSetupConfigCompleteness.isComplete(config)
         uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
     }
 
@@ -660,7 +661,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         threadDataset = config.threadDataset()
         otbrBaseUrl = config.otbrBaseUrl()
         attestationBypassEnabled = config.attestationBypassEnabled()
-        openHabConfigured = config.openHabBaseUrl().isNotBlank()
+        openHabConfigured = MatterSetupConfigCompleteness.isComplete(config)
         threadSettingsMessage = ThreadDatasetSettingsValidator.validate(
             threadDataset,
             config.threadDatasetUnreadable()

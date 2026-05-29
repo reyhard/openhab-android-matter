@@ -56,4 +56,46 @@ class MatterSetupBackNavigationTest {
 
         assertEquals(MatterSetupAction.BackToMainMenu, MatterSetupBackNavigation.systemBackAction(state))
     }
+
+    @Test
+    fun scanningQrBackReturnsToMainScreen() {
+        val state = MatterSetupUiState(
+            stage = MatterSetupStage.ScanningQr,
+            title = "Scan Matter QR code",
+            message = "Point the camera at the Matter QR code."
+        )
+
+        assertEquals(MatterSetupAction.BackToMainMenu, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
+    fun pairingModeBackReturnsToMainScreen() {
+        val state = MatterSetupUiState(
+            stage = MatterSetupStage.NeedsPairingMode,
+            title = "Put device in pairing mode",
+            message = "Make sure the Matter device is ready."
+        )
+
+        assertEquals(MatterSetupAction.BackToMainMenu, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
+    fun progressBackIsNotIntercepted() {
+        val state = MatterSetupUiState.progress(MatterSetupStage.ReadinessChecking)
+
+        assertNull(MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
+    fun failureBackIsNotIntercepted() {
+        val state = MatterSetupUiState.failed(
+            MatterSetupFailure(
+                step = MatterSetupStage.ReadinessChecking,
+                message = "Setup failed"
+            ),
+            MatterSetupDiagnosticsSummary.empty()
+        )
+
+        assertNull(MatterSetupBackNavigation.systemBackAction(state))
+    }
 }
