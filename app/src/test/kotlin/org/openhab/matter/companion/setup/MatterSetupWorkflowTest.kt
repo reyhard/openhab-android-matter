@@ -160,6 +160,64 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
+    fun scanFailureSanitizesDerivedUrlsInFailureStateAndDiagnostics() {
+        val ports = FakeMatterSetupPorts().apply {
+            openHabBaseUrl =
+                "https://openhab-user:openhab-password@openhab.local:8443/rest?token=ohab_secret"
+            otbrBaseUrl =
+                "http://otbr-user:otbr-password@otbr.local/api?dataset=hex:001122"
+            scanStarted = false
+            scanDetails =
+                "scan failed at https://derived-user:derived-password@openhab.local:8443/rest/things?querySecret=value&token=ohab_secret#scan-fragment with manual 34970112332 and payload MT:SECRET"
+            diagnosticsSummary = MatterSetupDiagnosticsSummary(
+                checks = listOf(
+                    "check http://derived-otbr:derived-otbr-password@otbr.local/api/thread-dataset?dataset=hex:001122&querySecret=otbr-value#otbr-fragment"
+                ),
+                warnings = listOf("warning controller-state"),
+                details = listOf(
+                    "detail https://derived-user:derived-password@openhab.local:8443/rest/things/123?manual=34970112332#detail-fragment MT:SECRET controller-state-2"
+                )
+            )
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val failureDetails = states.last().failure!!.details
+        val diagnosticsText = states.last().diagnostics.toString()
+        assertTrue(failureDetails.contains("https://openhab.local:8443/rest/things"))
+        assertTrue(diagnosticsText.contains("http://otbr.local/api/thread-dataset"))
+        assertTrue(diagnosticsText.contains("https://openhab.local:8443/rest/things/123"))
+        assertFalse(failureDetails.contains("derived-user"))
+        assertFalse(failureDetails.contains("derived-password"))
+        assertFalse(failureDetails.contains("querySecret"))
+        assertFalse(failureDetails.contains("value"))
+        assertFalse(failureDetails.contains("scan-fragment"))
+        assertFalse(failureDetails.contains("ohab_secret"))
+        assertFalse(failureDetails.contains("hex:001122"))
+        assertFalse(failureDetails.contains("34970112332"))
+        assertFalse(failureDetails.contains("MT:SECRET"))
+        assertFalse(failureDetails.contains("controller-state"))
+        assertFalse(failureDetails.contains("controller-state-2"))
+        assertFalse(diagnosticsText.contains("derived-user"))
+        assertFalse(diagnosticsText.contains("derived-password"))
+        assertFalse(diagnosticsText.contains("derived-otbr"))
+        assertFalse(diagnosticsText.contains("derived-otbr-password"))
+        assertFalse(diagnosticsText.contains("manual="))
+        assertFalse(diagnosticsText.contains("querySecret"))
+        assertFalse(diagnosticsText.contains("otbr-value"))
+        assertFalse(diagnosticsText.contains("detail-fragment"))
+        assertFalse(diagnosticsText.contains("otbr-fragment"))
+        assertFalse(diagnosticsText.contains("ohab_secret"))
+        assertFalse(diagnosticsText.contains("hex:001122"))
+        assertFalse(diagnosticsText.contains("34970112332"))
+        assertFalse(diagnosticsText.contains("MT:SECRET"))
+        assertFalse(diagnosticsText.contains("controller-state"))
+        assertFalse(diagnosticsText.contains("controller-state-2"))
+    }
+
+    @Test
     fun readinessFailureReplacesRawConfiguredUrlsWithSafeUrlsInFailureDetails() {
         val ports = FakeMatterSetupPorts().apply {
             openHabBaseUrl =

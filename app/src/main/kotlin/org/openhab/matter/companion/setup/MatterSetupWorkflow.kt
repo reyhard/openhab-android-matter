@@ -170,7 +170,8 @@ class MatterSetupWorkflow(
         }
 
         fun sanitize(text: String): String {
-            return replacements.entries.sortedByDescending { it.key.length }.fold(text) { sanitized, entry ->
+            val urlRedacted = text.sanitizeLogUrls()
+            return replacements.entries.sortedByDescending { it.key.length }.fold(urlRedacted) { sanitized, entry ->
                 sanitized.replace(entry.key, entry.value)
             }
         }
