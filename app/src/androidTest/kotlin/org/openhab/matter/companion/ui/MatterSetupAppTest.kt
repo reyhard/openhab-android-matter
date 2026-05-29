@@ -23,11 +23,12 @@ class MatterSetupAppTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun firstRunSetupScreenShowsWelcome() {
-        render(MatterSetupUiState.initial(openHabConfigured = false))
+    fun firstRunShowsWelcomeScreen() {
+        render(MatterSetupStateReducer.reset(setupComplete = false, openHabUrl = "http://openhab:8080"))
 
         composeRule.onNodeWithText("Set up Matter with openHAB").assertIsDisplayed()
         composeRule.onNodeWithText("Get started").assertIsDisplayed()
+        composeRule.onNodeWithText("Easy and guided").assertIsDisplayed()
     }
 
     @Test
@@ -46,13 +47,37 @@ class MatterSetupAppTest {
     }
 
     @Test
-    fun readyToScanScreenShowsQrManualAndSettingsActions() {
-        render(MatterSetupUiState.initial(openHabConfigured = true))
+    fun addMatterDeviceScreenShowsScanManualAndSettingsCog() {
+        render(MatterSetupUiState.addMatterDevice())
 
         composeRule.onNodeWithText("Add Matter device").assertIsDisplayed()
-        composeRule.onNodeWithText("Scan QR code").assertIsDisplayed()
+        composeRule.onNodeWithText("Scan code").assertIsDisplayed()
         composeRule.onNodeWithText("Enter code manually").assertIsDisplayed()
-        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        composeRule.onNodeWithText("⚙").assertIsDisplayed()
+        composeRule.onNodeWithText("You can enter the 11-digit setup code instead.").assertIsDisplayed()
+    }
+
+    @Test
+    fun getStartedDispatchesAction() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.reset(setupComplete = false, openHabUrl = "http://openhab:8080"),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Get started").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.GetStarted))
+    }
+
+    @Test
+    fun settingsCogDispatchesEditSettings() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(MatterSetupUiState.addMatterDevice(), onAction = actions::add)
+
+        composeRule.onNodeWithText("⚙").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.EditSettings))
     }
 
     @Test

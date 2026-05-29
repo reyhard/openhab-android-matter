@@ -1,51 +1,57 @@
 package org.openhab.matter.companion.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import org.openhab.matter.companion.R
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupUiState
+import org.openhab.matter.companion.ui.components.MatterSetupScaffold
+import org.openhab.matter.companion.ui.components.SectionLabel
+import org.openhab.matter.companion.ui.components.SettingsCard
 
 @Composable
 fun ScanDeviceScreen(
     state: MatterSetupUiState,
     onAction: (MatterSetupAction) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp)
+    MatterSetupScaffold(
+        title = state.title.ifBlank { "Add Matter device" },
+        message = state.message.ifBlank { "Scan the device QR code or enter the setup code manually." },
+        showSettings = true,
+        onSettings = { onAction(MatterSetupAction.EditSettings) }
     ) {
-        Text(
-            text = state.title.ifBlank { "Scan your device code" },
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold
+        Image(
+            painter = painterResource(R.drawable.matter_scan_guide),
+            contentDescription = "Matter scan guide",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .clip(RoundedCornerShape(8.dp))
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = state.message.ifBlank {
-                "Point your camera at the Matter QR code on the device or box."
-            }
-        )
+        Spacer(Modifier.height(24.dp))
+        ReadinessGuideCard()
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = { onAction(MatterSetupAction.StartScan) },
@@ -53,7 +59,7 @@ fun ScanDeviceScreen(
         ) {
             QrCodeIcon()
             Spacer(Modifier.width(12.dp))
-            Text("Scan QR code")
+            Text(state.primaryActionLabel.ifBlank { "Scan code" })
         }
         Spacer(Modifier.height(12.dp))
         OutlinedButton(
@@ -62,13 +68,41 @@ fun ScanDeviceScreen(
         ) {
             Text("Enter code manually")
         }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.EditSettings) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Settings")
+    }
+}
+
+@Composable
+private fun ReadinessGuideCard() {
+    SettingsCard {
+        SectionLabel("Ready to pair")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ReadinessRow("openHAB connected")
+            ReadinessRow("Thread network ready")
+            ReadinessRow("Bluetooth and location ready")
         }
+        Text(
+            text = "You can enter the 11-digit setup code instead.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun ReadinessRow(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Ready",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 

@@ -39,7 +39,11 @@ fun MatterSetupApp(
             systemBackAction?.let(onAction)
         }
         when (state.stage) {
-            MatterSetupStage.Welcome,
+            MatterSetupStage.Welcome -> WelcomeScreen(
+                state = state,
+                onAction = onAction
+            )
+
             MatterSetupStage.NeedsOpenHabSetup,
             MatterSetupStage.OpenHabSetupChecking,
             MatterSetupStage.Settings,
