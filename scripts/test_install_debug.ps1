@@ -10,7 +10,7 @@ function New-TestProject {
     $root = Join-Path ([System.IO.Path]::GetTempPath()) ("openhab-install-test-" + [Guid]::NewGuid().ToString("N"))
     $apkDir = Join-Path $root "app\build\outputs\apk\debug"
     New-Item -ItemType Directory -Force -Path $apkDir | Out-Null
-    $apk = Join-Path $apkDir "app-debug.apk"
+    $apk = Join-Path $apkDir "openhab-matter-helper.apk"
     Set-Content -LiteralPath $apk -Value "fake-apk" -NoNewline
     return @{ Root = $root; Apk = $apk }
 }

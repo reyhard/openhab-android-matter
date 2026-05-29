@@ -66,7 +66,7 @@ if ([string]::IsNullOrWhiteSpace($GradlePath)) {
     $GradlePath = Join-Path $resolvedProjectRoot "gradlew.bat"
 }
 if ([string]::IsNullOrWhiteSpace($ApkPath)) {
-    $ApkPath = Join-Path $resolvedProjectRoot "app\build\outputs\apk\debug\app-debug.apk"
+    $ApkPath = Join-Path $resolvedProjectRoot "app\build\outputs\apk\debug\openhab-matter-helper.apk"
 }
 if ([string]::IsNullOrWhiteSpace($AdbPath)) {
     $AdbPath = Resolve-AdbPath $resolvedProjectRoot

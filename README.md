@@ -147,7 +147,7 @@ $env:ANDROID_HOME='D:\Tools\Android\SDK'
 The APK is written to:
 
 ```text
-app\build\outputs\apk\debug\app-debug.apk
+app\build\outputs\apk\debug\openhab-matter-helper.apk
 ```
 
 The default source build packages a non-production JNI stub and is useful for
@@ -213,7 +213,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\install_debug.ps1
 ```
 
 The helper runs the offline unit tests and debug APK build, verifies
-`app\build\outputs\apk\debug\app-debug.apk`, lists ready ADB devices, and
+`app\build\outputs\apk\debug\openhab-matter-helper.apk`, lists ready ADB devices, and
 installs only when exactly one device or emulator is attached. If multiple
 devices are attached, pass `-Serial <device-id>`. If the APK is already built
 and you only want the ADB check/install step, pass `-SkipBuild`.

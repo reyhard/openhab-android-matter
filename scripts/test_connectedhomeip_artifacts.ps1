@@ -48,8 +48,9 @@ function New-ArtifactLayout {
         }
     }
 
+    $jniLibsRoot = Join-Path $Root "jniLibs"
     foreach ($abi in @("arm64-v8a", "armeabi-v7a", "x86", "x86_64")) {
-        $abiDir = Join-Path $Root ("jniLibs\" + $abi)
+        $abiDir = Join-Path $jniLibsRoot $abi
         New-Item -ItemType Directory -Force -Path $abiDir | Out-Null
         foreach ($library in @("libCHIPController.so", "libc++_shared.so")) {
             Set-Content -LiteralPath (Join-Path $abiDir $library) -Value "synthetic $abi $library" -NoNewline
@@ -129,13 +130,17 @@ if (-not (Test-Path -LiteralPath $ProjectRoot -PathType Container)) {
 
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 if ([string]::IsNullOrWhiteSpace($GradlePath)) {
-    $GradlePath = Join-Path $ProjectRoot "gradlew.bat"
+    if ($IsWindows) {
+        $GradlePath = Join-Path $ProjectRoot "gradlew.bat"
+    } else {
+        $GradlePath = Join-Path $ProjectRoot "gradlew"
+    }
 }
 if (-not (Test-Path -LiteralPath $GradlePath -PathType Leaf)) {
     throw "Gradle wrapper not found: $GradlePath"
 }
 
-$tmpRoot = Join-Path $ProjectRoot "build\tmp"
+$tmpRoot = Join-Path (Join-Path $ProjectRoot "build") "tmp"
 $positiveRoot = Join-Path $tmpRoot "chip-controller-artifacts-smoke"
 $emptyRoot = Join-Path $tmpRoot "chip-controller-artifacts-empty"
 $invalidRoot = Join-Path $tmpRoot "chip-controller-artifacts-invalid-jar"

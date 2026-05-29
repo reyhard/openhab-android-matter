@@ -65,7 +65,7 @@ if (-not (Test-Path -LiteralPath $ProjectRoot -PathType Container)) {
 
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 if ([string]::IsNullOrWhiteSpace($ApkPath)) {
-    $ApkPath = Join-Path $ProjectRoot "app\build\outputs\apk\debug\app-debug.apk"
+    $ApkPath = Join-Path $ProjectRoot "app\build\outputs\apk\debug\openhab-matter-helper.apk"
 }
 if ([string]::IsNullOrWhiteSpace($AaptPath)) {
     $AaptPath = Find-Aapt $ProjectRoot

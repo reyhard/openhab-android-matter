@@ -92,6 +92,10 @@ android {
         compose true
     }
 
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+
     if (chipNativeMode == "stub") {
         externalNativeBuild {
             cmake {
@@ -114,6 +118,12 @@ android {
                 jniLibs.srcDir file(new File(file(chipControllerArtifactsDir), "jniLibs"))
             }
         }
+    }
+}
+
+android.applicationVariants.configureEach { variant ->
+    variant.outputs.configureEach { output ->
+        output.outputFileName = "openhab-matter-helper.apk"
     }
 }
 
