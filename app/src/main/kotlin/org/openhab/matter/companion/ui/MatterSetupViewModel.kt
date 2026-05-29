@@ -49,6 +49,10 @@ import org.openhab.matter.companion.setup.WorkflowExecutionGate
 import org.openhab.matter.companion.setup.sanitizeLogUrls
 import org.openhab.matter.companion.setup.toLogSafeUrl
 
+internal fun resolveEffectiveSetupToken(editableToken: String, persistedToken: String): String {
+    return editableToken.trim().ifBlank { persistedToken }
+}
+
 class MatterSetupViewModel(application: Application) : AndroidViewModel(application) {
     var uiState by mutableStateOf(MatterSetupUiState.initial(openHabConfigured = false))
         private set
@@ -294,7 +298,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun startFirstRunSettingsCheck() {
         val baseUrl = effectiveOpenHabUrl()
-        val apiToken = token.trim()
+        var apiToken = token.trim()
         val datasetInput = threadDataset
         val otbrTarget = otbrBaseUrl.trim()
         if (!executionGate.tryStart()) {
@@ -305,6 +309,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         workerThread = Thread({
             try {
                 val existingConfig = configRepository.load()
+                apiToken = resolveEffectiveSetupToken(token, existingConfig.openHabApiToken())
                 val openHabStatus = openHabClient.checkReadiness(baseUrl, apiToken)
                 val otbrStatus = otbrClient.checkReadiness(otbrTarget)
                 val validation = FirstRunSettingsValidator.validate(
@@ -427,7 +432,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         }
         val existingConfig = configRepository.load()
         val safeDataset = parsedDataset.chipToolValue()
-        val savedToken = token.trim().ifBlank { existingConfig.openHabApiToken() }
+        val savedToken = resolveEffectiveSetupToken(token, existingConfig.openHabApiToken())
         configRepository.save(
             AppConfig(
                 safeDataset,
@@ -1076,7 +1081,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             openHabBaseUrl = openHabUrl.trim().ifBlank {
                 config.openHabBaseUrl().trim().ifBlank { MatterSetupConfigCompleteness.DefaultOpenHabUrl }
             },
-            openHabApiToken = token.trim().ifBlank { config.openHabApiToken() },
+            openHabApiToken = resolveEffectiveSetupToken(token, config.openHabApiToken()),
             threadDataset = config.threadDataset(),
             otbrBaseUrl = config.otbrBaseUrl(),
             attestationBypassEnabled = config.attestationBypassEnabled()
