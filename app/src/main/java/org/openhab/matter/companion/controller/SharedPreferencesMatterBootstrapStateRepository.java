@@ -9,6 +9,8 @@ public final class SharedPreferencesMatterBootstrapStateRepository implements Ma
     private static final String PREFERENCE_FILE = "openhab_matter_bootstrap_state";
     private static final String KEY_BOOTSTRAP_NODE_ID = "bootstrap_node_id";
     private static final String KEY_CONTROLLER_STATE = "controller_state";
+    private static final String KEY_VENDOR_NAME = "vendor_name";
+    private static final String KEY_PRODUCT_NAME = "product_name";
 
     private final SharedPreferences preferences;
     private final SecureMatterBootstrapStateMapper mapper;
@@ -29,7 +31,9 @@ public final class SharedPreferencesMatterBootstrapStateRepository implements Ma
         try {
             long bootstrapNodeId = preferences.getLong(KEY_BOOTSTRAP_NODE_ID, -1L);
             String controllerState = preferences.getString(KEY_CONTROLLER_STATE, "");
-            return mapper.fromStoredValues(bootstrapNodeId, controllerState);
+            String vendorName = preferences.getString(KEY_VENDOR_NAME, "");
+            String productName = preferences.getString(KEY_PRODUCT_NAME, "");
+            return mapper.fromStoredValues(bootstrapNodeId, controllerState, vendorName, productName);
         } catch (ClassCastException e) {
             return new MatterBootstrapState(-1L, "", true);
         }
@@ -42,6 +46,8 @@ public final class SharedPreferencesMatterBootstrapStateRepository implements Ma
             boolean saved = preferences.edit()
                     .putLong(KEY_BOOTSTRAP_NODE_ID, storedState.bootstrapNodeId())
                     .putString(KEY_CONTROLLER_STATE, storedState.controllerState())
+                    .putString(KEY_VENDOR_NAME, storedState.vendorName())
+                    .putString(KEY_PRODUCT_NAME, storedState.productName())
                     .commit();
             if (!saved) {
                 throw new IllegalStateException("Unable to commit Matter bootstrap state");
@@ -56,6 +62,8 @@ public final class SharedPreferencesMatterBootstrapStateRepository implements Ma
         boolean cleared = preferences.edit()
                 .remove(KEY_BOOTSTRAP_NODE_ID)
                 .remove(KEY_CONTROLLER_STATE)
+                .remove(KEY_VENDOR_NAME)
+                .remove(KEY_PRODUCT_NAME)
                 .commit();
         if (!cleared) {
             throw new IllegalStateException("Unable to clear Matter bootstrap state");

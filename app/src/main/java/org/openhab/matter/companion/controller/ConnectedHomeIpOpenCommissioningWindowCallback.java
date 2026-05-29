@@ -7,7 +7,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public final class ConnectedHomeIpOpenCommissioningWindowCallback {
-    private final Object proxy;
+    private Object proxy;
     private final String controllerState;
     private final CountDownLatch latch = new CountDownLatch(1);
     private MatterOpenCommissioningWindowResult result;
@@ -28,6 +28,13 @@ public final class ConnectedHomeIpOpenCommissioningWindowCallback {
         return proxy;
     }
 
+    public void setProxy(Object proxy) {
+        if (proxy == null) {
+            throw new IllegalArgumentException("proxy is required");
+        }
+        this.proxy = proxy;
+    }
+
     public MatterOpenCommissioningWindowResult awaitResult(long timeoutMillis) throws InterruptedException {
         if (!latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
             throw new IllegalStateException("OpenCommissioningWindow callback timed out");
@@ -42,36 +49,36 @@ public final class ConnectedHomeIpOpenCommissioningWindowCallback {
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) {
             if ("onSuccess".equals(method.getName())) {
-                String manualPairingCode = stringArg(args, 1);
-                String qrCode = stringArg(args, 2);
-                try {
-                    result = new MatterOpenCommissioningWindowResult(
-                            manualPairingCode,
-                            qrCode,
-                            controllerState);
-                } catch (IllegalArgumentException exception) {
-                    error = new IllegalStateException(
-                            "OpenCommissioningWindow returned blank manual and QR setup codes",
-                            exception);
-                } finally {
-                    latch.countDown();
-                }
-                return null;
+                onSuccess(longArg(args, 0), stringArg(args, 1), stringArg(args, 2));
+                return defaultValue(method.getReturnType());
             }
             if ("onError".equals(method.getName())) {
-                int status = args != null && args.length > 0 && args[0] instanceof Number
-                        ? ((Number) args[0]).intValue()
-                        : -1;
-                long deviceId = args != null && args.length > 1 && args[1] instanceof Number
-                        ? ((Number) args[1]).longValue()
-                        : -1L;
-                error = new IllegalStateException(
-                        "OpenCommissioningWindow failed for node " + deviceId + " with status " + status);
-                latch.countDown();
-                return null;
+                onError(intArg(args, 0), longArg(args, 1));
+                return defaultValue(method.getReturnType());
             }
             return defaultValue(method.getReturnType());
         }
+    }
+
+    public void onSuccess(long deviceId, String manualPairingCode, String qrCode) {
+        try {
+            result = new MatterOpenCommissioningWindowResult(
+                    manualPairingCode,
+                    qrCode,
+                    controllerState);
+        } catch (IllegalArgumentException exception) {
+            error = new IllegalStateException(
+                    "OpenCommissioningWindow returned blank manual and QR setup codes",
+                    exception);
+        } finally {
+            latch.countDown();
+        }
+    }
+
+    public void onError(int status, long deviceId) {
+        error = new IllegalStateException(
+                "OpenCommissioningWindow failed for node " + deviceId + " with status " + status);
+        latch.countDown();
     }
 
     private static String stringArg(Object[] args, int index) {
@@ -79,6 +86,20 @@ public final class ConnectedHomeIpOpenCommissioningWindowCallback {
             return "";
         }
         return args[index].toString();
+    }
+
+    private static int intArg(Object[] args, int index) {
+        if (args == null || args.length <= index || !(args[index] instanceof Number)) {
+            return -1;
+        }
+        return ((Number) args[index]).intValue();
+    }
+
+    private static long longArg(Object[] args, int index) {
+        if (args == null || args.length <= index || !(args[index] instanceof Number)) {
+            return -1L;
+        }
+        return ((Number) args[index]).longValue();
     }
 
     private static Object defaultValue(Class<?> returnType) {

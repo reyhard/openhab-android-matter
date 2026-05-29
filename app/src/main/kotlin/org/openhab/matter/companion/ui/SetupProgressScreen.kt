@@ -58,14 +58,6 @@ fun SetupProgressScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(text = state.message)
-        state.activeDetail?.let { detail ->
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
         countdownSeconds?.let {
             Spacer(Modifier.height(12.dp))
             Text(

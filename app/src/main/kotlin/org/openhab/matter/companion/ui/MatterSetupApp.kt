@@ -1,8 +1,10 @@
 package org.openhab.matter.companion.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.setup.MatterSetupAction
+import org.openhab.matter.companion.setup.MatterSetupBackNavigation
 import org.openhab.matter.companion.setup.MatterSetupStage
 import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.setup.PhoneMatterDevice
@@ -21,15 +23,21 @@ fun MatterSetupApp(
     threadBorderRouterDiscoveryInProgress: Boolean,
     phoneDevices: List<PhoneMatterDevice>,
     ipv6DiagnosticAddress: String,
+    manualSetupCode: String,
     onOpenHabUrlChange: (String) -> Unit,
     onTokenChange: (String) -> Unit,
     onThreadDatasetChange: (String) -> Unit,
     onOtbrBaseUrlChange: (String) -> Unit,
     onAttestationBypassChange: (Boolean) -> Unit,
     onIpv6DiagnosticAddressChange: (String) -> Unit,
+    onManualSetupCodeChange: (String) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
     MatterSetupTheme {
+        val systemBackAction = MatterSetupBackNavigation.systemBackAction(state)
+        BackHandler(enabled = systemBackAction != null) {
+            systemBackAction?.let(onAction)
+        }
         when (state.stage) {
             MatterSetupStage.NeedsOpenHabSetup,
             MatterSetupStage.OpenHabSetupChecking -> OpenHabSetupScreen(
@@ -54,6 +62,13 @@ fun MatterSetupApp(
             MatterSetupStage.ScanningQr,
             MatterSetupStage.QrScanned -> ScanDeviceScreen(
                 state = state,
+                onAction = onAction
+            )
+
+            MatterSetupStage.EnteringManualCode -> ManualCodeScreen(
+                state = state,
+                manualSetupCode = manualSetupCode,
+                onManualSetupCodeChange = onManualSetupCodeChange,
                 onAction = onAction
             )
 

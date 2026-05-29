@@ -82,14 +82,17 @@ public final class ConnectedHomeIpMatterControllerFactory {
         }
         ConnectedHomeIpPlatformControllerProvider platformProvider = new ConnectedHomeIpPlatformControllerProvider(context);
         ConnectedHomeIpReflectionCommandFactory commandFactory = ConnectedHomeIpReflectionCommandFactory.fromDefaultClassLoader();
+        ConnectedHomeIpDevicePointerProvider devicePointerProvider =
+                new ConnectedHomeIpReflectionDevicePointerProvider(commandFactory, DEVICE_POINTER_TIMEOUT_MILLIS);
         return new ConnectedHomeIpReflectionGateway(
                 platformProvider,
                 new ConnectedHomeIpAndroidBleConnectionProvider(context, platformProvider),
                 new ConnectedHomeIpRandomNodeIdAllocator(),
                 new ConnectedHomeIpReflectionCommissioningMonitor(commandFactory),
                 new ConnectedHomeIpReflectionAttestationHandler(commandFactory, ATTESTATION_FAIL_SAFE_EXPIRY_SECONDS),
-                new ConnectedHomeIpReflectionDevicePointerProvider(commandFactory, DEVICE_POINTER_TIMEOUT_MILLIS),
-                commandFactory);
+                devicePointerProvider,
+                commandFactory,
+                new ConnectedHomeIpReflectionDeviceMetadataReader(devicePointerProvider));
     }
 
     private static Context applicationContext(Context context) {

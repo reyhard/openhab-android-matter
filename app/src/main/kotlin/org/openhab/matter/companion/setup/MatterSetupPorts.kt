@@ -38,7 +38,9 @@ interface MatterSetupPorts {
 
     data class CommissionResult(
         val nodeId: Long,
-        val controllerState: String
+        val controllerState: String,
+        val vendorName: String = "",
+        val productName: String = ""
     ) {
         override fun toString(): String {
             return "CommissionResult(nodeId=$nodeId, controllerState=<redacted>)"

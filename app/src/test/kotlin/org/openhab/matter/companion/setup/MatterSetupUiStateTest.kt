@@ -26,6 +26,7 @@ class MatterSetupUiStateTest {
         assertEquals("Checking setup", state.steps[0].label)
         assertEquals("Opening pairing window", state.steps[2].label)
         assertEquals(MatterSetupStepStatus.Active, state.steps[2].status)
+        assertEquals("Preparing the device for openHAB.", state.steps[2].detail)
         assertEquals(300, state.countdownSeconds)
     }
 
@@ -39,6 +40,7 @@ class MatterSetupUiStateTest {
         assertEquals("Adding device to this phone", state.steps[1].label)
         assertEquals(MatterSetupStepStatus.Active, state.steps[1].status)
         assertEquals("Seeking Bluetooth device", state.activeDetail)
+        assertEquals("Seeking Bluetooth device", state.steps[1].detail)
         assertFalse(state.steps.any { it.label == "Connecting to device" })
     }
 

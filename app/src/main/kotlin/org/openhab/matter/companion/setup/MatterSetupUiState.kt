@@ -45,7 +45,7 @@ data class MatterSetupUiState(
                 stage = stage,
                 title = "Setting up your device",
                 message = progressMessage(stage),
-                steps = progressSteps(stage),
+                steps = progressSteps(stage, activeDetail.orEmpty()),
                 activeDetail = activeDetail?.takeIf { it.isNotBlank() },
                 countdownSeconds = countdownSeconds,
                 secondaryActions = listOf(MatterSetupAction.ShowTroubleshooting)
@@ -78,7 +78,7 @@ data class MatterSetupUiState(
             else -> "This usually takes less than a minute."
         }
 
-        private fun progressSteps(activeStage: MatterSetupStage): List<MatterSetupStep> {
+        private fun progressSteps(activeStage: MatterSetupStage, activeDetail: String): List<MatterSetupStep> {
             val stages = listOf(
                 MatterSetupStage.ReadinessChecking to "Checking setup",
                 MatterSetupStage.CommissioningToPhone to "Adding device to this phone",
@@ -97,12 +97,18 @@ data class MatterSetupUiState(
                 else -> activeIndex?.minus(1) ?: -1
             }
             return stages.mapIndexed { index, (_, label) ->
+                val status = when {
+                    index <= completeThroughIndex -> MatterSetupStepStatus.Complete
+                    activeIndex == index -> MatterSetupStepStatus.Active
+                    else -> MatterSetupStepStatus.Pending
+                }
                 MatterSetupStep(
                     label = label,
-                    status = when {
-                        index <= completeThroughIndex -> MatterSetupStepStatus.Complete
-                        activeIndex == index -> MatterSetupStepStatus.Active
-                        else -> MatterSetupStepStatus.Pending
+                    status = status,
+                    detail = if (status == MatterSetupStepStatus.Active) {
+                        activeDetail.ifBlank { progressMessage(activeStage) }
+                    } else {
+                        ""
                     }
                 )
             }

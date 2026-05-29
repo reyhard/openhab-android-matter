@@ -13,8 +13,9 @@ data class MatterSetupFailure(
 
             MatterSetupStage.CommissioningToPhone -> listOf(
                 "Keep the phone near the device.",
-                "Confirm the device is still in pairing mode.",
-                "Check Thread network and IPv6 routing if BLE already connected."
+                "Confirm the device is powered on and still in pairing mode.",
+                "Check Bluetooth and allow the Nearby devices permission.",
+                "Allow precise Location permission and enable Location services."
             )
 
             MatterSetupStage.OpeningCommissioningWindow,

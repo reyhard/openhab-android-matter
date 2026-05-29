@@ -20,12 +20,26 @@ public class SharedPreferencesMatterBootstrapStateRepositoryTest {
         FakeSharedPreferences preferences = new FakeSharedPreferences();
         SharedPreferencesMatterBootstrapStateRepository repository = repository(preferences);
 
-        repository.save(new MatterBootstrapState(1234L, "opaque-state", false));
+        repository.save(new MatterBootstrapState(1234L, "opaque-state", false, "Aqara", "U200"));
 
         assertEquals(1, preferences.commitCount);
         assertEquals(0, preferences.applyCount);
         assertEquals(1234L, preferences.getLong("bootstrap_node_id", -1L));
         assertEquals("enc:v1:encoded(opaque-state)", preferences.getString("controller_state", ""));
+        assertEquals("Aqara", preferences.getString("vendor_name", ""));
+        assertEquals("U200", preferences.getString("product_name", ""));
+    }
+
+    @Test
+    public void loadIncludesVendorAndProduct() {
+        FakeSharedPreferences preferences = new FakeSharedPreferences();
+        SharedPreferencesMatterBootstrapStateRepository repository = repository(preferences);
+        repository.save(new MatterBootstrapState(1234L, "opaque-state", false, "Aqara", "U200"));
+
+        MatterBootstrapState state = repository.load();
+
+        assertEquals("Aqara", state.vendorName());
+        assertEquals("U200", state.productName());
     }
 
     @Test

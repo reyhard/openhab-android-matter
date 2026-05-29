@@ -68,6 +68,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         private set
     var ipv6DiagnosticAddress by mutableStateOf("")
         private set
+    var manualSetupCode by mutableStateOf("")
+        private set
 
     private var scannedPayload = ""
     private val appContext = application.applicationContext
@@ -143,6 +145,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         ipv6DiagnosticAddress = value
     }
 
+    fun onManualSetupCodeChange(value: String) {
+        manualSetupCode = value
+    }
+
     fun handleAction(action: MatterSetupAction) {
         when (action) {
             MatterSetupAction.StartScan -> {
@@ -166,11 +172,13 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             MatterSetupAction.Retry,
             MatterSetupAction.AddAnotherDevice -> {
                 scannedPayload = ""
+                manualSetupCode = ""
                 uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
             }
 
             MatterSetupAction.BackToMainMenu -> {
                 scannedPayload = ""
+                manualSetupCode = ""
                 restorePersistedConfig()
                 uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
             }
@@ -210,8 +218,22 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 threadSettingsMessage = "Selected Thread Border Router: ${action.endpoint}"
             }
 
-            MatterSetupAction.ShowTroubleshooting,
             MatterSetupAction.EnterCodeManually -> {
+                uiState = MatterSetupUiState(
+                    stage = MatterSetupStage.EnteringManualCode,
+                    title = "Enter setup code",
+                    message = "Type the Matter setup code printed on the device or box.",
+                    primaryAction = MatterSetupAction.SubmitManualCode,
+                    primaryActionLabel = "Continue",
+                    secondaryActions = listOf(MatterSetupAction.BackToMainMenu)
+                )
+            }
+
+            MatterSetupAction.SubmitManualCode -> {
+                onQrPayloadScanned(manualSetupCode)
+            }
+
+            MatterSetupAction.ShowTroubleshooting -> {
                 uiState = MatterSetupStateReducer.advancedTroubleshooting(uiState)
             }
 
@@ -667,7 +689,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                         "Stored Matter bootstrap controller state could not be read. Re-run Thread commissioning."
                     )
                 }
-                if (bootstrap.bootstrapNodeId() < 0L || bootstrap.controllerState().isBlank()) {
+                if (bootstrap.bootstrapNodeId() < 0L) {
                     throw IllegalStateException("No staged Matter device is stored on this phone.")
                 }
 
@@ -818,8 +840,21 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                         bootstrapStateRepository.load().controllerState(),
                         { step -> progress(step.message()) }
                     )
-                    bootstrapStateRepository.save(MatterBootstrapState(result.nodeId(), result.controllerState(), false))
-                    return MatterSetupPorts.CommissionResult(result.nodeId(), result.controllerState())
+                    bootstrapStateRepository.save(
+                        MatterBootstrapState(
+                            result.nodeId(),
+                            result.controllerState(),
+                            false,
+                            result.vendorName(),
+                            result.productName()
+                        )
+                    )
+                    return MatterSetupPorts.CommissionResult(
+                        result.nodeId(),
+                        result.controllerState(),
+                        result.vendorName(),
+                        result.productName()
+                    )
                 }
 
                 override fun openCommissioningWindow(
@@ -838,7 +873,16 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                         controllerState,
                         null
                     )
-                    bootstrapStateRepository.save(MatterBootstrapState(nodeId, result.controllerState(), false))
+                    val currentState = bootstrapStateRepository.load()
+                    bootstrapStateRepository.save(
+                        MatterBootstrapState(
+                            nodeId,
+                            result.controllerState(),
+                            false,
+                            currentState.vendorName(),
+                            currentState.productName()
+                        )
+                    )
                     return MatterSetupPorts.OpenWindowResult(
                         manualCode = result.manualCode(),
                         qrCode = result.qrCode(),

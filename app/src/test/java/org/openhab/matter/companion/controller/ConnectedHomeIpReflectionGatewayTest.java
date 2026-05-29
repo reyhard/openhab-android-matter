@@ -18,6 +18,8 @@ public final class ConnectedHomeIpReflectionGatewayTest {
         CapturingBleConnectionProvider bleProvider = new CapturingBleConnectionProvider();
         CapturingCommissioningMonitor monitor = new CapturingCommissioningMonitor();
         CapturingAttestationHandler attestationHandler = new CapturingAttestationHandler();
+        CapturingMetadataReader metadataReader = new CapturingMetadataReader(
+                new MatterDeviceMetadata("Aqara", "U200"));
         ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
                 () -> controller,
                 bleProvider,
@@ -26,6 +28,7 @@ public final class ConnectedHomeIpReflectionGatewayTest {
                 attestationHandler,
                 unusedPointerProvider(),
                 fakeCommandFactory(),
+                metadataReader,
                 1000L);
 
         MatterCommissioningResult result = gateway.commissionBleThread(new ConnectedHomeIpCommissioningRequest(
@@ -49,6 +52,35 @@ public final class ConnectedHomeIpReflectionGatewayTest {
         assertEquals("controller-state", monitor.controllerState);
         assertEquals(987654321L, result.nodeId());
         assertEquals("commissioned-state", result.controllerState());
+        assertSame(controller, metadataReader.controller);
+        assertEquals(987654321L, metadataReader.nodeId);
+        assertEquals("Aqara", result.vendorName());
+        assertEquals("U200", result.productName());
+    }
+
+    @Test
+    public void commissionBleThreadIgnoresVendorProductReadFailure() throws Exception {
+        ConnectedHomeIpReflectionGateway gateway = new ConnectedHomeIpReflectionGateway(
+                () -> new FakeChipDeviceController(),
+                new CapturingBleConnectionProvider(),
+                () -> 987654321L,
+                new CapturingCommissioningMonitor(),
+                unusedAttestationHandler(),
+                unusedPointerProvider(),
+                fakeCommandFactory(),
+                new ThrowingMetadataReader(),
+                1000L);
+
+        MatterCommissioningResult result = gateway.commissionBleThread(new ConnectedHomeIpCommissioningRequest(
+                "0E080000000000010000",
+                20202021L,
+                3840,
+                false,
+                "controller-state"));
+
+        assertEquals(987654321L, result.nodeId());
+        assertEquals("", result.vendorName());
+        assertEquals("", result.productName());
     }
 
     @Test
@@ -606,6 +638,30 @@ public final class ConnectedHomeIpReflectionGatewayTest {
         @Override
         public MatterCommissioningResult awaitCommissioned(long nodeId, String controllerState) {
             throw new AssertionError("await should not be called");
+        }
+    }
+
+    private static final class CapturingMetadataReader implements ConnectedHomeIpDeviceMetadataReader {
+        private final MatterDeviceMetadata metadata;
+        private Object controller;
+        private long nodeId;
+
+        private CapturingMetadataReader(MatterDeviceMetadata metadata) {
+            this.metadata = metadata;
+        }
+
+        @Override
+        public MatterDeviceMetadata readVendorAndProduct(Object controller, long nodeId) {
+            this.controller = controller;
+            this.nodeId = nodeId;
+            return metadata;
+        }
+    }
+
+    private static final class ThrowingMetadataReader implements ConnectedHomeIpDeviceMetadataReader {
+        @Override
+        public MatterDeviceMetadata readVendorAndProduct(Object controller, long nodeId) {
+            throw new IllegalStateException("metadata read failed");
         }
     }
 

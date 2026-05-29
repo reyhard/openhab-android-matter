@@ -3,6 +3,9 @@ package org.openhab.matter.companion.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.test.espresso.Espresso.pressBack
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.openhab.matter.companion.setup.MatterSetupAction
@@ -29,12 +32,76 @@ class MatterSetupAppTest {
     }
 
     @Test
-    fun readyToScanScreenShowsQrAndSettingsActions() {
+    fun readyToScanScreenShowsQrManualAndSettingsActions() {
         render(MatterSetupUiState.initial(openHabConfigured = true))
 
         composeRule.onNodeWithText("Add Matter device").assertIsDisplayed()
         composeRule.onNodeWithText("Scan QR code").assertIsDisplayed()
+        composeRule.onNodeWithText("Enter code manually").assertIsDisplayed()
         composeRule.onNodeWithText("Settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun readyToScanManualCodeButtonDispatchesAction() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(MatterSetupUiState.initial(openHabConfigured = true), onAction = actions::add)
+
+        composeRule.onNodeWithText("Enter code manually").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.EnterCodeManually))
+    }
+
+    @Test
+    fun systemBackFromSettingsReturnsToMainMenu() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.editSettings("http://openhab.local:8080"),
+            onAction = actions::add
+        )
+
+        pressBack()
+
+        assertTrue(actions.contains(MatterSetupAction.BackToMainMenu))
+    }
+
+    @Test
+    fun manualCodeScreenShowsCodeEntryActions() {
+        render(
+            MatterSetupUiState(
+                stage = MatterSetupStage.EnteringManualCode,
+                title = "Enter setup code",
+                message = "Type the Matter setup code printed on the device or box.",
+                primaryAction = MatterSetupAction.SubmitManualCode,
+                primaryActionLabel = "Continue",
+                secondaryActions = listOf(MatterSetupAction.BackToMainMenu)
+            )
+        )
+
+        composeRule.onNodeWithText("Enter setup code").assertIsDisplayed()
+        composeRule.onNodeWithText("Pairing code").assertIsDisplayed()
+        composeRule.onNodeWithText("Continue").assertIsDisplayed()
+        composeRule.onNodeWithText("Back").assertIsDisplayed()
+    }
+
+    @Test
+    fun manualCodeContinueDispatchesSubmitAction() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupUiState(
+                stage = MatterSetupStage.EnteringManualCode,
+                title = "Enter setup code",
+                message = "Type the Matter setup code printed on the device or box.",
+                primaryAction = MatterSetupAction.SubmitManualCode,
+                primaryActionLabel = "Continue",
+                secondaryActions = listOf(MatterSetupAction.BackToMainMenu)
+            ),
+            manualSetupCode = "pin=20202021;disc=3840",
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Continue").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.SubmitManualCode))
     }
 
     @Test
@@ -134,6 +201,27 @@ class MatterSetupAppTest {
     }
 
     @Test
+    fun phoneDeviceListAllowsDebugPairingWindowAttemptWhenControllerStateIsMissing() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true),
+            phoneDevices = listOf(
+                PhoneMatterDevice(
+                    nodeId = 1234L,
+                    controllerStateStored = false,
+                    stateReadable = true
+                )
+            ),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Controller state is missing").assertIsDisplayed()
+        composeRule.onNodeWithText("Open pairing window again").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.OpenCommissioningWindowAgain))
+    }
+
+    @Test
     fun phoneDeviceListShowsEmptyState() {
         render(MatterSetupStateReducer.phoneDeviceList(hasDevices = false))
 
@@ -143,7 +231,9 @@ class MatterSetupAppTest {
 
     private fun render(
         state: MatterSetupUiState,
-        phoneDevices: List<PhoneMatterDevice> = emptyList()
+        phoneDevices: List<PhoneMatterDevice> = emptyList(),
+        manualSetupCode: String = "",
+        onAction: (MatterSetupAction) -> Unit = {}
     ) {
         composeRule.setContent {
             MatterSetupApp(
@@ -158,13 +248,15 @@ class MatterSetupAppTest {
                 threadBorderRouterDiscoveryInProgress = false,
                 phoneDevices = phoneDevices,
                 ipv6DiagnosticAddress = "",
+                manualSetupCode = manualSetupCode,
                 onOpenHabUrlChange = {},
                 onTokenChange = {},
                 onThreadDatasetChange = {},
                 onOtbrBaseUrlChange = {},
                 onAttestationBypassChange = {},
                 onIpv6DiagnosticAddressChange = {},
-                onAction = {}
+                onManualSetupCodeChange = {},
+                onAction = onAction
             )
         }
     }

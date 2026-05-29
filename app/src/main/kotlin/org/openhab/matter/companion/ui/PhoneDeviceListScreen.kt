@@ -26,7 +26,7 @@ fun PhoneDeviceListScreen(
     devices: List<PhoneMatterDevice>,
     onAction: (MatterSetupAction) -> Unit
 ) {
-    val hasCommissioningWindowDevice = devices.any { it.canOpenCommissioningWindow }
+    val hasCommissioningWindowDevice = devices.any { it.canAttemptCommissioningWindowForDebug }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -82,6 +82,13 @@ fun PhoneDeviceListScreen(
             ) {
                 Text("Open pairing window again")
             }
+            if (devices.any { it.canAttemptCommissioningWindowForDebug && !it.canOpenCommissioningWindow }) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Debug attempt: controller state is missing, so connectedhomeip may still fail to open the pairing window.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             if (!hasCommissioningWindowDevice) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -103,11 +110,18 @@ fun PhoneDeviceListScreen(
 @Composable
 private fun PhoneMatterDeviceSummary(device: PhoneMatterDevice) {
     Text(
-        text = device.displayNodeId,
+        text = device.displayName,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold
     )
     Spacer(Modifier.height(6.dp))
+    if (device.displayName != device.displayNodeId) {
+        Text(
+            text = "Node: ${device.displayNodeId}",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+    }
     Text(text = device.status)
     Spacer(Modifier.height(4.dp))
     Text(

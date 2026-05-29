@@ -24,6 +24,8 @@ public final class ConnectedHomeIpReflectionCommandFactory {
             "org.openhab.matter.companion.controller.ConnectedHomeIpConcreteDeviceAttestationDelegate";
     private static final String CONCRETE_CONNECTED_DEVICE_CALLBACK_CLASS =
             "org.openhab.matter.companion.controller.ConnectedHomeIpConcreteConnectedDeviceCallback";
+    private static final String CONCRETE_OPEN_COMMISSIONING_WINDOW_CALLBACK_CLASS =
+            "org.openhab.matter.companion.controller.ConnectedHomeIpConcreteOpenCommissioningWindowCallback";
 
     private final Class<?> networkCredentialsClass;
     private final Class<?> threadCredentialsClass;
@@ -195,7 +197,13 @@ public final class ConnectedHomeIpReflectionCommandFactory {
 
     public ConnectedHomeIpOpenCommissioningWindowCallback newOpenCommissioningWindowCallback(
             String controllerState) {
-        return new ConnectedHomeIpOpenCommissioningWindowCallback(openCommissioningCallbackClass, controllerState);
+        ConnectedHomeIpOpenCommissioningWindowCallback callback =
+                new ConnectedHomeIpOpenCommissioningWindowCallback(openCommissioningCallbackClass, controllerState);
+        Object concreteCallback = newConcreteOpenCommissioningWindowCallback(callback);
+        if (concreteCallback != null) {
+            callback.setProxy(concreteCallback);
+        }
+        return callback;
     }
 
     public boolean invokeOpenPairingWindowWithPinCallback(
@@ -409,6 +417,38 @@ public final class ConnectedHomeIpReflectionCommandFactory {
         } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
             ConnectedHomeIpDiagnostics.emit(
                     "Concrete connectedhomeip connected device callback unavailable: "
+                            + safeMessage(exception)
+                            + "; using proxy fallback");
+            return null;
+        }
+    }
+
+    private Object newConcreteOpenCommissioningWindowCallback(
+            ConnectedHomeIpOpenCommissioningWindowCallback callback) {
+        Class<?> callbackInterface = requireAvailable(openCommissioningCallbackClass, "openCommissioningCallbackClass");
+        try {
+            ClassLoader classLoader = ConnectedHomeIpReflectionCommandFactory.class.getClassLoader();
+            Class<?> callbackClass = Class.forName(
+                    CONCRETE_OPEN_COMMISSIONING_WINDOW_CALLBACK_CLASS,
+                    false,
+                    classLoader);
+            Constructor<?> constructor = callbackClass.getConstructor(
+                    ConnectedHomeIpOpenCommissioningWindowCallback.class);
+            Object concreteCallback = constructor.newInstance(callback);
+            if (!callbackInterface.isInstance(concreteCallback)) {
+                ConnectedHomeIpDiagnostics.emit(
+                        "Concrete open commissioning window callback is not compatible; using proxy fallback");
+                return null;
+            }
+            ConnectedHomeIpDiagnostics.emit("Using concrete connectedhomeip open commissioning window callback");
+            return concreteCallback;
+        } catch (ClassNotFoundException exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "Concrete connectedhomeip open commissioning window callback not packaged; using proxy fallback");
+            return null;
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "Concrete connectedhomeip open commissioning window callback unavailable: "
                             + safeMessage(exception)
                             + "; using proxy fallback");
             return null;

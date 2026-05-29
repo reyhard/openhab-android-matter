@@ -13,6 +13,7 @@ sealed interface MatterSetupAction {
     data object ShowPhoneDevices : MatterSetupAction
     data object StartScan : MatterSetupAction
     data object EnterCodeManually : MatterSetupAction
+    data object SubmitManualCode : MatterSetupAction
     data object ConfirmPairingMode : MatterSetupAction
     data object Retry : MatterSetupAction
     data object OpenCommissioningWindowAgain : MatterSetupAction

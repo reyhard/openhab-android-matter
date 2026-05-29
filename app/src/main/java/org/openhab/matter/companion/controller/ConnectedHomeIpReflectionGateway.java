@@ -12,6 +12,7 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
     private final ConnectedHomeIpAttestationHandler attestationHandler;
     private final ConnectedHomeIpDevicePointerProvider devicePointerProvider;
     private final ConnectedHomeIpReflectionCommandFactory commandFactory;
+    private final ConnectedHomeIpDeviceMetadataReader metadataReader;
     private final long openCommissioningWindowTimeoutMillis;
 
     public ConnectedHomeIpReflectionGateway(
@@ -30,6 +31,7 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
                 attestationHandler,
                 devicePointerProvider,
                 commandFactory,
+                ConnectedHomeIpDeviceMetadataReader.none(),
                 DEFAULT_OPEN_COMMISSIONING_WINDOW_TIMEOUT_MILLIS);
     }
 
@@ -42,6 +44,49 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
             ConnectedHomeIpDevicePointerProvider devicePointerProvider,
             ConnectedHomeIpReflectionCommandFactory commandFactory,
             long openCommissioningWindowTimeoutMillis) {
+        this(
+                controllerProvider,
+                bleConnectionProvider,
+                nodeIdAllocator,
+                commissioningMonitor,
+                attestationHandler,
+                devicePointerProvider,
+                commandFactory,
+                ConnectedHomeIpDeviceMetadataReader.none(),
+                openCommissioningWindowTimeoutMillis);
+    }
+
+    public ConnectedHomeIpReflectionGateway(
+            ConnectedHomeIpControllerProvider controllerProvider,
+            ConnectedHomeIpBleConnectionProvider bleConnectionProvider,
+            ConnectedHomeIpNodeIdAllocator nodeIdAllocator,
+            ConnectedHomeIpCommissioningMonitor commissioningMonitor,
+            ConnectedHomeIpAttestationHandler attestationHandler,
+            ConnectedHomeIpDevicePointerProvider devicePointerProvider,
+            ConnectedHomeIpReflectionCommandFactory commandFactory,
+            ConnectedHomeIpDeviceMetadataReader metadataReader) {
+        this(
+                controllerProvider,
+                bleConnectionProvider,
+                nodeIdAllocator,
+                commissioningMonitor,
+                attestationHandler,
+                devicePointerProvider,
+                commandFactory,
+                metadataReader,
+                DEFAULT_OPEN_COMMISSIONING_WINDOW_TIMEOUT_MILLIS);
+    }
+
+    public ConnectedHomeIpReflectionGateway(
+            ConnectedHomeIpControllerProvider controllerProvider,
+            ConnectedHomeIpBleConnectionProvider bleConnectionProvider,
+            ConnectedHomeIpNodeIdAllocator nodeIdAllocator,
+            ConnectedHomeIpCommissioningMonitor commissioningMonitor,
+            ConnectedHomeIpAttestationHandler attestationHandler,
+            ConnectedHomeIpDevicePointerProvider devicePointerProvider,
+            ConnectedHomeIpReflectionCommandFactory commandFactory,
+            ConnectedHomeIpDeviceMetadataReader metadataReader,
+            long openCommissioningWindowTimeoutMillis) {
         this.controllerProvider = require(controllerProvider, "controllerProvider");
         this.bleConnectionProvider = require(bleConnectionProvider, "bleConnectionProvider");
         this.nodeIdAllocator = require(nodeIdAllocator, "nodeIdAllocator");
@@ -49,6 +94,7 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
         this.attestationHandler = require(attestationHandler, "attestationHandler");
         this.devicePointerProvider = require(devicePointerProvider, "devicePointerProvider");
         this.commandFactory = require(commandFactory, "commandFactory");
+        this.metadataReader = require(metadataReader, "metadataReader");
         if (openCommissioningWindowTimeoutMillis <= 0) {
             throw new IllegalArgumentException("openCommissioningWindowTimeoutMillis must be positive");
         }
@@ -67,6 +113,7 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
         ConnectedHomeIpDiagnostics.emit("Cleared stale connectedhomeip BLE controller state before commissioning");
         attestationHandler.prepareForCommissioning(controller, nodeId, request.attestationBypassEnabled());
         commissioningMonitor.prepare(controller);
+        MatterCommissioningResult result;
         try (ConnectedHomeIpBleConnection connection = bleConnectionProvider.connect(request.discriminator())) {
             commandFactory.invokePairDeviceThroughBle(
                     controller,
@@ -75,7 +122,7 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
                     nodeId,
                     request.setupPin(),
                     commissionParameters);
-            return commissioningMonitor.awaitCommissioned(nodeId, request.controllerState());
+            result = commissioningMonitor.awaitCommissioned(nodeId, request.controllerState());
         } catch (Exception exception) {
             try {
                 commandFactory.invokeClose(controller);
@@ -85,6 +132,7 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
             }
             throw exception;
         }
+        return result.withMetadata(readVendorAndProduct(controller, result.nodeId()));
     }
 
     @Override
@@ -141,6 +189,21 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
             throw new IllegalArgumentException(name + " is required");
         }
         return value;
+    }
+
+    private MatterDeviceMetadata readVendorAndProduct(Object controller, long nodeId) {
+        try {
+            MatterDeviceMetadata metadata = metadataReader.readVendorAndProduct(controller, nodeId);
+            if (metadata != null && !metadata.isEmpty()) {
+                ConnectedHomeIpDiagnostics.emit("Read Matter Basic Information vendor/product metadata");
+            }
+            return metadata;
+        } catch (Exception | LinkageError exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "Unable to read Matter Basic Information vendor/product metadata: "
+                            + safeMessage(exception));
+            return MatterDeviceMetadata.empty();
+        }
     }
 
     private static String safeMessage(Throwable throwable) {

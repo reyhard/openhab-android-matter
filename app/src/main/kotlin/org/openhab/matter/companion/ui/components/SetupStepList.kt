@@ -45,11 +45,11 @@ fun SetupStepList(
                         }
                     )
                     Text(
-                        text = statusLabel(step.status),
+                        text = statusLine(step),
                         style = MaterialTheme.typography.bodySmall,
                         color = statusColor(step.status)
                     )
-                    if (step.detail.isNotBlank()) {
+                    if (step.status != MatterSetupStepStatus.Active && step.detail.isNotBlank()) {
                         Text(
                             text = step.detail,
                             style = MaterialTheme.typography.bodySmall,
@@ -82,4 +82,12 @@ private fun statusLabel(status: MatterSetupStepStatus): String = when (status) {
     MatterSetupStepStatus.Active -> "Active"
     MatterSetupStepStatus.Failed -> "Failed"
     MatterSetupStepStatus.Pending -> "Pending"
+}
+
+private fun statusLine(step: MatterSetupStep): String {
+    return if (step.status == MatterSetupStepStatus.Active && step.detail.isNotBlank()) {
+        step.detail
+    } else {
+        statusLabel(step.status)
+    }
 }

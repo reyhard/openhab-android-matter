@@ -1,32 +1,32 @@
 package org.openhab.matter.companion.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupUiState
 
 @Composable
-fun ScanDeviceScreen(
+fun ManualCodeScreen(
     state: MatterSetupUiState,
+    manualSetupCode: String,
+    onManualSetupCodeChange: (String) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
     Column(
@@ -36,59 +36,35 @@ fun ScanDeviceScreen(
             .padding(24.dp)
     ) {
         Text(
-            text = state.title.ifBlank { "Scan your device code" },
+            text = state.title,
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = state.message.ifBlank {
-                "Point your camera at the Matter QR code on the device or box."
-            }
-        )
+        Text(text = state.message)
         Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = { onAction(MatterSetupAction.StartScan) },
+        OutlinedTextField(
+            value = manualSetupCode,
+            onValueChange = onManualSetupCodeChange,
+            label = { Text("Pairing code") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
-        ) {
-            QrCodeIcon()
-            Spacer(Modifier.width(12.dp))
-            Text("Scan QR code")
-        }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.EnterCodeManually) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Enter code manually")
-        }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.EditSettings) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Settings")
-        }
-    }
-}
-
-@Composable
-private fun QrCodeIcon() {
-    val color = MaterialTheme.colorScheme.onPrimary
-    Canvas(modifier = Modifier.size(20.dp)) {
-        val cell = size.width / 5f
-        val squares = listOf(
-            0 to 0, 1 to 0, 0 to 1,
-            3 to 0, 4 to 0, 4 to 1,
-            0 to 3, 0 to 4, 1 to 4,
-            2 to 2, 3 to 3, 4 to 4
         )
-        squares.forEach { (x, y) ->
-            drawRect(
-                color = color,
-                topLeft = Offset(x * cell, y * cell),
-                size = Size(cell * 0.72f, cell * 0.72f)
-            )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = { onAction(MatterSetupAction.SubmitManualCode) },
+            enabled = manualSetupCode.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(state.primaryActionLabel.ifBlank { "Continue" })
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = { onAction(MatterSetupAction.BackToMainMenu) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Back")
         }
     }
 }

@@ -6,6 +6,7 @@ enum class MatterSetupStage {
     ReadyToScan,
     ScanningQr,
     QrScanned,
+    EnteringManualCode,
     ReadinessChecking,
     NeedsPairingMode,
     CommissioningToPhone,

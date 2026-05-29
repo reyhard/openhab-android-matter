@@ -416,7 +416,11 @@ public final class MainActivity extends Activity {
                         step -> appendFromWorker(MainActivityPresentation.safeTextForLog(step.message())));
                 runOnUiThread(() -> {
                     state.commissionedNodeId = result.nodeId();
-                    saveBootstrapState(result.nodeId(), result.controllerState());
+                    saveBootstrapState(
+                            result.nodeId(),
+                            result.controllerState(),
+                            result.vendorName(),
+                            result.productName());
                     append(MainActivityPresentation.bootstrapNodeId(state.commissionedNodeId));
                 });
             } catch (Exception ex) {
@@ -475,7 +479,11 @@ public final class MainActivity extends Activity {
                         step -> appendFromWorker(MainActivityPresentation.safeTextForLog(step.message())));
                 runOnUiThread(() -> {
                     state.temporaryCode = result.temporaryCode();
-                    saveBootstrapState(nodeId, result.controllerState());
+                    saveBootstrapState(
+                            nodeId,
+                            result.controllerState(),
+                            bootstrapState.vendorName(),
+                            bootstrapState.productName());
                     showTemporaryQrCode(result);
                     autoSubmitOpenHabMatterScan(state.temporaryCode);
                     append(OpenHabInstructions.troubleshooting());
@@ -1036,8 +1044,12 @@ public final class MainActivity extends Activity {
     }
 
     private void saveBootstrapState(long nodeId, String controllerState) {
+        saveBootstrapState(nodeId, controllerState, "", "");
+    }
+
+    private void saveBootstrapState(long nodeId, String controllerState, String vendorName, String productName) {
         try {
-            persistedBootstrapState = new MatterBootstrapState(nodeId, controllerState, false);
+            persistedBootstrapState = new MatterBootstrapState(nodeId, controllerState, false, vendorName, productName);
             bootstrapStateRepository.save(persistedBootstrapState);
         } catch (IllegalStateException ex) {
             append("Matter bootstrap controller state could not be saved. Re-run Thread commissioning if the app restarts before opening a commissioning window.");
