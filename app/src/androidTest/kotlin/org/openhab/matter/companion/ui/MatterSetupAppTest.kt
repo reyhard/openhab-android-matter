@@ -178,6 +178,19 @@ class MatterSetupAppTest {
     }
 
     @Test
+    fun settingsDetectRouterDispatchesEditThreadNetwork() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.settings(),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Detect router").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.EditThreadNetwork))
+    }
+
+    @Test
     fun threadNetworkEditorShowsDatasetRouterAndSave() {
         render(MatterSetupStateReducer.threadNetworkEditor())
 

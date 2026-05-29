@@ -71,7 +71,7 @@ fun SettingsScreen(
                 title = "Border router",
                 value = otbrBaseUrl.ifBlank { "Not set" },
                 actionLabel = "Detect router",
-                onActionClick = { onAction(MatterSetupAction.DetectThreadBorderRouters) }
+                onActionClick = { onAction(MatterSetupAction.EditThreadNetwork) }
             )
         }
         Spacer(Modifier.height(24.dp))
