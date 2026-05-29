@@ -32,16 +32,12 @@ class AndroidMatterSetupPorts(
         val ready = status.online() && status.restReachable() && status.matterControllerReady()
         val sanitizer = DetailSanitizer(config)
         val details = listOf(
-            "openHAB online=${status.online()}",
             "openHAB REST reachable=${status.restReachable()}",
             "openHAB Matter controller ready=${status.matterControllerReady()}",
             status.message().orEmpty(),
             status.details().orEmpty()
         ).sanitizeWith(sanitizer)
         val warnings = buildList {
-            if (!status.online()) {
-                add("openHAB is offline")
-            }
             if (!status.restReachable()) {
                 add("openHAB REST API is not reachable")
             }

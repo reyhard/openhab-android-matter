@@ -74,7 +74,9 @@ class AndroidMatterSetupPortsTest {
         assertFalse(result.ready)
         assertTrue(result.details.contains("Matter controller offline"))
         assertTrue(result.details.contains("Thing status is OFFLINE"))
+        assertFalse(result.details.contains("openHAB online=false"))
         assertTrue(result.warnings.contains("Matter controller offline"))
+        assertFalse(result.warnings.contains("openHAB is offline"))
     }
 
     @Test
