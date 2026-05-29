@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -44,7 +42,7 @@ fun AdvancedTroubleshootingScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Review the captured checks before retrying setup or opening a new commissioning window.",
+            text = "Review the captured checks before retrying setup.",
             style = MaterialTheme.typography.bodyLarge
         )
         if (failure != null) {
@@ -65,7 +63,7 @@ fun AdvancedTroubleshootingScreen(
         TroubleshootingSection(title = "Checks") {
             TroubleshootingBullets(
                 items = diagnostics.checks,
-                emptyText = "No diagnostic checks were captured. Use the recovery actions below after confirming the basics."
+                emptyText = "No diagnostic checks were captured. Review the recovery guidance below after confirming the basics."
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -93,23 +91,6 @@ fun AdvancedTroubleshootingScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(primaryActionLabel)
-        }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.OpenCommissioningWindowAgain) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Open commissioning window again")
-        }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.ForgetFromPhone) },
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.error
-            ),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Forget device from this phone")
         }
     }
 }
@@ -159,7 +140,7 @@ private fun buildRecoveryGuidance(state: MatterSetupUiState): List<String> {
             "Check that openHAB or its host can see current _matterc._udp mDNS records through Avahi.",
             "Disable VPNs that isolate local traffic, stay on the correct Wi-Fi, and keep Bluetooth and location enabled for commissioning.",
             "Confirm the device is still in pairing mode before retrying.",
-            "If the openHAB pairing window expired, open the commissioning window again before sending the code."
+            "If the openHAB pairing window expired, retry setup to request a fresh commissioning window before sending the code."
         )
     ).distinct()
 }
