@@ -108,6 +108,90 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
+    fun scanFailureReplacesRawConfiguredUrlsWithSafeUrlsInFailureStateAndDiagnostics() {
+        val ports = FakeMatterSetupPorts().apply {
+            openHabBaseUrl =
+                "https://openhab-user:openhab-password@openhab.local:8443/rest?token=ohab_secret&querySecret=scan-query#scan-fragment"
+            otbrBaseUrl =
+                "http://otbr-user:otbr-password@otbr.local/api?dataset=hex:001122&querySecret=otbr-query#otbr-fragment"
+            scanStarted = false
+            scanDetails = "scan failed at $openHabBaseUrl through $otbrBaseUrl with manual 34970112332"
+            diagnosticsSummary = MatterSetupDiagnosticsSummary(
+                checks = listOf("check $openHabBaseUrl"),
+                warnings = listOf("warning $otbrBaseUrl"),
+                details = listOf("detail $openHabBaseUrl $otbrBaseUrl MT:SECRET")
+            )
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val failureDetails = states.last().failure!!.details
+        val diagnosticsText = states.last().diagnostics.toString()
+        assertTrue(failureDetails.contains("https://openhab.local:8443/rest"))
+        assertTrue(failureDetails.contains("http://otbr.local/api"))
+        assertTrue(diagnosticsText.contains("https://openhab.local:8443/rest"))
+        assertTrue(diagnosticsText.contains("http://otbr.local/api"))
+        assertFalse(failureDetails.contains("openhab-user"))
+        assertFalse(failureDetails.contains("openhab-password"))
+        assertFalse(failureDetails.contains("otbr-user"))
+        assertFalse(failureDetails.contains("otbr-password"))
+        assertFalse(failureDetails.contains("querySecret"))
+        assertFalse(failureDetails.contains("scan-query"))
+        assertFalse(failureDetails.contains("otbr-query"))
+        assertFalse(failureDetails.contains("scan-fragment"))
+        assertFalse(failureDetails.contains("otbr-fragment"))
+        assertFalse(failureDetails.contains("ohab_secret"))
+        assertFalse(failureDetails.contains("hex:001122"))
+        assertFalse(failureDetails.contains("34970112332"))
+        assertFalse(diagnosticsText.contains("openhab-user"))
+        assertFalse(diagnosticsText.contains("openhab-password"))
+        assertFalse(diagnosticsText.contains("otbr-user"))
+        assertFalse(diagnosticsText.contains("otbr-password"))
+        assertFalse(diagnosticsText.contains("querySecret"))
+        assertFalse(diagnosticsText.contains("scan-query"))
+        assertFalse(diagnosticsText.contains("otbr-query"))
+        assertFalse(diagnosticsText.contains("scan-fragment"))
+        assertFalse(diagnosticsText.contains("otbr-fragment"))
+        assertFalse(diagnosticsText.contains("ohab_secret"))
+        assertFalse(diagnosticsText.contains("hex:001122"))
+        assertFalse(diagnosticsText.contains("34970112332"))
+    }
+
+    @Test
+    fun readinessFailureReplacesRawConfiguredUrlsWithSafeUrlsInFailureDetails() {
+        val ports = FakeMatterSetupPorts().apply {
+            openHabBaseUrl =
+                "https://ready-user:ready-password@openhab.local:8443/rest?token=ohab_secret&querySecret=ready-query#ready-fragment"
+            otbrBaseUrl =
+                "http://otbr-ready:otbr-ready-password@otbr.local/api?dataset=hex:001122&querySecret=otbr-ready-query#otbr-ready-fragment"
+            readinessReady = false
+            readinessWarnings = listOf("openHAB readiness failed at $openHabBaseUrl")
+            readinessDetails = listOf("OTBR readiness failed at $otbrBaseUrl")
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:SECRET")
+
+        val failureDetails = states.last().failure!!.details
+        assertTrue(failureDetails.contains("https://openhab.local:8443/rest"))
+        assertTrue(failureDetails.contains("http://otbr.local/api"))
+        assertFalse(failureDetails.contains("ready-user"))
+        assertFalse(failureDetails.contains("ready-password"))
+        assertFalse(failureDetails.contains("otbr-ready"))
+        assertFalse(failureDetails.contains("otbr-ready-password"))
+        assertFalse(failureDetails.contains("querySecret"))
+        assertFalse(failureDetails.contains("ready-query"))
+        assertFalse(failureDetails.contains("otbr-ready-query"))
+        assertFalse(failureDetails.contains("ready-fragment"))
+        assertFalse(failureDetails.contains("otbr-ready-fragment"))
+        assertFalse(failureDetails.contains("ohab_secret"))
+        assertFalse(failureDetails.contains("hex:001122"))
+    }
+
+    @Test
     fun setupResultToStringRedactsSensitiveValues() {
         val commission = MatterSetupPorts.CommissionResult(
             nodeId = 1234L,

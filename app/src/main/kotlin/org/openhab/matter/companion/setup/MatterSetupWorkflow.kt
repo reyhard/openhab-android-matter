@@ -12,6 +12,8 @@ class MatterSetupWorkflow(
         runCatching {
             val config = ports.loadConfig()
             diagnosticsContext = config.toDiagnosticsContext()
+            redactor.add(config.openHabBaseUrl, config.openHabBaseUrl.toLogSafeUrl())
+            redactor.add(config.otbrBaseUrl, config.otbrBaseUrl.toLogSafeUrl())
             redactor.add(config.openHabApiToken)
             redactor.add(config.threadDataset)
             if (!config.openHabConfigured) {
@@ -151,21 +153,25 @@ class MatterSetupWorkflow(
     }
 
     private class SensitiveValueRedactor(vararg initialValues: String) {
-        private val values = linkedSetOf<String>()
+        private val replacements = linkedMapOf<String, String>()
 
         init {
             initialValues.forEach(::add)
         }
 
         fun add(value: String) {
+            add(value, "<redacted>")
+        }
+
+        fun add(value: String, replacement: String) {
             if (value.isNotBlank()) {
-                values.add(value)
+                replacements[value] = replacement
             }
         }
 
         fun sanitize(text: String): String {
-            return values.sortedByDescending { it.length }.fold(text) { sanitized, value ->
-                sanitized.replace(value, "<redacted>")
+            return replacements.entries.sortedByDescending { it.key.length }.fold(text) { sanitized, entry ->
+                sanitized.replace(entry.key, entry.value)
             }
         }
     }
