@@ -40,6 +40,7 @@ class MatterSetupActivity : ComponentActivity() {
                 threadSettingsMessage = viewModel.threadSettingsMessage,
                 threadBorderRouters = viewModel.threadBorderRouters,
                 threadBorderRouterDiscoveryInProgress = viewModel.threadBorderRouterDiscoveryInProgress,
+                phoneDevices = viewModel.phoneDevices,
                 onOpenHabUrlChange = viewModel::onOpenHabUrlChange,
                 onTokenChange = viewModel::onTokenChange,
                 onThreadDatasetChange = viewModel::onThreadDatasetChange,

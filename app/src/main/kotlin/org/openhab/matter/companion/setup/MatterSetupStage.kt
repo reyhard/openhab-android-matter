@@ -15,5 +15,6 @@ enum class MatterSetupStage {
     WatchingOpenHabInbox,
     SuccessInboxDetected,
     Failed,
+    PhoneDeviceList,
     AdvancedTroubleshooting
 }

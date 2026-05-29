@@ -9,7 +9,9 @@ import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsSummary
 import org.openhab.matter.companion.setup.MatterSetupFailure
 import org.openhab.matter.companion.setup.MatterSetupStage
+import org.openhab.matter.companion.setup.MatterSetupStateReducer
 import org.openhab.matter.companion.setup.MatterSetupUiState
+import org.openhab.matter.companion.setup.PhoneMatterDevice
 
 class MatterSetupAppTest {
     @get:Rule
@@ -23,6 +25,7 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("openHAB address").assertIsDisplayed()
         composeRule.onNodeWithText("Access token").assertIsDisplayed()
         composeRule.onNodeWithText("Test connection").assertIsDisplayed()
+        composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
     }
 
     @Test
@@ -85,11 +88,60 @@ class MatterSetupAppTest {
         )
 
         composeRule.onNodeWithText("Advanced troubleshooting").assertIsDisplayed()
-        composeRule.onNodeWithText("Open pairing window again").assertIsDisplayed()
-        composeRule.onNodeWithText("Forget from this phone").assertIsDisplayed()
+        composeRule.onNodeWithText("Back to setup").assertIsDisplayed()
+        composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
     }
 
-    private fun render(state: MatterSetupUiState) {
+    @Test
+    fun phoneDeviceListShowsStoredDeviceActions() {
+        render(
+            state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true),
+            phoneDevices = listOf(
+                PhoneMatterDevice(
+                    nodeId = 1234L,
+                    controllerStateStored = true,
+                    stateReadable = true
+                )
+            )
+        )
+
+        composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
+        composeRule.onNodeWithText("0x4D2").assertIsDisplayed()
+        composeRule.onNodeWithText("Open pairing window again").assertIsDisplayed()
+        composeRule.onNodeWithText("Forget from this phone").assertIsDisplayed()
+        composeRule.onNodeWithText("Back to settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun phoneDeviceListExplainsWhenPairingWindowRetryIsUnavailable() {
+        render(
+            state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true),
+            phoneDevices = listOf(
+                PhoneMatterDevice(
+                    nodeId = 1234L,
+                    controllerStateStored = true,
+                    stateReadable = false
+                )
+            )
+        )
+
+        composeRule.onNodeWithText("Stored state is unreadable").assertIsDisplayed()
+        composeRule.onNodeWithText("Pairing window retry needs a readable stored node and controller state.")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun phoneDeviceListShowsEmptyState() {
+        render(MatterSetupStateReducer.phoneDeviceList(hasDevices = false))
+
+        composeRule.onNodeWithText("No staged Matter devices are stored on this phone.").assertIsDisplayed()
+        composeRule.onNodeWithText("Back to settings").assertIsDisplayed()
+    }
+
+    private fun render(
+        state: MatterSetupUiState,
+        phoneDevices: List<PhoneMatterDevice> = emptyList()
+    ) {
         composeRule.setContent {
             MatterSetupApp(
                 state = state,
@@ -101,6 +153,7 @@ class MatterSetupAppTest {
                 threadSettingsMessage = "",
                 threadBorderRouters = emptyList(),
                 threadBorderRouterDiscoveryInProgress = false,
+                phoneDevices = phoneDevices,
                 onOpenHabUrlChange = {},
                 onTokenChange = {},
                 onThreadDatasetChange = {},

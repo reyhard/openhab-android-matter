@@ -46,6 +46,14 @@ fun AdvancedTroubleshootingScreen(
             text = "Review the captured checks before retrying setup.",
             style = MaterialTheme.typography.bodyLarge
         )
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(
+            onClick = { onAction(primaryAction) },
+            enabled = state.primaryActionEnabled,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(primaryActionLabel)
+        }
         if (failure != null) {
             Spacer(Modifier.height(16.dp))
             TroubleshootingSection(title = "Failure") {
@@ -95,17 +103,10 @@ fun AdvancedTroubleshootingScreen(
         }
         Spacer(Modifier.height(12.dp))
         OutlinedButton(
-            onClick = { onAction(MatterSetupAction.OpenCommissioningWindowAgain) },
+            onClick = { onAction(MatterSetupAction.ShowPhoneDevices) },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Open pairing window again")
-        }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.ForgetFromPhone) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Forget from this phone")
+            Text("Devices on this phone")
         }
     }
 }

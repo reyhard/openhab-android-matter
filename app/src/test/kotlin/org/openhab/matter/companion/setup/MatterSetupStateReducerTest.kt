@@ -82,6 +82,22 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
+    fun phoneDeviceListUsesDedicatedStageAndBackActions() {
+        val state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true)
+
+        assertEquals(MatterSetupStage.PhoneDeviceList, state.stage)
+        assertEquals(MatterSetupAction.BackToSettings, state.primaryAction)
+        assertTrue(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+    }
+
+    @Test
+    fun emptyPhoneDeviceListExplainsThereAreNoStoredDevices() {
+        val state = MatterSetupStateReducer.phoneDeviceList(hasDevices = false)
+
+        assertEquals("No staged Matter devices are stored on this phone.", state.message)
+    }
+
+    @Test
     fun advancedTroubleshootingPreservesFailureAndDiagnostics() {
         val failure = MatterSetupFailure(
             step = MatterSetupStage.WatchingOpenHabInbox,
@@ -100,5 +116,15 @@ class MatterSetupStateReducerTest {
         assertEquals(MatterSetupStage.AdvancedTroubleshooting, state.stage)
         assertSame(failure, state.failure)
         assertSame(diagnostics, state.diagnostics)
+    }
+
+    @Test
+    fun advancedTroubleshootingFromSettingsReturnsToSettings() {
+        val state = MatterSetupStateReducer.advancedTroubleshooting(
+            MatterSetupStateReducer.editSettings("http://openhab.local:8080")
+        )
+
+        assertEquals(MatterSetupAction.BackToSettings, state.primaryAction)
+        assertEquals("Back to settings", state.primaryActionLabel)
     }
 }

@@ -60,10 +60,12 @@
 - The Compose automated readiness gate includes Android Bluetooth, location-service, runtime permission, Wi-Fi/mobile-data, and VPN diagnostics before BLE Thread commissioning.
 - Failure recovery keeps sanitized diagnostics and links to advanced troubleshooting guidance for openHAB readiness, network/VPN hints, OTBR reachability, mDNS/Avahi visibility including stale `_matterc._udp` records, IPv6 reachability, expired pairing windows, and pairing-mode checks.
 - The Compose advanced troubleshooting screen exposes one-tap OpenCommissioningWindow retry for the currently staged bootstrap device and a forget-from-phone cleanup action that clears this app's stored bootstrap state without claiming to factory reset the device.
+- The Compose settings flow has a dedicated **Devices on this phone** submenu for the app-stored bootstrap device, with visible back navigation, OpenCommissioningWindow retry, and forget-from-phone cleanup. This is currently a view of this app's persisted staging state, not a full connectedhomeip fabric inventory.
 
 ## Not Implemented Yet
 
 - Broader hardware validation across multiple Matter/Thread devices, Android versions, and OTBR/router combinations.
+- Full enumeration of every device on the Android connectedhomeip fabric, including live attributes such as IP address, node name, device name, and firmware version.
 - Real-device validation of the new Compose automated setup entry point across QR scan, BLE Thread commissioning, OpenCommissioningWindow, openHAB scan submission, and Inbox success.
 - Production-grade diagnostics for stale or conflicting `_matterc._udp` mDNS/Avahi records; the issue is currently diagnosable through logs and the troubleshooting guide, but not automatically remediated by the app.
 - Long-run connectedhomeip fabric persistence hardening across app restarts, phone reboots, and upgrade/reinstall scenarios. The current real-device flow restores enough controller state to open the commissioning window, but broader lifecycle coverage is still needed.

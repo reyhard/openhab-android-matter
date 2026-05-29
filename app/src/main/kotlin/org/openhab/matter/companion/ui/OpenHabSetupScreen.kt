@@ -57,6 +57,31 @@ fun OpenHabSetupScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(text = state.message)
+        if (MatterSetupAction.BackToMainMenu in state.secondaryActions) {
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.BackToMainMenu) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Back to main menu")
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { onAction(MatterSetupAction.ShowPhoneDevices) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Devices on this phone")
+        }
+        if (MatterSetupAction.ShowTroubleshooting in state.secondaryActions) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.ShowTroubleshooting) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Advanced troubleshooting")
+            }
+        }
         Spacer(Modifier.height(24.dp))
         Text(
             text = "openHAB",
@@ -89,24 +114,6 @@ fun OpenHabSetupScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(state.primaryActionLabel.ifBlank { "Continue" })
-        }
-        if (MatterSetupAction.BackToMainMenu in state.secondaryActions) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { onAction(MatterSetupAction.BackToMainMenu) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Back to main menu")
-            }
-        }
-        if (MatterSetupAction.ShowTroubleshooting in state.secondaryActions) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { onAction(MatterSetupAction.ShowTroubleshooting) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Advanced troubleshooting")
-            }
         }
         Spacer(Modifier.height(32.dp))
         Text(

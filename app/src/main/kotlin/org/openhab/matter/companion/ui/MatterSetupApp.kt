@@ -5,6 +5,7 @@ import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupStage
 import org.openhab.matter.companion.setup.MatterSetupUiState
+import org.openhab.matter.companion.setup.PhoneMatterDevice
 import org.openhab.matter.companion.ui.theme.MatterSetupTheme
 
 @Composable
@@ -18,6 +19,7 @@ fun MatterSetupApp(
     threadSettingsMessage: String,
     threadBorderRouters: List<ThreadBorderRouterRecord>,
     threadBorderRouterDiscoveryInProgress: Boolean,
+    phoneDevices: List<PhoneMatterDevice>,
     onOpenHabUrlChange: (String) -> Unit,
     onTokenChange: (String) -> Unit,
     onThreadDatasetChange: (String) -> Unit,
@@ -75,6 +77,12 @@ fun MatterSetupApp(
 
             MatterSetupStage.Failed -> SetupFailureScreen(
                 state = state,
+                onAction = onAction
+            )
+
+            MatterSetupStage.PhoneDeviceList -> PhoneDeviceListScreen(
+                state = state,
+                devices = phoneDevices,
                 onAction = onAction
             )
 

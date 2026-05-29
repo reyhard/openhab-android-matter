@@ -13,6 +13,23 @@ object MatterSetupStateReducer {
         return openHabSetup(openHabUrl, showBackToMainMenu = true)
     }
 
+    fun phoneDeviceList(hasDevices: Boolean, message: String = ""): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.PhoneDeviceList,
+            title = "Devices on this phone",
+            message = message.ifBlank {
+                if (hasDevices) {
+                    "Matter devices staged by this app for openHAB handoff."
+                } else {
+                    "No staged Matter devices are stored on this phone."
+                }
+            },
+            primaryAction = MatterSetupAction.BackToSettings,
+            primaryActionLabel = "Back to settings",
+            secondaryActions = listOf(MatterSetupAction.BackToMainMenu)
+        )
+    }
+
     fun openHabSetup(
         openHabUrl: String,
         showBackToMainMenu: Boolean = false
@@ -86,12 +103,21 @@ object MatterSetupStateReducer {
     }
 
     fun advancedTroubleshooting(current: MatterSetupUiState): MatterSetupUiState {
+        val primaryAction = when (current.stage) {
+            MatterSetupStage.NeedsOpenHabSetup,
+            MatterSetupStage.OpenHabSetupChecking -> MatterSetupAction.BackToSettings
+            else -> MatterSetupAction.Retry
+        }
         return MatterSetupUiState(
             stage = MatterSetupStage.AdvancedTroubleshooting,
             title = "Advanced troubleshooting",
             message = current.failure?.message ?: "Review setup diagnostics before trying again.",
-            primaryAction = MatterSetupAction.Retry,
-            primaryActionLabel = "Back to setup",
+            primaryAction = primaryAction,
+            primaryActionLabel = if (primaryAction == MatterSetupAction.BackToSettings) {
+                "Back to settings"
+            } else {
+                "Back to setup"
+            },
             failure = current.failure,
             diagnostics = current.diagnostics
         )

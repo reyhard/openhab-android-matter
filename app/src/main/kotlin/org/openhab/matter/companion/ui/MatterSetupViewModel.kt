@@ -35,6 +35,7 @@ import org.openhab.matter.companion.setup.MatterSetupStage
 import org.openhab.matter.companion.setup.MatterSetupStateReducer
 import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.setup.MatterSetupWorkflow
+import org.openhab.matter.companion.setup.PhoneMatterDevice
 import org.openhab.matter.companion.setup.ThreadDatasetSettingsStatus
 import org.openhab.matter.companion.setup.ThreadDatasetSettingsValidator
 import org.openhab.matter.companion.setup.WorkflowExecutionGate
@@ -59,6 +60,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     var threadBorderRouters by mutableStateOf<List<ThreadBorderRouterRecord>>(emptyList())
         private set
     var threadBorderRouterDiscoveryInProgress by mutableStateOf(false)
+        private set
+    var phoneDevices by mutableStateOf<List<PhoneMatterDevice>>(emptyList())
         private set
 
     private var scannedPayload = ""
@@ -161,6 +164,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
             }
 
+            MatterSetupAction.BackToSettings -> {
+                uiState = MatterSetupStateReducer.editSettings(openHabUrl)
+            }
+
             MatterSetupAction.SaveOpenHab,
             MatterSetupAction.TestOpenHab -> {
                 startOpenHabSetupCheck()
@@ -168,6 +175,11 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
             MatterSetupAction.EditSettings -> {
                 uiState = MatterSetupStateReducer.editSettings(openHabUrl)
+            }
+
+            MatterSetupAction.ShowPhoneDevices -> {
+                refreshPhoneDevices()
+                uiState = MatterSetupStateReducer.phoneDeviceList(phoneDevices.isNotEmpty())
             }
 
             MatterSetupAction.CheckThreadDataset -> {
@@ -347,6 +359,12 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
         }, "thread-border-router-discovery")
         workerThread?.start()
+    }
+
+    private fun refreshPhoneDevices() {
+        phoneDevices = PhoneMatterDevice.fromBootstrapState(bootstrapStateRepository.load())
+            ?.let(::listOf)
+            .orEmpty()
     }
 
     private fun emitOpenHabSetupFailure(
@@ -565,19 +583,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private fun forgetStagedDeviceFromPhone() {
         runCatching { bootstrapStateRepository.clear() }
             .onSuccess {
-                uiState = MatterSetupUiState(
-                    stage = MatterSetupStage.AdvancedTroubleshooting,
-                    title = "Staged device removed",
-                    message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems.",
-                    primaryAction = MatterSetupAction.BackToMainMenu,
-                    primaryActionLabel = "Back to main menu",
-                    diagnostics = MatterSetupDiagnosticsSummary(
-                        checks = listOf("Stored Matter bootstrap state cleared from this phone."),
-                        warnings = listOf(
-                            "If the device still reports too many administrators, remove this fabric from the device or factory reset it."
-                        ),
-                        details = emptyList()
-                    )
+                refreshPhoneDevices()
+                uiState = MatterSetupStateReducer.phoneDeviceList(
+                    hasDevices = false,
+                    message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems."
                 )
             }
             .onFailure { error ->
