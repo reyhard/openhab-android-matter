@@ -35,6 +35,10 @@ public final class ConnectedHomeIpOpenCommissioningWindowCallback {
         this.proxy = proxy;
     }
 
+    public void useCallbackObject(Object callbackObject) {
+        setProxy(callbackObject);
+    }
+
     public MatterOpenCommissioningWindowResult awaitResult(long timeoutMillis) throws InterruptedException {
         if (!latch.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
             throw new IllegalStateException("OpenCommissioningWindow callback timed out");
@@ -43,21 +47,6 @@ public final class ConnectedHomeIpOpenCommissioningWindowCallback {
             throw error;
         }
         return result;
-    }
-
-    private final class CallbackHandler implements InvocationHandler {
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) {
-            if ("onSuccess".equals(method.getName())) {
-                onSuccess(longArg(args, 0), stringArg(args, 1), stringArg(args, 2));
-                return defaultValue(method.getReturnType());
-            }
-            if ("onError".equals(method.getName())) {
-                onError(intArg(args, 0), longArg(args, 1));
-                return defaultValue(method.getReturnType());
-            }
-            return defaultValue(method.getReturnType());
-        }
     }
 
     public void onSuccess(long deviceId, String manualPairingCode, String qrCode) {
@@ -79,6 +68,21 @@ public final class ConnectedHomeIpOpenCommissioningWindowCallback {
         error = new IllegalStateException(
                 "OpenCommissioningWindow failed for node " + deviceId + " with status " + status);
         latch.countDown();
+    }
+
+    private final class CallbackHandler implements InvocationHandler {
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) {
+            if ("onSuccess".equals(method.getName())) {
+                onSuccess(longArg(args, 0), stringArg(args, 1), stringArg(args, 2));
+                return defaultValue(method.getReturnType());
+            }
+            if ("onError".equals(method.getName())) {
+                onError(intArg(args, 0), longArg(args, 1));
+                return defaultValue(method.getReturnType());
+            }
+            return defaultValue(method.getReturnType());
+        }
     }
 
     private static String stringArg(Object[] args, int index) {

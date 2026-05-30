@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.Manifest;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -113,6 +116,7 @@ public final class MainActivity extends Activity {
     private EditText otbrInput;
     private CheckBox attestationBypassInput;
     private ImageView temporaryQrImage;
+    private Button copyManualCodeButton;
     private boolean restoreNativeControllerSelection;
     private boolean persistedThreadDatasetUnreadable;
     private boolean persistedSetupPayloadUnreadable;
@@ -205,6 +209,8 @@ public final class MainActivity extends Activity {
         temporaryQrImage.setPadding(dp(12), dp(12), dp(12), dp(12));
         temporaryQrImage.setVisibility(android.view.View.GONE);
         temporaryQrImage.setLayoutParams(blockParams());
+        copyManualCodeButton = button("Copy manual code for openHAB");
+        copyManualCodeButton.setVisibility(android.view.View.GONE);
         output = label("", 15, TEXT_COLOR);
         output.setTextIsSelectable(true);
 
@@ -224,6 +230,7 @@ public final class MainActivity extends Activity {
         troubleshootingGuide.setOnClickListener(view -> showTroubleshootingGuide());
         saveConfig.setOnClickListener(view -> saveConfiguration());
         clearLogs.setOnClickListener(view -> clearLogs());
+        copyManualCodeButton.setOnClickListener(view -> copyTemporaryManualCode());
 
         root.addView(title);
         root.addView(subtitle);
@@ -256,6 +263,7 @@ public final class MainActivity extends Activity {
         root.addView(troubleshootingGuide);
         root.addView(saveConfig);
         root.addView(temporaryQrImage);
+        root.addView(copyManualCodeButton);
         root.addView(section("Guide output"));
         root.addView(clearLogs);
         root.addView(output);
@@ -513,6 +521,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showTemporaryQrCode(MatterOpenCommissioningWindowResult result) {
+        updateTemporaryManualCode(result);
         if (temporaryQrImage == null) {
             return;
         }
@@ -530,6 +539,66 @@ public final class MainActivity extends Activity {
             temporaryQrImage.setVisibility(android.view.View.GONE);
             append("Temporary Matter setup QR could not be displayed: " + exception.getMessage());
         }
+    }
+
+    private void updateTemporaryManualCode(MatterOpenCommissioningWindowResult result) {
+        String sourceCode = result.temporaryCode();
+        try {
+            String normalized = MatterHandoffCodeParser.parseForOpenHabScanInput(sourceCode);
+            if (normalized.startsWith("MT:")) {
+                throw new IllegalArgumentException("connectedhomeip returned only a QR payload");
+            }
+            state.temporaryManualCode = formatManualCode(normalized);
+            if (copyManualCodeButton != null) {
+                copyManualCodeButton.setText("Copy manual code for openHAB");
+                copyManualCodeButton.setVisibility(android.view.View.VISIBLE);
+            }
+            append("Manual openHAB setup code ready: " + state.temporaryManualCode);
+        } catch (IllegalArgumentException exception) {
+            state.temporaryManualCode = "";
+            if (copyManualCodeButton != null) {
+                copyManualCodeButton.setVisibility(android.view.View.GONE);
+            }
+            append("Manual setup code could not be derived: " + exception.getMessage());
+        }
+    }
+
+    private static String formatManualCode(String normalized) {
+        if (normalized == null) {
+            return "";
+        }
+        String code = normalized.replaceAll("[\\s-]", "");
+        if (code.matches("\\d{11}")) {
+            return code.substring(0, 4) + "-" + code.substring(4, 8) + "-" + code.substring(8);
+        }
+        if (code.matches("\\d{21}")) {
+            return code.substring(0, 4)
+                    + "-"
+                    + code.substring(4, 8)
+                    + "-"
+                    + code.substring(8, 12)
+                    + "-"
+                    + code.substring(12, 16)
+                    + "-"
+                    + code.substring(16, 20)
+                    + "-"
+                    + code.substring(20);
+        }
+        return normalized;
+    }
+
+    private void copyTemporaryManualCode() {
+        if (state.temporaryManualCode == null || state.temporaryManualCode.trim().isEmpty()) {
+            append("No manual setup code is available to copy.");
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            append("Clipboard service is unavailable.");
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("Matter manual setup code", state.temporaryManualCode));
+        append("Copied manual setup code for openHAB Scan Input.");
     }
 
     private void scanMatterQrWithExternalScanner() {
@@ -997,9 +1066,13 @@ public final class MainActivity extends Activity {
     private void clearLogs() {
         state.logs = "";
         state.temporaryCode = "";
+        state.temporaryManualCode = "";
         if (temporaryQrImage != null) {
             temporaryQrImage.setVisibility(android.view.View.GONE);
             temporaryQrImage.setImageBitmap(null);
+        }
+        if (copyManualCodeButton != null) {
+            copyManualCodeButton.setVisibility(android.view.View.GONE);
         }
         output.setText("");
     }

@@ -8,6 +8,7 @@ public final class AppState {
     public String otbrBaseUrl = "";
     public String logs = "";
     public String temporaryCode = "";
+    public String temporaryManualCode = "";
     public long commissionedNodeId = -1L;
     public boolean attestationBypassEnabled;
 }
