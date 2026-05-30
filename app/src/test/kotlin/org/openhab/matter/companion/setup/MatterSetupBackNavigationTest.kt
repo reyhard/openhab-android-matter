@@ -44,6 +44,16 @@ class MatterSetupBackNavigationTest {
     }
 
     @Test
+    fun phoneDevicesFromRequiredSetupTroubleshootingBackReturnsToRequiredSetup() {
+        val state = MatterSetupStateReducer.phoneDeviceList(
+            hasDevices = false,
+            returnAction = MatterSetupAction.BackToRequiredSetup
+        )
+
+        assertEquals(MatterSetupAction.BackToRequiredSetup, MatterSetupBackNavigation.systemBackAction(state))
+    }
+
+    @Test
     fun troubleshootingFromSettingsBackReturnsToSettings() {
         val state = MatterSetupStateReducer.advancedTroubleshooting(MatterSetupStateReducer.settings())
 

@@ -242,8 +242,12 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.ShowPhoneDevices -> {
+                val returnAction = phoneDeviceReturnAction()
                 refreshPhoneDevices()
-                uiState = MatterSetupStateReducer.phoneDeviceList(phoneDevices.isNotEmpty())
+                uiState = MatterSetupStateReducer.phoneDeviceList(
+                    hasDevices = phoneDevices.isNotEmpty(),
+                    returnAction = returnAction
+                )
             }
 
             MatterSetupAction.CheckThreadDataset -> {
@@ -843,6 +847,14 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         ).title
     }
 
+    private fun phoneDeviceReturnAction(): MatterSetupAction {
+        return if (uiState.stage == MatterSetupStage.AdvancedTroubleshooting) {
+            uiState.primaryAction ?: MatterSetupAction.BackToSettings
+        } else {
+            MatterSetupAction.BackToSettings
+        }
+    }
+
     private fun startRealWorkflow(setupPayload: String) {
         if (!executionGate.tryStart()) {
             return
@@ -955,12 +967,14 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun forgetStagedDeviceFromPhone() {
+        val returnAction = uiState.primaryAction ?: MatterSetupAction.BackToSettings
         runCatching { bootstrapStateRepository.clear() }
             .onSuccess {
                 refreshPhoneDevices()
                 uiState = MatterSetupStateReducer.phoneDeviceList(
                     hasDevices = false,
-                    message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems."
+                    message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems.",
+                    returnAction = returnAction
                 )
             }
             .onFailure { error ->

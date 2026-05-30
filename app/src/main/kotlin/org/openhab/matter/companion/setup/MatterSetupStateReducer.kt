@@ -69,7 +69,11 @@ object MatterSetupStateReducer {
         )
     }
 
-    fun phoneDeviceList(hasDevices: Boolean, message: String = ""): MatterSetupUiState {
+    fun phoneDeviceList(
+        hasDevices: Boolean,
+        message: String = "",
+        returnAction: MatterSetupAction = MatterSetupAction.BackToSettings
+    ): MatterSetupUiState {
         return MatterSetupUiState(
             stage = MatterSetupStage.PhoneDeviceList,
             title = "Devices on this phone",
@@ -80,8 +84,12 @@ object MatterSetupStateReducer {
                     "No staged Matter devices are stored on this phone."
                 }
             },
-            primaryAction = MatterSetupAction.BackToSettings,
-            primaryActionLabel = "Back to settings"
+            primaryAction = returnAction,
+            primaryActionLabel = if (returnAction == MatterSetupAction.BackToRequiredSetup) {
+                "Back to setup"
+            } else {
+                "Back to settings"
+            }
         )
     }
 

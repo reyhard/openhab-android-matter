@@ -9,8 +9,9 @@ object MatterSetupBackNavigation {
             MatterSetupStage.NeedsPairingMode -> MatterSetupAction.BackToMainMenu
 
             MatterSetupStage.ChangeToken,
-            MatterSetupStage.ThreadNetworkEditor,
-            MatterSetupStage.PhoneDeviceList -> MatterSetupAction.BackToSettings
+            MatterSetupStage.ThreadNetworkEditor -> MatterSetupAction.BackToSettings
+
+            MatterSetupStage.PhoneDeviceList -> state.primaryAction ?: MatterSetupAction.BackToSettings
 
             MatterSetupStage.AdvancedTroubleshooting -> state.primaryAction
 
