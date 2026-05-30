@@ -27,9 +27,12 @@ import org.openhab.matter.companion.openhab.HttpOpenHabInboxClient
 import org.openhab.matter.companion.openhab.HttpOpenHabMatterDiscoveryClient
 import org.openhab.matter.companion.openhab.OpenHabInboxStatus
 import org.openhab.matter.companion.openhab.OpenHabStatus
+import org.openhab.matter.companion.otbr.HttpOtbrClient
 import org.openhab.matter.companion.setup.AndroidMatterSetupPorts
+import org.openhab.matter.companion.setup.FirstRunSettingsValidator
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupConfig
+import org.openhab.matter.companion.setup.MatterSetupConfigCompleteness
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsContext
 import org.openhab.matter.companion.setup.MatterSetupDiagnosticsSummary
 import org.openhab.matter.companion.setup.MatterSetupDeviceIdentity
@@ -46,12 +49,38 @@ import org.openhab.matter.companion.setup.WorkflowExecutionGate
 import org.openhab.matter.companion.setup.sanitizeLogUrls
 import org.openhab.matter.companion.setup.toLogSafeUrl
 
+internal fun resolveEffectiveSetupToken(editableToken: String, persistedToken: String): String {
+    return editableToken.trim().ifBlank { persistedToken }
+}
+
+internal fun threadSettingsConfigForSave(
+    existingConfig: AppConfig,
+    safeDataset: String,
+    openHabBaseUrl: String,
+    otbrBaseUrl: String,
+    attestationBypassEnabled: Boolean
+): AppConfig {
+    return AppConfig(
+        safeDataset,
+        existingConfig.setupPayload(),
+        openHabBaseUrl,
+        existingConfig.openHabApiToken(),
+        otbrBaseUrl,
+        false,
+        existingConfig.setupPayloadUnreadable(),
+        existingConfig.openHabApiTokenUnreadable(),
+        attestationBypassEnabled
+    )
+}
+
 class MatterSetupViewModel(application: Application) : AndroidViewModel(application) {
     var uiState by mutableStateOf(MatterSetupUiState.initial(openHabConfigured = false))
         private set
     var openHabUrl by mutableStateOf("")
         private set
     var token by mutableStateOf("")
+        private set
+    var openHabTokenStored by mutableStateOf(false)
         private set
     var threadDataset by mutableStateOf("")
         private set
@@ -67,6 +96,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         private set
     var phoneDevices by mutableStateOf<List<PhoneMatterDevice>>(emptyList())
         private set
+    var scanReadiness by mutableStateOf(ScanReadinessUiState.ready())
+        private set
     var ipv6DiagnosticAddress by mutableStateOf("")
         private set
     var manualSetupCode by mutableStateOf("")
@@ -81,6 +112,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private val configRepository by lazy { SharedPreferencesAppConfigRepository(appContext) }
     private val bootstrapStateRepository by lazy { SharedPreferencesMatterBootstrapStateRepository(appContext) }
     private val openHabClient by lazy { HttpOpenHabClient() }
+    private val otbrClient by lazy { HttpOtbrClient() }
     private val openHabMatterDiscoveryClient by lazy { HttpOpenHabMatterDiscoveryClient() }
     private val openHabInboxClient by lazy { HttpOpenHabInboxClient() }
     private val fakeMatterController by lazy { FakeMatterController() }
@@ -94,17 +126,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     init {
-        val config = configRepository.load()
-        openHabUrl = config.openHabBaseUrl()
-        token = config.openHabApiToken()
-        threadDataset = config.threadDataset()
-        otbrBaseUrl = config.otbrBaseUrl()
-        attestationBypassEnabled = config.attestationBypassEnabled()
-        threadSettingsMessage = ThreadDatasetSettingsValidator.validate(
-            threadDataset,
-            config.threadDatasetUnreadable()
-        ).title
-        openHabConfigured = config.openHabBaseUrl().isNotBlank()
+        restorePersistedConfig(maskToken = true)
+        refreshScanReadiness()
         uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
     }
 
@@ -113,14 +136,13 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         if (uiState.stage == MatterSetupStage.NeedsOpenHabSetup) {
             val failure = uiState.failure
             uiState = if (failure == null) {
-                MatterSetupStateReducer.openHabSetup(value, showBackToMainMenu = openHabConfigured)
+                MatterSetupStateReducer.requiredSetup(value)
             } else {
                 MatterSetupStateReducer.openHabSetupNotReady(
                     value,
                     uiState.message,
                     failure,
-                    uiState.diagnostics,
-                    showBackToMainMenu = openHabConfigured
+                    uiState.diagnostics
                 )
             }
         }
@@ -140,6 +162,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
     fun onAttestationBypassChange(value: Boolean) {
         attestationBypassEnabled = value
+        saveAttestationBypass(value)
     }
 
     fun onIpv6DiagnosticAddressChange(value: String) {
@@ -153,7 +176,14 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     fun handleAction(action: MatterSetupAction) {
         when (action) {
             MatterSetupAction.StartScan -> {
+                refreshScanReadiness()
                 uiState = scanningState()
+            }
+
+            MatterSetupAction.OpenBluetoothSettings,
+            MatterSetupAction.OpenLocationSettings,
+            MatterSetupAction.RequestSetupPermissions -> {
+                refreshScanReadiness()
             }
 
             MatterSetupAction.ConfirmPairingMode -> {
@@ -180,26 +210,65 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             MatterSetupAction.BackToMainMenu -> {
                 scannedPayload = ""
                 manualSetupCode = ""
-                restorePersistedConfig()
+                restorePersistedConfig(maskToken = true)
                 uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
             }
 
             MatterSetupAction.BackToSettings -> {
-                uiState = MatterSetupStateReducer.editSettings(openHabUrl)
+                restorePersistedConfig(maskToken = true)
+                refreshPhoneDevices()
+                uiState = MatterSetupStateReducer.settings()
+            }
+
+            MatterSetupAction.BackToRequiredSetup -> {
+                uiState = MatterSetupStateReducer.requiredSetup(openHabUrl)
             }
 
             MatterSetupAction.SaveOpenHab,
-            MatterSetupAction.TestOpenHab -> {
-                startOpenHabSetupCheck()
+            MatterSetupAction.TestOpenHab,
+            MatterSetupAction.TestSettings -> {
+                startFirstRunSettingsCheck()
+            }
+
+            MatterSetupAction.GetStarted -> {
+                openHabUrl = effectiveOpenHabUrl()
+                uiState = MatterSetupStateReducer.requiredSetup(openHabUrl)
             }
 
             MatterSetupAction.EditSettings -> {
-                uiState = MatterSetupStateReducer.editSettings(openHabUrl)
+                restorePersistedConfig(maskToken = true)
+                refreshPhoneDevices()
+                uiState = MatterSetupStateReducer.settings()
+            }
+
+            MatterSetupAction.EditOpenHabAddress -> {
+                uiState = MatterSetupStateReducer.openHabAddressEditor()
+            }
+
+            MatterSetupAction.SaveOpenHabAddress -> {
+                saveOpenHabAddress()
+            }
+
+            MatterSetupAction.ChangeToken -> {
+                token = ""
+                uiState = MatterSetupStateReducer.changeToken()
+            }
+
+            MatterSetupAction.SaveChangedToken -> {
+                startChangedTokenCheck()
+            }
+
+            MatterSetupAction.EditThreadNetwork -> {
+                uiState = MatterSetupStateReducer.threadNetworkEditor()
             }
 
             MatterSetupAction.ShowPhoneDevices -> {
+                val returnAction = phoneDeviceReturnAction()
                 refreshPhoneDevices()
-                uiState = MatterSetupStateReducer.phoneDeviceList(phoneDevices.isNotEmpty())
+                uiState = MatterSetupStateReducer.phoneDeviceList(
+                    hasDevices = phoneDevices.isNotEmpty(),
+                    returnAction = returnAction
+                )
             }
 
             MatterSetupAction.CheckThreadDataset -> {
@@ -220,14 +289,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.EnterCodeManually -> {
-                uiState = MatterSetupUiState(
-                    stage = MatterSetupStage.EnteringManualCode,
-                    title = "Enter setup code",
-                    message = "Type the Matter setup code printed on the device or box.",
-                    primaryAction = MatterSetupAction.SubmitManualCode,
-                    primaryActionLabel = "Continue",
-                    secondaryActions = listOf(MatterSetupAction.BackToMainMenu)
-                )
+                uiState = MatterSetupStateReducer.manualCodeEntry()
             }
 
             MatterSetupAction.SubmitManualCode -> {
@@ -285,13 +347,12 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         super.onCleared()
     }
 
-    private fun startOpenHabSetupCheck() {
-        val baseUrl = openHabUrl.trim()
-        val apiToken = token
-        if (baseUrl.isBlank()) {
-            uiState = MatterSetupStateReducer.openHabSetup(openHabUrl)
-            return
-        }
+    private fun startFirstRunSettingsCheck() {
+        val baseUrl = effectiveOpenHabUrl()
+        val datasetInput = threadDataset
+        val otbrTarget = otbrBaseUrl.trim()
+        val existingConfig = configRepository.load()
+        val apiToken = resolveEffectiveSetupToken(token, existingConfig.openHabApiToken())
         if (!executionGate.tryStart()) {
             return
         }
@@ -299,24 +360,44 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         uiState = MatterSetupStateReducer.openHabSetupChecking()
         workerThread = Thread({
             try {
-                val existingConfig = configRepository.load()
-                val status = openHabClient.checkReadiness(baseUrl, apiToken)
-                if (status.online() && status.restReachable() && status.matterControllerReady()) {
-                    saveOpenHabConfig(existingConfig, baseUrl, apiToken)
+                val openHabStatus = openHabClient.checkReadiness(baseUrl, apiToken)
+                val otbrStatus = otbrClient.checkReadiness(otbrTarget)
+                val validation = FirstRunSettingsValidator.validate(
+                    openHabUrl = baseUrl,
+                    token = apiToken,
+                    dataset = datasetInput,
+                    otbrBaseUrl = otbrTarget,
+                    openHabStatus = openHabStatus,
+                    otbrStatus = otbrStatus
+                )
+                if (validation.ready) {
+                    val safeDataset = ThreadDataset.parse(datasetInput).chipToolValue()
+                    configRepository.save(
+                        AppConfig(
+                            safeDataset,
+                            existingConfig.setupPayload(),
+                            baseUrl,
+                            apiToken,
+                            otbrTarget,
+                            false,
+                            existingConfig.setupPayloadUnreadable(),
+                            false,
+                            attestationBypassEnabled
+                        )
+                    )
+                    controllerSession.syncAttestationBypass(attestationBypassEnabled)
                     postState {
                         openHabUrl = baseUrl
-                        token = apiToken
+                        token = ""
+                        openHabTokenStored = true
+                        threadDataset = safeDataset
+                        otbrBaseUrl = otbrTarget
                         openHabConfigured = true
-                        uiState = MatterSetupStateReducer.openHabSetupReady(baseUrl)
+                        threadSettingsMessage = ThreadDatasetSettingsValidator.validate(safeDataset).title
+                        uiState = MatterSetupUiState.addMatterDevice()
                     }
                 } else {
-                    emitOpenHabSetupFailure(
-                        "openHAB is not ready yet",
-                        status,
-                        existingConfig,
-                        baseUrl,
-                        apiToken
-                    )
+                    emitFirstRunSettingsFailure(baseUrl, existingConfig, apiToken, validation.warnings, validation.details)
                 }
             } catch (error: Exception) {
                 val existingConfig = runCatching { configRepository.load() }.getOrDefault(AppConfig("", ""))
@@ -324,17 +405,87 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             } finally {
                 executionGate.finish()
             }
-        }, "openhab-setup-check")
+        }, "first-run-settings-check")
         workerThread?.start()
     }
 
-    private fun saveOpenHabConfig(existingConfig: AppConfig, baseUrl: String, apiToken: String) {
+    private fun startChangedTokenCheck() {
+        val baseUrl = effectiveOpenHabUrl()
+        val apiToken = token.trim()
+        if (apiToken.isBlank()) {
+            val warning = "openHAB access token is required"
+            uiState = MatterSetupStateReducer.changeToken().copy(
+                message = warning,
+                diagnostics = MatterSetupDiagnosticsSummary(
+                    checks = emptyList(),
+                    warnings = listOf(warning),
+                    details = emptyList()
+                )
+            )
+            return
+        }
+        if (!executionGate.tryStart()) {
+            return
+        }
+
+        uiState = MatterSetupStateReducer.changeTokenChecking()
+        workerThread = Thread({
+            try {
+                val existingConfig = configRepository.load()
+                val status = openHabClient.checkReadiness(baseUrl, apiToken)
+                if (status.online() && status.restReachable() && status.matterControllerReady()) {
+                    configRepository.save(
+                        AppConfig(
+                            existingConfig.threadDataset(),
+                            existingConfig.setupPayload(),
+                            baseUrl,
+                            apiToken,
+                            existingConfig.otbrBaseUrl(),
+                            existingConfig.threadDatasetUnreadable(),
+                            existingConfig.setupPayloadUnreadable(),
+                            false,
+                            existingConfig.attestationBypassEnabled()
+                        )
+                    )
+                    postState {
+                        openHabUrl = baseUrl
+                        token = ""
+                        openHabTokenStored = true
+                        openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
+                        uiState = MatterSetupStateReducer.settings()
+                    }
+                } else {
+                    emitChangedTokenFailure(status, existingConfig, baseUrl, apiToken)
+                }
+            } catch (error: Exception) {
+                val existingConfig = runCatching { configRepository.load() }.getOrDefault(AppConfig("", ""))
+                emitChangedTokenError(error, existingConfig, baseUrl, apiToken)
+            } finally {
+                executionGate.finish()
+            }
+        }, "changed-token-check")
+        workerThread?.start()
+    }
+
+    private fun effectiveOpenHabUrl(): String {
+        return openHabUrl.trim().ifBlank { MatterSetupConfigCompleteness.DefaultOpenHabUrl }
+    }
+
+    private fun updateThreadDatasetValidationMessage(): Boolean {
+        val validation = ThreadDatasetSettingsValidator.validate(threadDataset)
+        threadSettingsMessage = "${validation.title} ${validation.message}"
+        return validation.status == ThreadDatasetSettingsStatus.Valid
+    }
+
+    private fun saveOpenHabAddress() {
+        val baseUrl = effectiveOpenHabUrl()
+        val existingConfig = configRepository.load()
         configRepository.save(
             AppConfig(
                 existingConfig.threadDataset(),
                 existingConfig.setupPayload(),
                 baseUrl,
-                apiToken,
+                existingConfig.openHabApiToken(),
                 existingConfig.otbrBaseUrl(),
                 existingConfig.threadDatasetUnreadable(),
                 existingConfig.setupPayloadUnreadable(),
@@ -342,12 +493,29 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 existingConfig.attestationBypassEnabled()
             )
         )
+        openHabUrl = baseUrl
+        openHabTokenStored = existingConfig.openHabApiToken().isNotBlank()
+        openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
+        uiState = MatterSetupStateReducer.settings()
     }
 
-    private fun updateThreadDatasetValidationMessage(): Boolean {
-        val validation = ThreadDatasetSettingsValidator.validate(threadDataset)
-        threadSettingsMessage = "${validation.title} ${validation.message}"
-        return validation.status == ThreadDatasetSettingsStatus.Valid
+    private fun saveAttestationBypass(value: Boolean) {
+        val existingConfig = configRepository.load()
+        configRepository.save(
+            AppConfig(
+                existingConfig.threadDataset(),
+                existingConfig.setupPayload(),
+                existingConfig.openHabBaseUrl(),
+                existingConfig.openHabApiToken(),
+                existingConfig.otbrBaseUrl(),
+                existingConfig.threadDatasetUnreadable(),
+                existingConfig.setupPayloadUnreadable(),
+                existingConfig.openHabApiTokenUnreadable(),
+                value
+            )
+        )
+        controllerSession.syncAttestationBypass(value)
+        openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
     }
 
     private fun saveThreadSettings() {
@@ -358,20 +526,17 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         val existingConfig = configRepository.load()
         val safeDataset = parsedDataset.chipToolValue()
         configRepository.save(
-            AppConfig(
-                safeDataset,
-                existingConfig.setupPayload(),
-                openHabUrl,
-                token,
-                otbrBaseUrl.trim(),
-                false,
-                existingConfig.setupPayloadUnreadable(),
-                existingConfig.openHabApiTokenUnreadable(),
-                attestationBypassEnabled
+            threadSettingsConfigForSave(
+                existingConfig = existingConfig,
+                safeDataset = safeDataset,
+                openHabBaseUrl = effectiveOpenHabUrl(),
+                otbrBaseUrl = otbrBaseUrl.trim(),
+                attestationBypassEnabled = attestationBypassEnabled
             )
         )
         threadDataset = safeDataset
         controllerSession.syncAttestationBypass(attestationBypassEnabled)
+        openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
         threadSettingsMessage = "Saved Thread settings. Dataset value is stored encrypted and not shown in logs."
     }
 
@@ -407,6 +572,31 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         phoneDevices = PhoneMatterDevice.fromBootstrapState(bootstrapStateRepository.load())
             ?.let(::listOf)
             .orEmpty()
+    }
+
+    fun refreshScanReadiness() {
+        val bluetooth = readinessProbe.bluetoothDiagnostic()
+        val location = readinessProbe.locationServicesDiagnostic()
+        val missingPermissionDiagnostics = readinessProbe.permissionDiagnostics()
+            .filter { !it.ok }
+        val permissionsReady = missingPermissionDiagnostics.isEmpty()
+        scanReadiness = ScanReadinessUiState(
+            bluetoothReady = bluetooth.ok,
+            locationReady = location.ok,
+            permissionsReady = permissionsReady,
+            bluetoothMessage = if (bluetooth.ok) "" else bluetooth.message,
+            locationMessage = if (location.ok) "" else location.message,
+            permissionsMessage = if (permissionsReady) {
+                ""
+            } else {
+                "Grant required permissions: ${missingPermissionDiagnostics.joinToString { it.name }}."
+            },
+            bluetoothHelperAvailable = !bluetooth.ok && bluetooth.message.contains("Turn on", ignoreCase = true),
+            locationHelperAvailable = !location.ok && location.message.contains("Turn on", ignoreCase = true),
+            permissionsHelperAvailable = !permissionsReady ||
+                bluetooth.message.contains("permission", ignoreCase = true) ||
+                location.message.contains("permission", ignoreCase = true)
+        )
     }
 
     private fun browseMatterServices() {
@@ -585,8 +775,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     ),
                     warnings = listOf(status.message().orEmpty()).sanitizeWith(sanitizer),
                     details = listOf(status.details().orEmpty()).sanitizeWith(sanitizer)
-                ),
-                showBackToMainMenu = openHabConfigured
+                )
             )
         )
     }
@@ -616,8 +805,99 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                     checks = listOf("openHAB URL configured=true"),
                     warnings = listOf("openHAB readiness check failed"),
                     details = listOf(detail)
-                ),
-                showBackToMainMenu = openHabConfigured
+                )
+            )
+        )
+    }
+
+    private fun emitFirstRunSettingsFailure(
+        baseUrl: String,
+        config: AppConfig,
+        apiToken: String,
+        warnings: List<String>,
+        details: List<String>
+    ) {
+        val sanitizer = SetupFailureSanitizer(config, baseUrl, apiToken)
+        val safeWarnings = warnings.sanitizeWith(sanitizer)
+        val safeDetails = details.sanitizeWith(sanitizer)
+        val message = safeWarnings.firstOrNull() ?: "Settings are not ready yet"
+        val failure = MatterSetupFailure(
+            step = MatterSetupStage.OpenHabSetupChecking,
+            message = message,
+            details = safeDetails.joinToString("; ")
+        )
+        emitState(
+            MatterSetupStateReducer.openHabSetupNotReady(
+                baseUrl,
+                safeWarnings.ifEmpty { listOf(message) }.joinToString(". "),
+                failure,
+                MatterSetupDiagnosticsSummary(
+                    checks = safeDetails.filter {
+                        it.contains("configured=") || it.contains("reachable=") || it.contains("ready=") ||
+                            it.contains("valid=")
+                    },
+                    warnings = safeWarnings,
+                    details = safeDetails
+                )
+            )
+        )
+    }
+
+    private fun emitChangedTokenFailure(
+        status: OpenHabStatus,
+        config: AppConfig,
+        baseUrl: String,
+        apiToken: String
+    ) {
+        val sanitizer = SetupFailureSanitizer(config, baseUrl, apiToken)
+        val warning = status.message().orEmpty().ifBlank { "openHAB token validation failed" }
+        val details = listOf(
+            "openHAB REST reachable=${status.restReachable()}",
+            "openHAB Matter controller ready=${status.matterControllerReady()}",
+            warning,
+            status.details().orEmpty()
+        ).sanitizeWith(sanitizer)
+        val safeWarning = sanitizer.sanitize(warning)
+        val failure = MatterSetupFailure(
+            step = MatterSetupStage.ChangeToken,
+            message = safeWarning,
+            details = details.joinToString("; ")
+        )
+        emitState(
+            MatterSetupStateReducer.changeToken().copy(
+                message = safeWarning,
+                failure = failure,
+                diagnostics = MatterSetupDiagnosticsSummary(
+                    checks = details.filter { it.contains("reachable=") || it.contains("ready=") },
+                    warnings = listOf(safeWarning),
+                    details = details
+                )
+            )
+        )
+    }
+
+    private fun emitChangedTokenError(
+        error: Exception,
+        config: AppConfig,
+        baseUrl: String,
+        apiToken: String
+    ) {
+        val sanitizer = SetupFailureSanitizer(config, baseUrl, apiToken)
+        val detail = sanitizer.sanitize(error.message.orEmpty()).ifBlank { error.javaClass.simpleName }
+        val failure = MatterSetupFailure(
+            step = MatterSetupStage.ChangeToken,
+            message = "openHAB token validation failed",
+            details = detail
+        )
+        emitState(
+            MatterSetupStateReducer.changeToken().copy(
+                message = "openHAB token validation failed",
+                failure = failure,
+                diagnostics = MatterSetupDiagnosticsSummary(
+                    checks = emptyList(),
+                    warnings = listOf("openHAB token validation failed"),
+                    details = listOf(detail)
+                )
             )
         )
     }
@@ -639,18 +919,27 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         )
     }
 
-    private fun restorePersistedConfig() {
+    private fun restorePersistedConfig(maskToken: Boolean = false) {
         val config = configRepository.load()
-        openHabUrl = config.openHabBaseUrl()
-        token = config.openHabApiToken()
+        openHabUrl = config.openHabBaseUrl().trim().ifBlank { MatterSetupConfigCompleteness.DefaultOpenHabUrl }
+        token = if (maskToken) "" else config.openHabApiToken()
+        openHabTokenStored = config.openHabApiToken().isNotBlank()
         threadDataset = config.threadDataset()
         otbrBaseUrl = config.otbrBaseUrl()
         attestationBypassEnabled = config.attestationBypassEnabled()
-        openHabConfigured = config.openHabBaseUrl().isNotBlank()
+        openHabConfigured = MatterSetupConfigCompleteness.isComplete(config)
         threadSettingsMessage = ThreadDatasetSettingsValidator.validate(
             threadDataset,
             config.threadDatasetUnreadable()
         ).title
+    }
+
+    private fun phoneDeviceReturnAction(): MatterSetupAction {
+        return if (uiState.stage == MatterSetupStage.AdvancedTroubleshooting) {
+            uiState.primaryAction ?: MatterSetupAction.BackToSettings
+        } else {
+            MatterSetupAction.BackToSettings
+        }
     }
 
     private fun startRealWorkflow(setupPayload: String) {
@@ -765,12 +1054,14 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun forgetStagedDeviceFromPhone() {
+        val returnAction = uiState.primaryAction ?: MatterSetupAction.BackToSettings
         runCatching { bootstrapStateRepository.clear() }
             .onSuccess {
                 refreshPhoneDevices()
                 uiState = MatterSetupStateReducer.phoneDeviceList(
                     hasDevices = false,
-                    message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems."
+                    message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems.",
+                    returnAction = returnAction
                 )
             }
             .onFailure { error ->
@@ -911,8 +1202,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private fun loadMatterSetupConfig(): MatterSetupConfig {
         val config = configRepository.load()
         return MatterSetupConfig(
-            openHabBaseUrl = openHabUrl,
-            openHabApiToken = token,
+            openHabBaseUrl = openHabUrl.trim().ifBlank {
+                config.openHabBaseUrl().trim().ifBlank { MatterSetupConfigCompleteness.DefaultOpenHabUrl }
+            },
+            openHabApiToken = resolveEffectiveSetupToken(token, config.openHabApiToken()),
             threadDataset = config.threadDataset(),
             otbrBaseUrl = config.otbrBaseUrl(),
             attestationBypassEnabled = config.attestationBypassEnabled()

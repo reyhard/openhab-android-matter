@@ -1,7 +1,9 @@
 package org.openhab.matter.companion.ui
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBack
@@ -22,24 +24,116 @@ class MatterSetupAppTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun firstRunSetupScreenShowsOpenHabSettings() {
-        render(MatterSetupUiState.initial(openHabConfigured = false))
+    fun firstRunShowsWelcomeScreen() {
+        render(MatterSetupStateReducer.reset(setupComplete = false, openHabUrl = "http://openhab:8080"))
 
-        composeRule.onNodeWithText("Connect to openHAB").assertIsDisplayed()
-        composeRule.onNodeWithText("openHAB address").assertIsDisplayed()
-        composeRule.onNodeWithText("Access token").assertIsDisplayed()
-        composeRule.onNodeWithText("Test connection").assertIsDisplayed()
-        composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
+        composeRule.onNodeWithText("Set up Matter with openHAB").assertIsDisplayed()
+        composeRule.onNodeWithText("Get started").assertIsDisplayed()
+        composeRule.onNodeWithText("Easy and guided").assertIsDisplayed()
     }
 
     @Test
-    fun readyToScanScreenShowsQrManualAndSettingsActions() {
-        render(MatterSetupUiState.initial(openHabConfigured = true))
+    fun requiredSetupScreenShowsAllRequiredFields() {
+        render(
+            state = MatterSetupStateReducer.requiredSetup("http://openhab:8080"),
+            openHabUrl = "http://openhab:8080"
+        )
+
+        composeRule.onNodeWithText("Connect to openHAB").assertIsDisplayed()
+        composeRule.onNodeWithText("openHAB address").assertIsDisplayed()
+        composeRule.onNodeWithText("Address of your openHAB instance.").assertIsDisplayed()
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Active Operational Dataset").assertIsDisplayed()
+        composeRule.onNodeWithText("Thread Border Router address").assertIsDisplayed()
+        composeRule.onNodeWithText("Detect border router").assertIsDisplayed()
+        composeRule.onNodeWithText("Continue").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Test settings").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Advanced troubleshooting").assertCountEquals(0)
+    }
+
+    @Test
+    fun failedRequiredSetupTroubleshootingDispatchesAction() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.openHabSetupNotReady(
+                openHabUrl = "http://openhab:8080",
+                message = "Settings are not ready yet."
+            ),
+            openHabUrl = "http://openhab:8080",
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Advanced troubleshooting").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.ShowTroubleshooting))
+    }
+
+    @Test
+    fun addMatterDeviceScreenShowsScanManualAndSettingsCog() {
+        render(MatterSetupUiState.addMatterDevice())
 
         composeRule.onNodeWithText("Add Matter device").assertIsDisplayed()
-        composeRule.onNodeWithText("Scan QR code").assertIsDisplayed()
+        composeRule.onNodeWithText("Scan code").assertIsDisplayed()
         composeRule.onNodeWithText("Enter code manually").assertIsDisplayed()
-        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        composeRule.onNodeWithText("⚙").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Ready").assertCountEquals(0)
+        composeRule.onAllNodesWithText("You can enter the 11-digit setup code instead.").assertCountEquals(0)
+    }
+
+    @Test
+    fun scanReadinessShowsSingleReadyRowWhenDeviceIsReady() {
+        render(
+            state = MatterSetupUiState.addMatterDevice(),
+            scanReadiness = ScanReadinessUiState.ready()
+        )
+
+        composeRule.onNodeWithText("Bluetooth and location ready").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Turn on Bluetooth").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Open location settings").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Grant permissions").assertCountEquals(0)
+    }
+
+    @Test
+    fun scanReadinessShowsHelperButtonsForFailedChecks() {
+        render(
+            state = MatterSetupUiState.addMatterDevice(),
+            scanReadiness = ScanReadinessUiState(
+                bluetoothReady = false,
+                locationReady = false,
+                permissionsReady = false,
+                bluetoothHelperAvailable = true,
+                locationHelperAvailable = true,
+                permissionsHelperAvailable = true
+            )
+        )
+
+        composeRule.onNodeWithText("Bluetooth and location ready").assertIsDisplayed()
+        composeRule.onNodeWithText("Turn on Bluetooth").assertIsDisplayed()
+        composeRule.onNodeWithText("Open location settings").assertIsDisplayed()
+        composeRule.onNodeWithText("Grant permissions").assertIsDisplayed()
+    }
+
+    @Test
+    fun getStartedDispatchesAction() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.reset(setupComplete = false, openHabUrl = "http://openhab:8080"),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Get started").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.GetStarted))
+    }
+
+    @Test
+    fun settingsCogDispatchesEditSettings() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(MatterSetupUiState.addMatterDevice(), onAction = actions::add)
+
+        composeRule.onNodeWithText("⚙").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.EditSettings))
     }
 
     @Test
@@ -56,13 +150,158 @@ class MatterSetupAppTest {
     fun systemBackFromSettingsReturnsToMainMenu() {
         val actions = mutableListOf<MatterSetupAction>()
         render(
-            state = MatterSetupStateReducer.editSettings("http://openhab.local:8080"),
+            state = MatterSetupStateReducer.settings(),
             onAction = actions::add
         )
 
         pressBack()
 
         assertTrue(actions.contains(MatterSetupAction.BackToMainMenu))
+    }
+
+    @Test
+    fun settingsScreenShowsOrganizedSections() {
+        render(
+            state = MatterSetupStateReducer.settings(),
+            openHabTokenStored = true
+        )
+
+        composeRule.onNodeWithText("openHAB connection").assertIsDisplayed()
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Set").assertIsDisplayed()
+        composeRule.onNodeWithText("Thread network").assertIsDisplayed()
+        composeRule.onNodeWithText("Thread network settings").assertIsDisplayed()
+        composeRule.onNodeWithText("This phone").assertIsDisplayed()
+        composeRule.onNodeWithText("Advanced").assertIsDisplayed()
+        composeRule.onNodeWithText("Attestation bypass").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Change token").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Edit").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Detect router").assertCountEquals(0)
+    }
+
+    @Test
+    fun settingsScreenShowsMissingWhenEditableTokenBlankWithoutStoredToken() {
+        render(
+            state = MatterSetupStateReducer.settings(),
+            openHabTokenStored = false,
+            threadDataset = "hex:0E080000000000010000",
+            otbrBaseUrl = "fd00::1"
+        )
+
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Missing").assertIsDisplayed()
+        composeRule.onNodeWithText("Not set").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreenShowsSetWhenStoredTokenIsHiddenFromEditableField() {
+        render(
+            state = MatterSetupStateReducer.settings(),
+            token = "",
+            openHabTokenStored = true
+        )
+
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Set").assertIsDisplayed()
+        composeRule.onNodeWithText("Stored securely").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsOpenHabAddressRowDispatchesEditOpenHabAddress() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.settings(),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("openHAB address").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.EditOpenHabAddress))
+    }
+
+    @Test
+    fun settingsAccessTokenRowDispatchesChangeToken() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.settings(),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Access token").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.ChangeToken))
+    }
+
+    @Test
+    fun settingsThreadNetworkRowDispatchesEditThreadNetwork() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.settings(),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Thread network settings").performClick()
+
+        assertTrue(actions.contains(MatterSetupAction.EditThreadNetwork))
+    }
+
+    @Test
+    fun threadNetworkEditorShowsDatasetRouterAndSave() {
+        render(MatterSetupStateReducer.threadNetworkEditor())
+
+        composeRule.onNodeWithText("Thread network").assertIsDisplayed()
+        composeRule.onNodeWithText("Active Operational Dataset").assertIsDisplayed()
+        composeRule.onNodeWithText("Thread Border Router address").assertIsDisplayed()
+        composeRule.onNodeWithText("Detect border router").assertIsDisplayed()
+        composeRule.onNodeWithText("Save").assertIsDisplayed()
+    }
+
+    @Test
+    fun changeTokenScreenShowsTokenReplacementControls() {
+        render(MatterSetupStateReducer.changeToken())
+
+        composeRule.onNodeWithText("Change token").assertIsDisplayed()
+        composeRule.onNodeWithText("Access token").assertIsDisplayed()
+        composeRule.onNodeWithText("Save token").assertIsDisplayed()
+    }
+
+    @Test
+    fun openHabAddressEditorShowsAddressAndSaveControls() {
+        render(
+            state = MatterSetupStateReducer.openHabAddressEditor(),
+            openHabUrl = "http://openhab:8080"
+        )
+
+        composeRule.onNodeWithText("openHAB address").assertIsDisplayed()
+        composeRule.onNodeWithText("Address of your openHAB instance.").assertIsDisplayed()
+        composeRule.onNodeWithText("Save address").assertIsDisplayed()
+    }
+
+    @Test
+    fun changeTokenCheckingDoesNotExposeThreadFields() {
+        render(
+            state = MatterSetupStateReducer.changeTokenChecking(),
+            token = "new.secret",
+            threadDataset = "hex:0E080000000000010000",
+            otbrBaseUrl = "fd00::1"
+        )
+
+        composeRule.onNodeWithText("Change token").assertIsDisplayed()
+        composeRule.onNodeWithText("Checking...").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Active Operational Dataset").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Thread Border Router address").assertCountEquals(0)
+    }
+
+    @Test
+    fun changeTokenScreenCanToggleTokenRevealControl() {
+        render(
+            state = MatterSetupStateReducer.changeToken(),
+            token = "new.secret"
+        )
+
+        composeRule.onNodeWithText("Show").performClick()
+
+        composeRule.onNodeWithText("Hide").assertIsDisplayed()
     }
 
     @Test
@@ -81,7 +320,8 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Enter setup code").assertIsDisplayed()
         composeRule.onNodeWithText("Pairing code").assertIsDisplayed()
         composeRule.onNodeWithText("Continue").assertIsDisplayed()
-        composeRule.onNodeWithText("Back").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Back").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Back to main menu").assertCountEquals(0)
     }
 
     @Test
@@ -161,7 +401,8 @@ class MatterSetupAppTest {
         )
 
         composeRule.onNodeWithText("Advanced troubleshooting").assertIsDisplayed()
-        composeRule.onNodeWithText("Back to setup").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Back to setup").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Back").assertCountEquals(0)
         composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
         composeRule.onNodeWithText("Browse Matter services").assertIsDisplayed()
         composeRule.onNodeWithText("Device IPv6 address").assertIsDisplayed()
@@ -185,7 +426,8 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("0x4D2").assertIsDisplayed()
         composeRule.onNodeWithText("Open pairing window again").assertIsDisplayed()
         composeRule.onNodeWithText("Forget from this phone").assertIsDisplayed()
-        composeRule.onNodeWithText("Back to settings").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Back to settings").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Back to main menu").assertCountEquals(0)
     }
 
     @Test
@@ -232,27 +474,36 @@ class MatterSetupAppTest {
         render(MatterSetupStateReducer.phoneDeviceList(hasDevices = false))
 
         composeRule.onNodeWithText("No staged Matter devices are stored on this phone.").assertIsDisplayed()
-        composeRule.onNodeWithText("Back to settings").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Back to settings").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Back to main menu").assertCountEquals(0)
     }
 
     private fun render(
         state: MatterSetupUiState,
         phoneDevices: List<PhoneMatterDevice> = emptyList(),
         manualSetupCode: String = "",
+        openHabUrl: String = "http://openhab.local:8080",
+        token: String = "",
+        openHabTokenStored: Boolean = false,
+        threadDataset: String = "",
+        otbrBaseUrl: String = "",
+        scanReadiness: ScanReadinessUiState = ScanReadinessUiState.ready(),
         onAction: (MatterSetupAction) -> Unit = {}
     ) {
         composeRule.setContent {
             MatterSetupApp(
                 state = state,
-                openHabUrl = "http://openhab.local:8080",
-                token = "",
-                threadDataset = "",
-                otbrBaseUrl = "",
+                openHabUrl = openHabUrl,
+                token = token,
+                openHabTokenStored = openHabTokenStored,
+                threadDataset = threadDataset,
+                otbrBaseUrl = otbrBaseUrl,
                 attestationBypassEnabled = false,
                 threadSettingsMessage = "",
                 threadBorderRouters = emptyList(),
                 threadBorderRouterDiscoveryInProgress = false,
                 phoneDevices = phoneDevices,
+                scanReadiness = scanReadiness,
                 ipv6DiagnosticAddress = "",
                 manualSetupCode = manualSetupCode,
                 onOpenHabUrlChange = {},
@@ -265,5 +516,9 @@ class MatterSetupAppTest {
                 onAction = onAction
             )
         }
+    }
+
+    private fun assertOpenHabLogoAndMatterVisualsCanRender() {
+        composeRule.onNodeWithText("Set up Matter with openHAB").assertIsDisplayed()
     }
 }

@@ -1,6 +1,7 @@
 package org.openhab.matter.companion.setup
 
 enum class MatterSetupStage {
+    Welcome,
     NeedsOpenHabSetup,
     OpenHabSetupChecking,
     ReadyToScan,
@@ -16,6 +17,10 @@ enum class MatterSetupStage {
     WatchingOpenHabInbox,
     SuccessInboxDetected,
     Failed,
+    Settings,
+    OpenHabAddressEditor,
+    ChangeToken,
+    ThreadNetworkEditor,
     PhoneDeviceList,
     AdvancedTroubleshooting
 }

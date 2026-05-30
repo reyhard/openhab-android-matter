@@ -58,7 +58,7 @@ public final class HttpOtbrClient implements OtbrClient {
             }
         }
         try {
-            String resolvableAddress = stripIpv6Zone(stripIpv6Brackets(address));
+            String resolvableAddress = stripEndpointPort(stripIpv6Zone(stripIpv6Brackets(address)));
             InetAddress inetAddress = InetAddress.getByName(resolvableAddress);
             return new OtbrStatus(true, "OTBR address is accepted",
                     "Address " + address + " resolves to " + inetAddress.getHostAddress()
@@ -76,7 +76,21 @@ public final class HttpOtbrClient implements OtbrClient {
     }
 
     private static boolean hasUnsupportedScheme(String target) {
+        if (looksLikeHostPortEndpoint(target)) {
+            return false;
+        }
         return target.matches("^[A-Za-z][A-Za-z0-9+.-]*:.*") && !looksLikeIpv6Address(target);
+    }
+
+    private static boolean looksLikeHostPortEndpoint(String target) {
+        if (target == null || looksLikeIpv6Address(target)) {
+            return false;
+        }
+        int colonIndex = target.lastIndexOf(':');
+        if (colonIndex <= 0 || colonIndex != target.indexOf(':') || colonIndex == target.length() - 1) {
+            return false;
+        }
+        return target.substring(colonIndex + 1).matches("[0-9]+");
     }
 
     private static boolean looksLikeIpv6Address(String target) {
@@ -107,6 +121,9 @@ public final class HttpOtbrClient implements OtbrClient {
         if (target != null && target.startsWith("[") && target.endsWith("]")) {
             return target.substring(1, target.length() - 1);
         }
+        if (target != null && target.startsWith("[") && target.contains("]:")) {
+            return target.substring(1, target.indexOf("]:"));
+        }
         return target;
     }
 
@@ -119,6 +136,21 @@ public final class HttpOtbrClient implements OtbrClient {
             return target;
         }
         return target.substring(0, zoneIndex);
+    }
+
+    private static String stripEndpointPort(String target) {
+        if (target == null || looksLikeIpv6Address(target)) {
+            return target;
+        }
+        int colonIndex = target.lastIndexOf(':');
+        if (colonIndex <= 0 || colonIndex == target.length() - 1) {
+            return target;
+        }
+        String port = target.substring(colonIndex + 1);
+        if (!port.matches("[0-9]+")) {
+            return target;
+        }
+        return target.substring(0, colonIndex);
     }
 
     private static URL normalizedUrl(String baseUrl) throws MalformedURLException {

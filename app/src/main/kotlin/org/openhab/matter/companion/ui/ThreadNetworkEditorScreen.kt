@@ -1,16 +1,17 @@
 package org.openhab.matter.companion.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,70 +26,28 @@ import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.ui.components.MatterSetupScaffold
-import org.openhab.matter.companion.ui.components.SectionLabel
 import org.openhab.matter.companion.ui.components.SettingsCard
 
 @Composable
-fun OpenHabSetupScreen(
+fun ThreadNetworkEditorScreen(
     state: MatterSetupUiState,
-    openHabUrl: String,
-    token: String,
     threadDataset: String,
     otbrBaseUrl: String,
-    attestationBypassEnabled: Boolean,
     threadSettingsMessage: String,
     threadBorderRouters: List<ThreadBorderRouterRecord>,
     threadBorderRouterDiscoveryInProgress: Boolean,
-    onUrlChange: (String) -> Unit,
-    onTokenChange: (String) -> Unit,
     onThreadDatasetChange: (String) -> Unit,
     onOtbrBaseUrlChange: (String) -> Unit,
-    onAttestationBypassChange: (Boolean) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
-    val effectiveOpenHabUrl = openHabUrl.ifBlank { state.openHabUrlFallback }
-    var tokenVisible by remember { mutableStateOf(false) }
     var threadDatasetVisible by remember { mutableStateOf(false) }
     MatterSetupScaffold(
         title = state.title,
         message = state.message,
-        showBack = false,
-        centerText = true
+        showBack = true,
+        onBack = { onAction(MatterSetupAction.BackToSettings) }
     ) {
         SettingsCard {
-            SectionLabel("openHAB connection")
-            OutlinedTextField(
-                value = effectiveOpenHabUrl,
-                onValueChange = onUrlChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("openHAB address") },
-                supportingText = { Text("Address of your openHAB instance.") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
-            )
-            OutlinedTextField(
-                value = token,
-                onValueChange = onTokenChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Access token") },
-                supportingText = { Text("Create one in openHAB under Profile / API tokens.") },
-                singleLine = true,
-                visualTransformation = if (tokenVisible) {
-                    VisualTransformation.None
-                } else {
-                    PasswordVisualTransformation()
-                },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    TextButton(onClick = { tokenVisible = !tokenVisible }) {
-                        Text(if (tokenVisible) "Hide" else "Show")
-                    }
-                }
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        SettingsCard {
-            SectionLabel("Thread network")
             OutlinedTextField(
                 value = threadDataset,
                 onValueChange = onThreadDatasetChange,
@@ -132,29 +91,36 @@ fun OpenHabSetupScreen(
                 }
             }
             if (threadSettingsMessage.isNotBlank()) {
-                Text(threadSettingsMessage)
+                Text(
+                    text = threadSettingsMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.CheckThreadDataset) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Check dataset")
             }
         }
         Spacer(Modifier.height(24.dp))
-        Button(
-            enabled = state.primaryActionEnabled,
-            onClick = { onAction(MatterSetupAction.TestSettings) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Continue")
-        }
-        if (MatterSetupAction.ShowTroubleshooting in state.secondaryActions) {
-            Spacer(Modifier.height(8.dp))
             OutlinedButton(
-                onClick = { onAction(MatterSetupAction.ShowTroubleshooting) },
-                modifier = Modifier.fillMaxWidth()
+                onClick = { onAction(MatterSetupAction.BackToSettings) },
+                modifier = Modifier.weight(1f)
             ) {
-                Text("Advanced troubleshooting")
+                Text("Cancel")
+            }
+            Button(
+                enabled = state.primaryActionEnabled,
+                onClick = { onAction(MatterSetupAction.SaveThreadSettings) },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(state.primaryActionLabel.ifBlank { "Save" })
             }
         }
     }

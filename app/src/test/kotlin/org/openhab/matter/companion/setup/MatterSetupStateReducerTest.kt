@@ -9,37 +9,39 @@ import org.junit.Test
 class MatterSetupStateReducerTest {
     @Test
     fun openHabSetupActionIsEnabledWhenUrlHasNonBlankText() {
-        val state = MatterSetupStateReducer.openHabSetup("  http://openhab.local:8080  ")
+        val state = MatterSetupStateReducer.requiredSetup("  http://openhab.local:8080  ")
 
         assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
-        assertEquals(MatterSetupAction.TestOpenHab, state.primaryAction)
+        assertEquals(MatterSetupAction.TestSettings, state.primaryAction)
         assertTrue(state.primaryActionEnabled)
     }
 
     @Test
-    fun openHabSetupActionIsDisabledWhenUrlIsBlank() {
-        val state = MatterSetupStateReducer.openHabSetup("   ")
+    fun requiredSetupUsesDefaultUrlWhenUrlIsBlank() {
+        val state = MatterSetupStateReducer.requiredSetup("   ")
 
         assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
-        assertFalse(state.primaryActionEnabled)
+        assertTrue(state.primaryActionEnabled)
+        assertEquals("http://openhab:8080", state.openHabUrlFallback)
     }
 
     @Test
-    fun resetReturnsOpenHabSetupWhenOpenHabIsNotConfigured() {
+    fun resetReturnsWelcomeWhenConfigurationIsIncomplete() {
         val state = MatterSetupStateReducer.reset(
-            openHabConfigured = false,
-            openHabUrl = "http://openhab.local:8080"
+            setupComplete = false,
+            openHabUrl = "http://openhab:8080"
         )
 
-        assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
-        assertEquals(MatterSetupAction.TestOpenHab, state.primaryAction)
-        assertTrue(state.primaryActionEnabled)
+        assertEquals(MatterSetupStage.Welcome, state.stage)
+        assertEquals("Set up Matter with openHAB", state.title)
+        assertEquals(MatterSetupAction.GetStarted, state.primaryAction)
+        assertEquals("Get started", state.primaryActionLabel)
     }
 
     @Test
-    fun resetReturnsReadyToScanWhenOpenHabIsConfigured() {
+    fun resetReturnsReadyToScanWhenConfigurationIsComplete() {
         val state = MatterSetupStateReducer.reset(
-            openHabConfigured = true,
+            setupComplete = true,
             openHabUrl = "http://openhab.local:8080"
         )
 
@@ -47,47 +49,63 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
-    fun editSettingsReturnsOpenHabSetupWithCurrentUrlPreserved() {
-        val state = MatterSetupStateReducer.editSettings("http://openhab.local:8080")
+    fun getStartedReturnsRequiredSetupWithDefaultOpenHabAddress() {
+        val state = MatterSetupStateReducer.requiredSetup("")
 
         assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
-        assertEquals(MatterSetupAction.TestOpenHab, state.primaryAction)
-        assertTrue(state.primaryActionEnabled)
-        assertTrue(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+        assertEquals("Connect to openHAB", state.title)
+        assertEquals(MatterSetupAction.TestSettings, state.primaryAction)
+        assertEquals("Continue", state.primaryActionLabel)
+        assertEquals("http://openhab:8080", state.openHabUrlFallback)
+        assertFalse(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+        assertFalse(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
     }
 
     @Test
-    fun firstRunOpenHabSetupDoesNotExposeBackToMainMenu() {
-        val state = MatterSetupStateReducer.openHabSetup("http://openhab.local:8080")
+    fun settingsStateUsesDedicatedSettingsStage() {
+        val state = MatterSetupStateReducer.settings()
 
+        assertEquals(MatterSetupStage.Settings, state.stage)
+        assertEquals("Settings", state.title)
         assertFalse(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
     }
 
     @Test
-    fun openHabSetupReadyKeepsUserInSettingsWithBackAndTroubleshootingActions() {
-        val state = MatterSetupStateReducer.openHabSetupReady("http://openhab.local:8080")
+    fun changeTokenCheckingUsesChangeTokenStageAndDisablesSave() {
+        val state = MatterSetupStateReducer.changeTokenChecking()
+
+        assertEquals(MatterSetupStage.ChangeToken, state.stage)
+        assertEquals(MatterSetupAction.SaveChangedToken, state.primaryAction)
+        assertEquals("Checking...", state.primaryActionLabel)
+        assertFalse(state.primaryActionEnabled)
+    }
+
+    @Test
+    fun openHabSetupReadyDoesNotExposeTroubleshootingBeforeValidationFails() {
+        val state = MatterSetupStateReducer.requiredSetup("http://openhab.local:8080")
 
         assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
-        assertEquals("openHAB is ready. You can go back and scan a Matter QR code.", state.message)
-        assertEquals(MatterSetupAction.TestOpenHab, state.primaryAction)
-        assertTrue(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+        assertEquals(MatterSetupAction.TestSettings, state.primaryAction)
+        assertFalse(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+        assertFalse(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
+    }
+
+    @Test
+    fun failedOpenHabSetupIncludesTroubleshootingAction() {
+        val state = MatterSetupStateReducer.openHabSetupNotReady(
+            openHabUrl = "http://openhab.local:8080",
+            message = "Settings are not ready yet."
+        )
+
         assertTrue(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
     }
 
     @Test
-    fun openHabSetupIncludesTroubleshootingAction() {
-        val state = MatterSetupStateReducer.openHabSetup("http://openhab.local:8080")
-
-        assertTrue(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
-    }
-
-    @Test
-    fun phoneDeviceListUsesDedicatedStageAndBackActions() {
+    fun phoneDeviceListDoesNotExposeBackToMainMenu() {
         val state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true)
 
         assertEquals(MatterSetupStage.PhoneDeviceList, state.stage)
-        assertEquals(MatterSetupAction.BackToSettings, state.primaryAction)
-        assertTrue(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+        assertFalse(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
     }
 
     @Test
@@ -95,6 +113,16 @@ class MatterSetupStateReducerTest {
         val state = MatterSetupStateReducer.phoneDeviceList(hasDevices = false)
 
         assertEquals("No staged Matter devices are stored on this phone.", state.message)
+    }
+
+    @Test
+    fun phoneDeviceListCanReturnToRequiredSetup() {
+        val state = MatterSetupStateReducer.phoneDeviceList(
+            hasDevices = false,
+            returnAction = MatterSetupAction.BackToRequiredSetup
+        )
+
+        assertEquals(MatterSetupAction.BackToRequiredSetup, state.primaryAction)
     }
 
     @Test
@@ -121,10 +149,20 @@ class MatterSetupStateReducerTest {
     @Test
     fun advancedTroubleshootingFromSettingsReturnsToSettings() {
         val state = MatterSetupStateReducer.advancedTroubleshooting(
-            MatterSetupStateReducer.editSettings("http://openhab.local:8080")
+            MatterSetupStateReducer.settings()
         )
 
         assertEquals(MatterSetupAction.BackToSettings, state.primaryAction)
         assertEquals("Back to settings", state.primaryActionLabel)
+    }
+
+    @Test
+    fun advancedTroubleshootingFromRequiredSetupReturnsToRequiredSetup() {
+        val state = MatterSetupStateReducer.advancedTroubleshooting(
+            MatterSetupStateReducer.requiredSetup("http://openhab:8080")
+        )
+
+        assertEquals(MatterSetupAction.BackToRequiredSetup, state.primaryAction)
+        assertEquals("Back to setup", state.primaryActionLabel)
     }
 }

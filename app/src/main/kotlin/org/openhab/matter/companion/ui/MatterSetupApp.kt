@@ -15,6 +15,7 @@ fun MatterSetupApp(
     state: MatterSetupUiState,
     openHabUrl: String,
     token: String,
+    openHabTokenStored: Boolean,
     threadDataset: String,
     otbrBaseUrl: String,
     attestationBypassEnabled: Boolean,
@@ -22,6 +23,7 @@ fun MatterSetupApp(
     threadBorderRouters: List<ThreadBorderRouterRecord>,
     threadBorderRouterDiscoveryInProgress: Boolean,
     phoneDevices: List<PhoneMatterDevice>,
+    scanReadiness: ScanReadinessUiState,
     ipv6DiagnosticAddress: String,
     manualSetupCode: String,
     onOpenHabUrlChange: (String) -> Unit,
@@ -39,6 +41,11 @@ fun MatterSetupApp(
             systemBackAction?.let(onAction)
         }
         when (state.stage) {
+            MatterSetupStage.Welcome -> WelcomeScreen(
+                state = state,
+                onAction = onAction
+            )
+
             MatterSetupStage.NeedsOpenHabSetup,
             MatterSetupStage.OpenHabSetupChecking -> OpenHabSetupScreen(
                 state = state,
@@ -58,10 +65,49 @@ fun MatterSetupApp(
                 onAction = onAction
             )
 
+            MatterSetupStage.Settings -> SettingsScreen(
+                state = state,
+                openHabUrl = openHabUrl,
+                tokenSet = openHabTokenStored,
+                threadDatasetSet = threadDataset.isNotBlank(),
+                otbrBaseUrl = otbrBaseUrl,
+                phoneDeviceCount = phoneDevices.size,
+                attestationBypassEnabled = attestationBypassEnabled,
+                onAttestationBypassChange = onAttestationBypassChange,
+                onAction = onAction
+            )
+
+            MatterSetupStage.OpenHabAddressEditor -> OpenHabAddressScreen(
+                state = state,
+                openHabUrl = openHabUrl,
+                onUrlChange = onOpenHabUrlChange,
+                onAction = onAction
+            )
+
+            MatterSetupStage.ChangeToken -> ChangeTokenScreen(
+                state = state,
+                token = token,
+                onTokenChange = onTokenChange,
+                onAction = onAction
+            )
+
+            MatterSetupStage.ThreadNetworkEditor -> ThreadNetworkEditorScreen(
+                state = state,
+                threadDataset = threadDataset,
+                otbrBaseUrl = otbrBaseUrl,
+                threadSettingsMessage = threadSettingsMessage,
+                threadBorderRouters = threadBorderRouters,
+                threadBorderRouterDiscoveryInProgress = threadBorderRouterDiscoveryInProgress,
+                onThreadDatasetChange = onThreadDatasetChange,
+                onOtbrBaseUrlChange = onOtbrBaseUrlChange,
+                onAction = onAction
+            )
+
             MatterSetupStage.ReadyToScan,
             MatterSetupStage.ScanningQr,
             MatterSetupStage.QrScanned -> ScanDeviceScreen(
                 state = state,
+                scanReadiness = scanReadiness,
                 onAction = onAction
             )
 

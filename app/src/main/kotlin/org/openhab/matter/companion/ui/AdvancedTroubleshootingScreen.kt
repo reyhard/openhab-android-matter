@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -27,8 +26,6 @@ fun AdvancedTroubleshootingScreen(
     onIpv6DiagnosticAddressChange: (String) -> Unit,
     onAction: (MatterSetupAction) -> Unit
 ) {
-    val primaryAction = state.primaryAction ?: MatterSetupAction.Retry
-    val primaryActionLabel = state.primaryActionLabel.ifBlank { "Back to setup" }
     val failure = state.failure
     val diagnostics = state.diagnostics
     val guidance = buildRecoveryGuidance(state)
@@ -49,14 +46,6 @@ fun AdvancedTroubleshootingScreen(
             text = "Review the captured checks before retrying setup.",
             style = MaterialTheme.typography.bodyLarge
         )
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = { onAction(primaryAction) },
-            enabled = state.primaryActionEnabled,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(primaryActionLabel)
-        }
         if (failure != null) {
             Spacer(Modifier.height(16.dp))
             TroubleshootingSection(title = "Failure") {
@@ -126,14 +115,6 @@ fun AdvancedTroubleshootingScreen(
             TroubleshootingBullets(items = guidance)
         }
         Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = { onAction(primaryAction) },
-            enabled = state.primaryActionEnabled,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(primaryActionLabel)
-        }
-        Spacer(Modifier.height(12.dp))
         OutlinedButton(
             onClick = { onAction(MatterSetupAction.ShowPhoneDevices) },
             modifier = Modifier.fillMaxWidth()

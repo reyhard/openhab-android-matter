@@ -49,6 +49,24 @@ public final class HttpOtbrClientTest {
     }
 
     @Test
+    public void acceptsPlainIpv4AddressWithPortAsNetworkReachabilityTarget() {
+        OtbrStatus status = new HttpOtbrClient().checkReadiness("127.0.0.1:49154");
+
+        assertTrue(status.reachable());
+        assertEquals("OTBR address is accepted", status.message());
+        assertTrue(status.details().contains("127.0.0.1:49154"));
+    }
+
+    @Test
+    public void acceptsHostNameWithPortAsNetworkReachabilityTarget() {
+        OtbrStatus status = new HttpOtbrClient().checkReadiness("localhost:49154");
+
+        assertTrue(status.reachable());
+        assertEquals("OTBR address is accepted", status.message());
+        assertTrue(status.details().contains("localhost:49154"));
+    }
+
+    @Test
     public void acceptsScopedIpv6AddressAsNetworkAddress() {
         OtbrStatus status = new HttpOtbrClient().checkReadiness("fe80::abcd%wlan0");
 
