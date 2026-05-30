@@ -96,6 +96,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         private set
     var phoneDevices by mutableStateOf<List<PhoneMatterDevice>>(emptyList())
         private set
+    var scanReadiness by mutableStateOf(ScanReadinessUiState.ready())
+        private set
     var ipv6DiagnosticAddress by mutableStateOf("")
         private set
     var manualSetupCode by mutableStateOf("")
@@ -125,6 +127,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
     init {
         restorePersistedConfig(maskToken = true)
+        refreshScanReadiness()
         uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
     }
 
@@ -159,6 +162,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
     fun onAttestationBypassChange(value: Boolean) {
         attestationBypassEnabled = value
+        saveAttestationBypass(value)
     }
 
     fun onIpv6DiagnosticAddressChange(value: String) {
@@ -172,7 +176,14 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     fun handleAction(action: MatterSetupAction) {
         when (action) {
             MatterSetupAction.StartScan -> {
+                refreshScanReadiness()
                 uiState = scanningState()
+            }
+
+            MatterSetupAction.OpenBluetoothSettings,
+            MatterSetupAction.OpenLocationSettings,
+            MatterSetupAction.RequestSetupPermissions -> {
+                refreshScanReadiness()
             }
 
             MatterSetupAction.ConfirmPairingMode -> {
@@ -205,6 +216,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
             MatterSetupAction.BackToSettings -> {
                 restorePersistedConfig(maskToken = true)
+                refreshPhoneDevices()
                 uiState = MatterSetupStateReducer.settings()
             }
 
@@ -225,7 +237,16 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
             MatterSetupAction.EditSettings -> {
                 restorePersistedConfig(maskToken = true)
+                refreshPhoneDevices()
                 uiState = MatterSetupStateReducer.settings()
+            }
+
+            MatterSetupAction.EditOpenHabAddress -> {
+                uiState = MatterSetupStateReducer.openHabAddressEditor()
+            }
+
+            MatterSetupAction.SaveOpenHabAddress -> {
+                saveOpenHabAddress()
             }
 
             MatterSetupAction.ChangeToken -> {
@@ -456,6 +477,47 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         return validation.status == ThreadDatasetSettingsStatus.Valid
     }
 
+    private fun saveOpenHabAddress() {
+        val baseUrl = effectiveOpenHabUrl()
+        val existingConfig = configRepository.load()
+        configRepository.save(
+            AppConfig(
+                existingConfig.threadDataset(),
+                existingConfig.setupPayload(),
+                baseUrl,
+                existingConfig.openHabApiToken(),
+                existingConfig.otbrBaseUrl(),
+                existingConfig.threadDatasetUnreadable(),
+                existingConfig.setupPayloadUnreadable(),
+                existingConfig.openHabApiTokenUnreadable(),
+                existingConfig.attestationBypassEnabled()
+            )
+        )
+        openHabUrl = baseUrl
+        openHabTokenStored = existingConfig.openHabApiToken().isNotBlank()
+        openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
+        uiState = MatterSetupStateReducer.settings()
+    }
+
+    private fun saveAttestationBypass(value: Boolean) {
+        val existingConfig = configRepository.load()
+        configRepository.save(
+            AppConfig(
+                existingConfig.threadDataset(),
+                existingConfig.setupPayload(),
+                existingConfig.openHabBaseUrl(),
+                existingConfig.openHabApiToken(),
+                existingConfig.otbrBaseUrl(),
+                existingConfig.threadDatasetUnreadable(),
+                existingConfig.setupPayloadUnreadable(),
+                existingConfig.openHabApiTokenUnreadable(),
+                value
+            )
+        )
+        controllerSession.syncAttestationBypass(value)
+        openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
+    }
+
     private fun saveThreadSettings() {
         val parsedDataset = runCatching { ThreadDataset.parse(threadDataset) }.getOrElse {
             updateThreadDatasetValidationMessage()
@@ -510,6 +572,31 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         phoneDevices = PhoneMatterDevice.fromBootstrapState(bootstrapStateRepository.load())
             ?.let(::listOf)
             .orEmpty()
+    }
+
+    fun refreshScanReadiness() {
+        val bluetooth = readinessProbe.bluetoothDiagnostic()
+        val location = readinessProbe.locationServicesDiagnostic()
+        val missingPermissionDiagnostics = readinessProbe.permissionDiagnostics()
+            .filter { !it.ok }
+        val permissionsReady = missingPermissionDiagnostics.isEmpty()
+        scanReadiness = ScanReadinessUiState(
+            bluetoothReady = bluetooth.ok,
+            locationReady = location.ok,
+            permissionsReady = permissionsReady,
+            bluetoothMessage = if (bluetooth.ok) "" else bluetooth.message,
+            locationMessage = if (location.ok) "" else location.message,
+            permissionsMessage = if (permissionsReady) {
+                ""
+            } else {
+                "Grant required permissions: ${missingPermissionDiagnostics.joinToString { it.name }}."
+            },
+            bluetoothHelperAvailable = !bluetooth.ok && bluetooth.message.contains("Turn on", ignoreCase = true),
+            locationHelperAvailable = !location.ok && location.message.contains("Turn on", ignoreCase = true),
+            permissionsHelperAvailable = !permissionsReady ||
+                bluetooth.message.contains("permission", ignoreCase = true) ||
+                location.message.contains("permission", ignoreCase = true)
+        )
     }
 
     private fun browseMatterServices() {

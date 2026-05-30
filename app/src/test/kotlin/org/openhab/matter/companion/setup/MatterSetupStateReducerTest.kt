@@ -55,9 +55,10 @@ class MatterSetupStateReducerTest {
         assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
         assertEquals("Connect to openHAB", state.title)
         assertEquals(MatterSetupAction.TestSettings, state.primaryAction)
-        assertEquals("Test settings", state.primaryActionLabel)
+        assertEquals("Continue", state.primaryActionLabel)
         assertEquals("http://openhab:8080", state.openHabUrlFallback)
         assertFalse(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
+        assertFalse(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
     }
 
     @Test
@@ -80,18 +81,21 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
-    fun openHabSetupReadyKeepsUserInSettingsWithTroubleshootingAction() {
+    fun openHabSetupReadyDoesNotExposeTroubleshootingBeforeValidationFails() {
         val state = MatterSetupStateReducer.requiredSetup("http://openhab.local:8080")
 
         assertEquals(MatterSetupStage.NeedsOpenHabSetup, state.stage)
         assertEquals(MatterSetupAction.TestSettings, state.primaryAction)
         assertFalse(state.secondaryActions.contains(MatterSetupAction.BackToMainMenu))
-        assertTrue(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
+        assertFalse(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
     }
 
     @Test
-    fun openHabSetupIncludesTroubleshootingAction() {
-        val state = MatterSetupStateReducer.requiredSetup("http://openhab.local:8080")
+    fun failedOpenHabSetupIncludesTroubleshootingAction() {
+        val state = MatterSetupStateReducer.openHabSetupNotReady(
+            openHabUrl = "http://openhab.local:8080",
+            message = "Settings are not ready yet."
+        )
 
         assertTrue(state.secondaryActions.contains(MatterSetupAction.ShowTroubleshooting))
     }

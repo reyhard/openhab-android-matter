@@ -34,7 +34,14 @@ class MatterSetupActivity : ComponentActivity() {
     private val locationSettingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
+        viewModel.refreshScanReadiness()
         continuePendingSetupActionAfterLocationSettings()
+    }
+
+    private val bluetoothSettingsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.refreshScanReadiness()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,6 +63,7 @@ class MatterSetupActivity : ComponentActivity() {
                 threadBorderRouters = viewModel.threadBorderRouters,
                 threadBorderRouterDiscoveryInProgress = viewModel.threadBorderRouterDiscoveryInProgress,
                 phoneDevices = viewModel.phoneDevices,
+                scanReadiness = viewModel.scanReadiness,
                 ipv6DiagnosticAddress = viewModel.ipv6DiagnosticAddress,
                 manualSetupCode = viewModel.manualSetupCode,
                 onOpenHabUrlChange = viewModel::onOpenHabUrlChange,
@@ -70,6 +78,11 @@ class MatterSetupActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshScanReadiness()
+    }
+
     private fun handleAction(action: MatterSetupAction) {
         when (action) {
             MatterSetupAction.StartScan -> {
@@ -79,6 +92,23 @@ class MatterSetupActivity : ComponentActivity() {
 
             MatterSetupAction.ConfirmPairingMode -> {
                 handleConfirmPairingMode()
+            }
+
+            MatterSetupAction.RequestSetupPermissions -> {
+                val missingPermissions = MatterSetupRuntimePermissions.missingForSetup(this)
+                if (missingPermissions.isEmpty()) {
+                    viewModel.refreshScanReadiness()
+                } else {
+                    setupPermissionLauncher.launch(missingPermissions.toTypedArray())
+                }
+            }
+
+            MatterSetupAction.OpenLocationSettings -> {
+                locationSettingsLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
+
+            MatterSetupAction.OpenBluetoothSettings -> {
+                bluetoothSettingsLauncher.launch(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
             }
 
             else -> {
@@ -103,6 +133,7 @@ class MatterSetupActivity : ComponentActivity() {
     }
 
     private fun continuePendingSetupActionAfterPermissions() {
+        viewModel.refreshScanReadiness()
         if (pendingSetupAction != MatterSetupAction.ConfirmPairingMode) {
             return
         }

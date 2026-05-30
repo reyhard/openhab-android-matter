@@ -8,6 +8,7 @@ object MatterSetupBackNavigation {
             MatterSetupStage.ScanningQr,
             MatterSetupStage.NeedsPairingMode -> MatterSetupAction.BackToMainMenu
 
+            MatterSetupStage.OpenHabAddressEditor,
             MatterSetupStage.ChangeToken,
             MatterSetupStage.ThreadNetworkEditor -> MatterSetupAction.BackToSettings
 

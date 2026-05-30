@@ -6,6 +6,8 @@ sealed interface MatterSetupAction {
     data object TestOpenHab : MatterSetupAction
     data object TestSettings : MatterSetupAction
     data object EditSettings : MatterSetupAction
+    data object EditOpenHabAddress : MatterSetupAction
+    data object SaveOpenHabAddress : MatterSetupAction
     data object ChangeToken : MatterSetupAction
     data object SaveChangedToken : MatterSetupAction
     data object EditThreadNetwork : MatterSetupAction
@@ -18,6 +20,9 @@ sealed interface MatterSetupAction {
     data object BackToRequiredSetup : MatterSetupAction
     data object ShowPhoneDevices : MatterSetupAction
     data object StartScan : MatterSetupAction
+    data object OpenBluetoothSettings : MatterSetupAction
+    data object OpenLocationSettings : MatterSetupAction
+    data object RequestSetupPermissions : MatterSetupAction
     data object EnterCodeManually : MatterSetupAction
     data object SubmitManualCode : MatterSetupAction
     data object ConfirmPairingMode : MatterSetupAction

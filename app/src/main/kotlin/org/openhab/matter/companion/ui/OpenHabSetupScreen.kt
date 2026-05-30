@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +52,8 @@ fun OpenHabSetupScreen(
     MatterSetupScaffold(
         title = state.title,
         message = state.message,
-        showBack = false
+        showBack = false,
+        centerText = true
     ) {
         SettingsCard {
             SectionLabel("openHAB connection")
@@ -136,9 +139,14 @@ fun OpenHabSetupScreen(
         Button(
             enabled = state.primaryActionEnabled,
             onClick = { onAction(MatterSetupAction.TestSettings) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
         ) {
-            Text(state.primaryActionLabel.ifBlank { "Test settings" })
+            Text("Continue")
         }
         if (MatterSetupAction.ShowTroubleshooting in state.secondaryActions) {
             Spacer(Modifier.height(8.dp))

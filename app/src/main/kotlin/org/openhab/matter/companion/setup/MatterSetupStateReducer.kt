@@ -16,9 +16,8 @@ object MatterSetupStateReducer {
             title = "Connect to openHAB",
             message = "Connect to your openHAB home and Thread network before adding Matter devices.",
             primaryAction = MatterSetupAction.TestSettings,
-            primaryActionLabel = "Test settings",
+            primaryActionLabel = "Continue",
             primaryActionEnabled = effectiveUrl.trim().isNotBlank(),
-            secondaryActions = listOf(MatterSetupAction.ShowTroubleshooting),
             openHabUrlFallback = effectiveUrl
         )
     }
@@ -38,6 +37,16 @@ object MatterSetupStateReducer {
             message = "Enter a new openHAB access token and test it before saving.",
             primaryAction = MatterSetupAction.SaveChangedToken,
             primaryActionLabel = "Save token"
+        )
+    }
+
+    fun openHabAddressEditor(): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.OpenHabAddressEditor,
+            title = "openHAB address",
+            message = "Address of your openHAB instance.",
+            primaryAction = MatterSetupAction.SaveOpenHabAddress,
+            primaryActionLabel = "Save address"
         )
     }
 
@@ -113,7 +122,8 @@ object MatterSetupStateReducer {
         return requiredSetup(openHabUrl).copy(
             message = message.ifBlank { "Settings are not ready yet. Check the details in troubleshooting." },
             failure = failure,
-            diagnostics = diagnostics
+            diagnostics = diagnostics,
+            secondaryActions = listOf(MatterSetupAction.ShowTroubleshooting)
         )
     }
 
@@ -123,6 +133,7 @@ object MatterSetupStateReducer {
             MatterSetupStage.OpenHabSetupChecking -> MatterSetupAction.BackToRequiredSetup
 
             MatterSetupStage.Settings,
+            MatterSetupStage.OpenHabAddressEditor,
             MatterSetupStage.ChangeToken,
             MatterSetupStage.ThreadNetworkEditor -> MatterSetupAction.BackToSettings
 

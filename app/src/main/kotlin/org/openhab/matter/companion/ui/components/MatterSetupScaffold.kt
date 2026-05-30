@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.openhab.matter.companion.R
 
@@ -33,6 +34,7 @@ fun MatterSetupScaffold(
     message: String,
     showBack: Boolean = false,
     showSettings: Boolean = false,
+    centerText: Boolean = false,
     onBack: () -> Unit = {},
     onSettings: () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
@@ -53,14 +55,18 @@ fun MatterSetupScaffold(
         Text(
             text = title,
             style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            textAlign = if (centerText) TextAlign.Center else TextAlign.Start,
+            modifier = Modifier.fillMaxWidth()
         )
         if (message.isNotBlank()) {
             Spacer(Modifier.height(8.dp))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = if (centerText) TextAlign.Center else TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
             )
         }
         Spacer(Modifier.height(24.dp))

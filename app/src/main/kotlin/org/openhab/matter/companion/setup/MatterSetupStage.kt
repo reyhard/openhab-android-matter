@@ -18,6 +18,7 @@ enum class MatterSetupStage {
     SuccessInboxDetected,
     Failed,
     Settings,
+    OpenHabAddressEditor,
     ChangeToken,
     ThreadNetworkEditor,
     PhoneDeviceList,

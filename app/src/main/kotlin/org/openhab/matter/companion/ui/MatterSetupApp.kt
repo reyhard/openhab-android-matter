@@ -23,6 +23,7 @@ fun MatterSetupApp(
     threadBorderRouters: List<ThreadBorderRouterRecord>,
     threadBorderRouterDiscoveryInProgress: Boolean,
     phoneDevices: List<PhoneMatterDevice>,
+    scanReadiness: ScanReadinessUiState,
     ipv6DiagnosticAddress: String,
     manualSetupCode: String,
     onOpenHabUrlChange: (String) -> Unit,
@@ -72,6 +73,14 @@ fun MatterSetupApp(
                 otbrBaseUrl = otbrBaseUrl,
                 phoneDeviceCount = phoneDevices.size,
                 attestationBypassEnabled = attestationBypassEnabled,
+                onAttestationBypassChange = onAttestationBypassChange,
+                onAction = onAction
+            )
+
+            MatterSetupStage.OpenHabAddressEditor -> OpenHabAddressScreen(
+                state = state,
+                openHabUrl = openHabUrl,
+                onUrlChange = onOpenHabUrlChange,
                 onAction = onAction
             )
 
@@ -98,6 +107,7 @@ fun MatterSetupApp(
             MatterSetupStage.ScanningQr,
             MatterSetupStage.QrScanned -> ScanDeviceScreen(
                 state = state,
+                scanReadiness = scanReadiness,
                 onAction = onAction
             )
 
