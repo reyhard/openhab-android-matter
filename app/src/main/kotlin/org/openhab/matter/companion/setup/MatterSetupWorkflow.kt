@@ -84,7 +84,7 @@ class MatterSetupWorkflow(
             }
 
             activeStage = MatterSetupStage.WatchingOpenHabInbox
-            emit(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds))
+            emit(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds, deviceIdentity = windowIdentity))
             val inbox = ports.waitForOpenHabInbox(config, scan.timeoutSeconds, baselineInbox.matterEntryIds)
             if (!inbox.matterEntryDetected) {
                 fail(

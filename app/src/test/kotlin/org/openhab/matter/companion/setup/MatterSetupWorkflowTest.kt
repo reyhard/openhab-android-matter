@@ -76,10 +76,12 @@ class MatterSetupWorkflowTest {
 
         val windowOpenState = states.first { it.stage == MatterSetupStage.CommissioningWindowOpen }
         val sendingState = states.first { it.stage == MatterSetupStage.SendingCodeToOpenHab }
+        val watchingState = states.first { it.stage == MatterSetupStage.WatchingOpenHabInbox }
         assertEquals("Aqara", windowOpenState.deviceIdentity?.vendorName)
         assertEquals("U200", windowOpenState.deviceIdentity?.productName)
         assertEquals("Aqara U200", windowOpenState.deviceIdentity?.displayName)
         assertEquals(windowOpenState.deviceIdentity, sendingState.deviceIdentity)
+        assertEquals(windowOpenState.deviceIdentity, watchingState.deviceIdentity)
     }
 
     @Test

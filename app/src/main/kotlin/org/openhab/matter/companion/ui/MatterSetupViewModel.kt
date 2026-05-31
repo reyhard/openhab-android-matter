@@ -1344,7 +1344,7 @@ class MatterSetupViewModel @JvmOverloads constructor(
                 }
 
                 activeStage = MatterSetupStage.WatchingOpenHabInbox
-                emitState(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds))
+                emitState(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds, deviceIdentity = windowIdentity))
                 val inbox = ports.waitForOpenHabInbox(
                     workflowConfig,
                     scan.timeoutSeconds,
