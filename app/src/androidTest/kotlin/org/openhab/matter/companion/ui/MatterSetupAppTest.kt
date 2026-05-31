@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBack
@@ -30,6 +31,12 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Set up Matter with openHAB").assertIsDisplayed()
         composeRule.onNodeWithText("Get started").assertIsDisplayed()
         composeRule.onNodeWithText("Easy and guided").assertIsDisplayed()
+        composeRule.onNodeWithText("Clear steps to get you set up quickly.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Easy and guided").assertIsDisplayed()
+        composeRule.onNodeWithText("Private and local").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Private and local").assertIsDisplayed()
+        composeRule.onNodeWithText("One home, everything together").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("One home, everything together").assertIsDisplayed()
     }
 
     @Test
@@ -75,7 +82,8 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Add Matter device").assertIsDisplayed()
         composeRule.onNodeWithText("Scan code").assertIsDisplayed()
         composeRule.onNodeWithText("Enter code manually").assertIsDisplayed()
-        composeRule.onNodeWithText("⚙").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Settings").assertIsDisplayed()
+        composeRule.onAllNodesWithText("⚙").assertCountEquals(0)
         composeRule.onAllNodesWithText("Ready").assertCountEquals(0)
         composeRule.onAllNodesWithText("You can enter the 11-digit setup code instead.").assertCountEquals(0)
     }
@@ -131,7 +139,7 @@ class MatterSetupAppTest {
         val actions = mutableListOf<MatterSetupAction>()
         render(MatterSetupUiState.addMatterDevice(), onAction = actions::add)
 
-        composeRule.onNodeWithText("⚙").performClick()
+        composeRule.onNodeWithContentDescription("Settings").performClick()
 
         assertTrue(actions.contains(MatterSetupAction.EditSettings))
     }
