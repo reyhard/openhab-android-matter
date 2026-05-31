@@ -33,6 +33,25 @@ public class ConnectedHomeIpReflectionDeviceMetadataReaderTest {
         assertEquals("fd88:9326:57d6:0001:af67:97fb:407a:cbad", details.ipv6Address());
     }
 
+    @Test
+    public void readDeviceDetailsUsesClusterSpecificAttributeCallbacks() throws Exception {
+        ChipClusters.batPercentRemaining = 153;
+        ChipClusters.batQuantity = 2;
+        ChipClusters.batReplacementDescription = "AAA";
+        ChipClusters.threadNetworkName = "OpenThread";
+        ChipClusters.threadChannel = 25;
+        ConnectedHomeIpReflectionDeviceMetadataReader reader = new ConnectedHomeIpReflectionDeviceMetadataReader(
+                (controller, nodeId) -> new ConnectedHomeIpDevicePointer(123L, () -> {}));
+
+        MatterDeviceDetails details = reader.readDeviceDetails(new Object(), 0x165BC267A7E344D0L);
+
+        assertEquals(Integer.valueOf(153), details.batteryPercentRemaining());
+        assertEquals(Integer.valueOf(2), details.batteryQuantity());
+        assertEquals("AAA", details.batteryDesignation());
+        assertEquals("OpenThread", details.threadNetworkName());
+        assertEquals(Integer.valueOf(25), details.threadChannel());
+    }
+
     private static byte[] bytes(int... values) {
         byte[] result = new byte[values.length];
         for (int index = 0; index < values.length; index++) {

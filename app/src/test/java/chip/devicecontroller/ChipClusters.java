@@ -95,7 +95,13 @@ public final class ChipClusters {
     public static final class PowerSourceCluster {
         public PowerSourceCluster(long devicePointer, int endpoint) {}
 
-        public void readBatPercentRemainingAttribute(IntegerAttributeCallback callback) {
+        public interface BatPercentRemainingAttributeCallback {
+            void onSuccess(Integer value);
+
+            void onError(String value);
+        }
+
+        public void readBatPercentRemainingAttribute(BatPercentRemainingAttributeCallback callback) {
             callback.onSuccess(batPercentRemaining);
         }
 
@@ -115,6 +121,12 @@ public final class ChipClusters {
     public static final class GeneralDiagnosticsCluster {
         public GeneralDiagnosticsCluster(long devicePointer, int endpoint) {}
 
+        public interface NetworkInterfacesAttributeCallback {
+            void onSuccess(List<Object> value);
+
+            void onError(String value);
+        }
+
         public void readNetworkInterfacesAttribute(NetworkInterfacesAttributeCallback callback) {
             callback.onSuccess(networkInterfaces);
         }
@@ -123,11 +135,23 @@ public final class ChipClusters {
     public static final class ThreadNetworkDiagnosticsCluster {
         public ThreadNetworkDiagnosticsCluster(long devicePointer, int endpoint) {}
 
-        public void readNetworkNameAttribute(CharStringAttributeCallback callback) {
+        public interface NetworkNameAttributeCallback {
+            void onSuccess(String value);
+
+            void onError(String value);
+        }
+
+        public interface ChannelAttributeCallback {
+            void onSuccess(Integer value);
+
+            void onError(String value);
+        }
+
+        public void readNetworkNameAttribute(NetworkNameAttributeCallback callback) {
             callback.onSuccess(threadNetworkName);
         }
 
-        public void readChannelAttribute(IntegerAttributeCallback callback) {
+        public void readChannelAttribute(ChannelAttributeCallback callback) {
             callback.onSuccess(threadChannel);
         }
     }

@@ -50,7 +50,7 @@ class MatterSetupViewModelPhoneDeviceTest {
     }
 
     @Test
-    fun fetchPhoneDeviceDetailsFailsClosedWhenControllerStateIsMissing() {
+    fun fetchPhoneDeviceDetailsAttemptsNativeReadWhenControllerStateIsMissing() {
         val nativeController = RecordingNativeController(
             details = MatterDeviceDetails.Builder()
                 .softwareVersionString("1.8.7")
@@ -70,15 +70,18 @@ class MatterSetupViewModelPhoneDeviceTest {
         viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
         viewModel.handleAction(MatterSetupAction.ShowPhoneDeviceDetails(0x4D2))
         viewModel.handleAction(MatterSetupAction.FetchPhoneDeviceDetails)
-        drainMainThread()
 
+        waitForFetchToFinish(viewModel)
+
+        assertEquals(1, nativeController.readDeviceDetailsCalls)
+        assertEquals(0x4D2L, nativeController.lastNodeId)
+        assertEquals("", nativeController.lastControllerState)
         assertEquals(MatterSetupStage.PhoneDeviceDetails, viewModel.uiState.stage)
         assertEquals("Staged product", viewModel.uiState.phoneDeviceDetails.deviceName)
         assertEquals("Staged vendor", viewModel.uiState.phoneDeviceDetails.vendor)
-        assertEquals("", viewModel.uiState.phoneDeviceDetails.firmwareVersion)
+        assertEquals("1.8.7", viewModel.uiState.phoneDeviceDetails.firmwareVersion)
         assertFalse(viewModel.uiState.phoneDeviceDetailsFetching)
-        assertEquals("Could not fetch data from device", viewModel.uiState.phoneDeviceDetailsMessage)
-        assertEquals(0, nativeController.readDeviceDetailsCalls)
+        assertEquals("Device data refreshed", viewModel.uiState.phoneDeviceDetailsMessage)
     }
 
     @Test
