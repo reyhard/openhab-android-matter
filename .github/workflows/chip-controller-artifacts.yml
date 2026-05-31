@@ -23,6 +23,7 @@ jobs:
       CHIP_ARTIFACT_TAG: chip-controller-artifacts-latest
       CHIP_ARTIFACT_NAME: openhab-chip-artifacts-arm64.zip
       CHIP_ARTIFACT_DIR_NAME: openhab-chip-artifacts-arm64
+      KOTLIN_VERSION: 2.1.21
 
     steps:
       - name: Check out connectedhomeip
@@ -68,16 +69,27 @@ jobs:
             "cmake;3.22.1" \
             "ndk;28.2.13676358"
 
+      - name: Set up Kotlin compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSLo "$RUNNER_TEMP/kotlin-compiler.zip" \
+            "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip"
+          unzip -q "$RUNNER_TEMP/kotlin-compiler.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
+
       - name: Build connectedhomeip Android controller artifacts
         shell: bash
         run: |
           set -eo pipefail
           export ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/28.2.13676358"
+          export PATH="$RUNNER_TEMP/kotlinc/bin:$PATH"
           export TERM="${TERM:-xterm-256color}"
           if [[ ! -d "${ANDROID_NDK_HOME}" ]]; then
             echo "::error::Expected NDK directory not found: ${ANDROID_NDK_HOME}"
             exit 1
           fi
+          kotlinc -version
 
           cd connectedhomeip
           set +u
