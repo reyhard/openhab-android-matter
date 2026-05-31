@@ -12,6 +12,13 @@ class MatterDeviceDetailFormatterTest {
     }
 
     @Test
+    fun batteryOddHalfPercentFormatsWithDecimal() {
+        assertEquals("51.5%", MatterDeviceDetailFormatter.battery(103, null, ""))
+        assertEquals("51.5% · 1×CR2032", MatterDeviceDetailFormatter.battery(103, 1, "CR2032"))
+        assertEquals("52%", MatterDeviceDetailFormatter.battery(104, null, ""))
+    }
+
+    @Test
     fun threadAndOtaFormattersUseStableFallbacks() {
         assertEquals("OpenThread · Channel 25", MatterDeviceDetailFormatter.threadNetwork("OpenThread", 25))
         assertEquals("OpenThread", MatterDeviceDetailFormatter.threadNetwork("OpenThread", null))

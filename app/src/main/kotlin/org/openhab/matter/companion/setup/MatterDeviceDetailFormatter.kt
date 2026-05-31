@@ -17,7 +17,11 @@ object MatterDeviceDetailFormatter {
         if (halfPercent == null) {
             return UNKNOWN
         }
-        val percent = "${halfPercent / 2}%"
+        val percent = if (halfPercent % 2 == 0) {
+            "${halfPercent / 2}%"
+        } else {
+            "${halfPercent / 2}.5%"
+        }
         val type = designation.trim()
         return if (quantity != null && quantity > 0 && type.isNotBlank()) {
             "$percent · ${quantity}×$type"

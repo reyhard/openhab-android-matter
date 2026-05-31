@@ -152,6 +152,21 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
+    fun phoneDeviceDetailsPreservesReturnActionFromPhoneDeviceList() {
+        val state = MatterSetupStateReducer.phoneDeviceDetails(
+            device = PhoneMatterDevice(
+                nodeId = 0x4D2,
+                controllerStateStored = true,
+                stateReadable = true
+            ),
+            returnAction = MatterSetupAction.BackToRequiredSetup
+        )
+
+        assertEquals(MatterSetupAction.BackToRequiredSetup, state.primaryAction)
+        assertEquals("Back to setup", state.primaryActionLabel)
+    }
+
+    @Test
     fun advancedTroubleshootingPreservesFailureAndDiagnostics() {
         val failure = MatterSetupFailure(
             step = MatterSetupStage.WatchingOpenHabInbox,

@@ -3,6 +3,9 @@ package org.openhab.matter.companion.ui
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.openhab.matter.companion.config.AppConfig
+import org.openhab.matter.companion.setup.MatterSetupAction
+import org.openhab.matter.companion.setup.MatterSetupStateReducer
+import org.openhab.matter.companion.setup.PhoneMatterDevice
 
 class MatterSetupViewModelTokenTest {
     @Test
@@ -99,5 +102,19 @@ class MatterSetupViewModelTokenTest {
         assertEquals("http://new-openhab:8080", result.openHabBaseUrl())
         assertEquals("edited.token", result.openHabApiToken())
         assertEquals(false, result.openHabApiTokenUnreadable())
+    }
+
+    @Test
+    fun phoneDeviceDetailsReturnActionUsesStoredDetailsContext() {
+        val state = MatterSetupStateReducer.phoneDeviceDetails(
+            device = PhoneMatterDevice(
+                nodeId = 0x4D2,
+                controllerStateStored = true,
+                stateReadable = true
+            ),
+            returnAction = MatterSetupAction.BackToRequiredSetup
+        )
+
+        assertEquals(MatterSetupAction.BackToRequiredSetup, resolvePhoneDeviceReturnAction(state))
     }
 }

@@ -103,6 +103,15 @@ internal fun shouldRefreshOpenHabConnectionAfterAction(action: MatterSetupAction
     )
 }
 
+internal fun resolvePhoneDeviceReturnAction(state: MatterSetupUiState): MatterSetupAction {
+    return when (state.stage) {
+        MatterSetupStage.AdvancedTroubleshooting,
+        MatterSetupStage.PhoneDeviceDetails -> state.primaryAction ?: MatterSetupAction.BackToSettings
+
+        else -> MatterSetupAction.BackToSettings
+    }
+}
+
 class MatterSetupViewModel(application: Application) : AndroidViewModel(application) {
     var uiState by mutableStateOf(MatterSetupUiState.initial(openHabConfigured = false))
         private set
@@ -1067,11 +1076,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun phoneDeviceReturnAction(): MatterSetupAction {
-        return if (uiState.stage == MatterSetupStage.AdvancedTroubleshooting) {
-            uiState.primaryAction ?: MatterSetupAction.BackToSettings
-        } else {
-            MatterSetupAction.BackToSettings
-        }
+        return resolvePhoneDeviceReturnAction(uiState)
     }
 
     private fun startRealWorkflow(setupPayload: String) {
