@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR Scan Guidelines Mockup</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #111;
+      color: #fff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #171717;
+    }
+
+    .phone {
+      width: min(420px, 100vw, calc(100vh * 420 / 880));
+      aspect-ratio: 420 / 880;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 68% 36%, rgba(255, 255, 255, 0.20), transparent 8%),
+        linear-gradient(135deg, #4c5551 0%, #222b2d 35%, #65756e 58%, #252827 100%);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45);
+    }
+
+    .preview {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .preview::before {
+      content: "";
+      position: absolute;
+      inset: -8%;
+      background:
+        linear-gradient(28deg, transparent 0 44%, rgba(255,255,255,0.14) 45% 47%, transparent 48%),
+        linear-gradient(108deg, rgba(71, 98, 92, 0.70), rgba(27, 34, 36, 0.94)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 22px);
+      filter: blur(0.2px);
+      transform: rotate(-2deg);
+    }
+
+    .instruction {
+      position: absolute;
+      z-index: 4;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 18px 22px 16px;
+      text-align: center;
+      font-size: 18px;
+      line-height: 1.35;
+      background: rgba(0, 0, 0, 0.58);
+    }
+
+    .guide-stage {
+      position: absolute;
+      z-index: 2;
+      inset: 0;
+    }
+
+    .dim {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.20);
+      pointer-events: none;
+    }
+
+    .dim.top {
+      left: 0;
+      top: 0;
+      right: 0;
+      height: 38.6%;
+    }
+
+    .dim.bottom {
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 38.4%;
+    }
+
+    .dim.left {
+      left: 0;
+      top: 38.6%;
+      width: 25.7%;
+      height: 23%;
+    }
+
+    .dim.right {
+      right: 0;
+      top: 38.6%;
+      width: 25.2%;
+      height: 23%;
+    }
+
+    .guidelines {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .controls {
+      position: absolute;
+      z-index: 4;
+      left: 50%;
+      bottom: 90px;
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.46);
+      transform: translateX(-50%);
+    }
+
+    .zoom {
+      min-width: 58px;
+      min-height: 40px;
+      border: 0;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      background: transparent;
+    }
+
+    .zoom.active {
+      color: #111;
+      background: #fff;
+    }
+
+    .cancel {
+      position: absolute;
+      z-index: 4;
+      left: 50%;
+      bottom: 24px;
+      min-width: 132px;
+      min-height: 48px;
+      border: 0;
+      border-radius: 6px;
+      color: #111;
+      background: #f5f5f5;
+      font-size: 16px;
+      transform: translateX(-50%);
+    }
+  </style>
+</head>
+<body>
+  <main class="phone" aria-label="Scan QR code mockup">
+    <div class="preview"></div>
+    <div class="instruction">Point the camera at a Matter QR code.</div>
+    <section class="guide-stage" aria-label="QR scan target">
+      <div class="dim top"></div>
+      <div class="dim bottom"></div>
+      <div class="dim left"></div>
+      <div class="dim right"></div>
+      <img class="guidelines" src="qr_scan_guidelines.svg" alt="">
+    </section>
+    <div class="controls" aria-label="Camera zoom">
+      <button class="zoom active" type="button">1x</button>
+      <button class="zoom" type="button">2x</button>
+    </div>
+    <button class="cancel" type="button">Cancel</button>
+  </main>
+</body>
+</html>
