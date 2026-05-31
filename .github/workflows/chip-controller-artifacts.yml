@@ -108,7 +108,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RAW_DIR="$RUNNER_TEMP/chip-artifacts-raw"
+          RAW_DIR="$RUNNER_TEMP/chip-artifacts-raw/android-arm64-chip-tool"
           OUT_ROOT="$RUNNER_TEMP/$CHIP_ARTIFACT_DIR_NAME"
           OUT_ARCHIVE="$RUNNER_TEMP/$CHIP_ARTIFACT_NAME"
 
