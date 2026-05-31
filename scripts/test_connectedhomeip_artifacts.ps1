@@ -98,6 +98,8 @@ $RequiredClassEntries = @(
     'chip/devicecontroller/CommissionParameters$Builder.class',
     'chip/devicecontroller/ChipDeviceController$CompletionListener.class',
     'chip/devicecontroller/DeviceAttestationDelegate.class',
+    'chip/devicecontroller/AttestationTrustStoreDelegate.class',
+    'chip/devicecontroller/DeviceAttestation.class',
     'chip/devicecontroller/OpenCommissioningCallback.class',
     'chip/devicecontroller/GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback.class',
     'chip/platform/AndroidChipPlatform.class',
