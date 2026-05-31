@@ -37,8 +37,8 @@ class MatterSetupAppTest {
         composeRule.onNodeWithContentDescription("Easy and guided").assertIsDisplayed()
         composeRule.onNodeWithText("Private and local").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Private and local").assertIsDisplayed()
-        composeRule.onNodeWithText("One home, everything together").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("One home, everything together").assertIsDisplayed()
+        composeRule.onAllNodesWithText("One home, everything together").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("One home, everything together").assertCountEquals(0)
     }
 
     @Test
