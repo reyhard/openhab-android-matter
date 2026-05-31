@@ -10,6 +10,8 @@ def chipNativeMode = (findProperty("openhabMatterChipNativeMode") ?: "stub").toS
 def chipPrebuiltDir = (findProperty("openhabMatterChipPrebuiltDir") ?: "").toString().trim()
 def chipSupportedAbis = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
 def chipControllerArtifactsDir = (findProperty("openhabMatterChipControllerArtifactsDir") ?: "").toString().trim()
+def chipPaaTrustStoreDir = (findProperty("openhabMatterChipPaaTrustStoreDir") ?: "").toString().trim()
+def chipCdTrustStoreDir = (findProperty("openhabMatterChipCdTrustStoreDir") ?: "").toString().trim()
 def chipControllerSupportedAbis = (findProperty("openhabMatterChipControllerAbis")
         ?: "arm64-v8a;armeabi-v7a;x86;x86_64")
         .toString()
@@ -39,6 +41,8 @@ def chipControllerRequiredClassEntries = [
         'chip/devicecontroller/CommissionParameters$Builder.class',
         'chip/devicecontroller/ChipDeviceController$CompletionListener.class',
         "chip/devicecontroller/DeviceAttestationDelegate.class",
+        "chip/devicecontroller/AttestationTrustStoreDelegate.class",
+        "chip/devicecontroller/DeviceAttestation.class",
         "chip/devicecontroller/OpenCommissioningCallback.class",
         'chip/devicecontroller/GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback.class',
         "chip/platform/AndroidChipPlatform.class",
@@ -52,6 +56,7 @@ def chipControllerRequiredClassEntries = [
         "chip/platform/DiagnosticDataProviderImpl.class",
         "chip/platform/BleCallback.class"
 ]
+def generatedTrustStoreAssetsDir = layout.buildDirectory.dir("generated/openhabMatter/truststoreAssets")
 def verifyJarFile = { File jar ->
     try {
         new ZipFile(jar).withCloseable {
@@ -116,6 +121,7 @@ android {
             main {
                 java.srcDir file("src/connectedhomeip/java")
                 jniLibs.srcDir file(new File(file(chipControllerArtifactsDir), "jniLibs"))
+                assets.srcDir generatedTrustStoreAssetsDir
             }
         }
     }
@@ -198,8 +204,45 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
     }
 }
 
+tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
+    outputs.dir(generatedTrustStoreAssetsDir)
+    doLast {
+        File outRoot = generatedTrustStoreAssetsDir.get().asFile
+        delete(outRoot)
+        if (chipPaaTrustStoreDir.isEmpty() && chipCdTrustStoreDir.isEmpty()) {
+            return
+        }
+        outRoot.mkdirs()
+
+        if (!chipPaaTrustStoreDir.isEmpty()) {
+            File paaRoot = file(chipPaaTrustStoreDir)
+            if (!paaRoot.isDirectory()) {
+                throw new GradleException("PAA trust store directory does not exist: " + paaRoot)
+            }
+            copy {
+                from paaRoot
+                include "**/*.pem", "**/*.der"
+                into new File(outRoot, "matter/truststore/paa")
+            }
+        }
+
+        if (!chipCdTrustStoreDir.isEmpty()) {
+            File cdRoot = file(chipCdTrustStoreDir)
+            if (!cdRoot.isDirectory()) {
+                throw new GradleException("CD trust store directory does not exist: " + cdRoot)
+            }
+            copy {
+                from cdRoot
+                include "**/*.pem", "**/*.der"
+                into new File(outRoot, "matter/truststore/cd")
+            }
+        }
+    }
+}
+
 preBuild.dependsOn("verifyOpenhabMatterChipNativeInputs")
 preBuild.dependsOn("verifyConnectedHomeIpControllerArtifacts")
+preBuild.dependsOn("prepareConnectedHomeIpTrustStoreAssets")
 
 dependencies {
     def camerax_version = "1.6.1"

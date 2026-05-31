@@ -47,6 +47,8 @@ public class ConnectedHomeIpControllerArtifactsTest {
                 "chip.devicecontroller.CommissionParameters$Builder",
                 "chip.devicecontroller.ChipDeviceController$CompletionListener",
                 "chip.devicecontroller.DeviceAttestationDelegate",
+                "chip.devicecontroller.AttestationTrustStoreDelegate",
+                "chip.devicecontroller.DeviceAttestation",
                 "chip.devicecontroller.OpenCommissioningCallback",
                 "chip.devicecontroller.GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback",
                 "chip.platform.AndroidChipPlatform",

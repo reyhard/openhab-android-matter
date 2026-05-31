@@ -88,6 +88,26 @@ The artifact directory must use this layout:
 <artifact-dir>/jniLibs/x86_64/libc++_shared.so
 ```
 
+### Attestation Trust Store Assets
+
+When commissioning with attestation verification enabled, package trusted PAA
+certificates (and optional CD trust keys) into APK assets:
+
+```powershell
+.\gradlew.bat :app:assembleDebug --offline "-PopenhabMatterChipControllerArtifactsDir=<artifact-dir>" "-PopenhabMatterChipPaaTrustStoreDir=<connectedhomeip>\credentials\production\paa-root-certs" "-PopenhabMatterChipCdTrustStoreDir=<connectedhomeip>\credentials\production\cd-certs"
+```
+
+The app loads assets from `matter/truststore/paa` and `matter/truststore/cd`,
+then installs `ChipDeviceController.setAttestationTrustStoreDelegate(...)`
+before `setDeviceAttestationDelegate(...)`.
+
+For missing vendor PAAs, refresh local certs from DCL in a connectedhomeip
+checkout and rebuild:
+
+```powershell
+python D:\Source\connectedhomeip\credentials\fetch_paa_certs_from_dcl.py --use-main-net-http --paa-trust-store-path D:\Source\connectedhomeip\credentials\production\paa-root-certs
+```
+
 All required jar and native library files must be non-empty. `verifyConnectedHomeIpControllerArtifacts` fails on missing files and on empty placeholder files. To smoke-test the validation contract without real connectedhomeip binaries, run:
 
 ```powershell
