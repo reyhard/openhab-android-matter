@@ -20,6 +20,11 @@ jobs:
 
     env:
       APK_PATH: app/build/outputs/apk/debug/openhab-matter-helper.apk
+      CHIP_CONTROLLER_ARTIFACTS_DIR: ${{ runner.temp }}/connectedhomeip-controller-artifacts
+      CHIP_CONTROLLER_ABIS: arm64-v8a
+      CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG: chip-controller-artifacts-latest
+      CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME: openhab-chip-artifacts-arm64.zip
+      CHIP_GRADLE_ARGS: -PopenhabMatterChipControllerArtifactsDir=${{ runner.temp }}/connectedhomeip-controller-artifacts -PopenhabMatterChipControllerAbis=arm64-v8a
 
     steps:
       - name: Check out repository
@@ -54,20 +59,81 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Download connectedhomeip controller artifacts
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RELEASE_API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG}"
+          ARCHIVE_PATH="$RUNNER_TEMP/${CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME}"
+          rm -rf "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+          mkdir -p "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+
+          RELEASE_JSON="$(curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "$RELEASE_API_URL")"
+
+          ASSET_ID="$(echo "$RELEASE_JSON" | jq -r \
+            --arg NAME "$CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME" \
+            '.assets[] | select(.name == $NAME) | .id' | head -n1)"
+
+          if [[ -z "${ASSET_ID:-}" || "${ASSET_ID}" == "null" ]]; then
+            echo "::error::Release '${CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG}' does not contain '${CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME}'."
+            echo "::error::Run workflow 'Build CHIP Controller Artifacts' first."
+            exit 1
+          fi
+
+          curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${ASSET_ID}" \
+            -o "$ARCHIVE_PATH"
+
+          unzip -q -o "$ARCHIVE_PATH" -d "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+
+          if [[ ! -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPController.jar" ]]; then
+            NESTED_ROOT="$(find "$CHIP_CONTROLLER_ARTIFACTS_DIR" -mindepth 2 -maxdepth 3 -type f -name CHIPController.jar -print -quit || true)"
+            if [[ -n "$NESTED_ROOT" ]]; then
+              NESTED_ROOT="$(dirname "$NESTED_ROOT")"
+              TMP_DIR="${CHIP_CONTROLLER_ARTIFACTS_DIR}.tmp"
+              rm -rf "$TMP_DIR"
+              mkdir -p "$TMP_DIR"
+              cp -a "$NESTED_ROOT"/. "$TMP_DIR"/
+              rm -rf "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+              mv "$TMP_DIR" "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+            fi
+          fi
+
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPController.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPInteractionModel.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPClusterID.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPClusters.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/AndroidPlatform.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/OnboardingPayload.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/libMatterTlv.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/libMatterJson.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/jniLibs/arm64-v8a/libCHIPController.so"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/jniLibs/arm64-v8a/libc++_shared.so"
+
       - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest --stacktrace $CHIP_GRADLE_ARGS
 
       - name: Run Android lint
-        run: ./gradlew :app:lintDebug --stacktrace
+        run: ./gradlew :app:lintDebug --stacktrace $CHIP_GRADLE_ARGS
 
       - name: Validate connectedhomeip artifact checks
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_connectedhomeip_artifacts.ps1 -GradlePath ./gradlew
 
+      - name: Validate downloaded connectedhomeip artifacts
+        run: ./gradlew :app:verifyConnectedHomeIpControllerArtifacts --stacktrace $CHIP_GRADLE_ARGS
+
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: ./gradlew :app:assembleDebug --stacktrace $CHIP_GRADLE_ARGS
 
       - name: Validate release build
-        run: ./gradlew :app:assembleRelease --stacktrace
+        run: ./gradlew :app:assembleRelease --stacktrace $CHIP_GRADLE_ARGS
 
       - name: Verify APK artifact
         run: |

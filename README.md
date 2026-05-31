@@ -133,6 +133,21 @@ $env:ANDROID_HOME='D:\Tools\Android\SDK'
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug -PopenhabMatterChipControllerArtifactsDir=<artifact-dir> -PopenhabMatterChipControllerAbis=arm64-v8a
 ```
 
+### GitHub Actions Packaging
+
+The `Android CI` workflow now requires connectedhomeip artifacts and builds APKs
+with `-PopenhabMatterChipControllerArtifactsDir` so uploaded CI APKs include
+the CHIP controller.
+
+The artifact source path is managed automatically:
+
+- Workflow `Build CHIP Controller Artifacts` builds arm64 CHIPTool-style
+  artifacts from connectedhomeip and publishes release tag
+  `chip-controller-artifacts-latest` with asset
+  `openhab-chip-artifacts-arm64.zip`.
+- `Android CI` downloads that release asset by tag on every run. No manual
+  URL/secret path updates are required after the release asset is published.
+
 For production attestation verification, also package local trust-store
 certificates with `-PopenhabMatterChipPaaTrustStoreDir=<dir>` and optionally
 `-PopenhabMatterChipCdTrustStoreDir=<dir>`, where `<dir>` paths point to local
