@@ -40,7 +40,8 @@ fun WelcomeScreen(
 ) {
     MatterSetupScaffold(
         title = state.title,
-        message = "A guided local setup for adding Matter devices to your openHAB home."
+        message = "A guided local setup for adding Matter devices to your openHAB home.",
+        centerText = true
     ) {
         Image(
             painter = painterResource(R.drawable.openhab_setup_hero),
@@ -67,17 +68,9 @@ fun WelcomeScreen(
             iconTint = Color(0xFF1F8B46),
             iconBackground = Color(0xFFEAF6EE)
         )
-        Spacer(Modifier.height(12.dp))
-        BenefitCard(
-            title = "One home, everything together",
-            message = "Matter devices work beautifully with openHAB.",
-            iconRes = R.drawable.ic_welcome_home,
-            iconTint = Color(0xFF5B56B3),
-            iconBackground = Color(0xFFF0EEFF)
-        )
         Spacer(Modifier.height(24.dp))
         Button(
-            onClick = { onAction(MatterSetupAction.GetStarted) },
+            onClick = { onAction(state.primaryAction ?: MatterSetupAction.GetStarted) },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(state.primaryActionLabel.ifBlank { "Get started" })
@@ -116,7 +109,7 @@ private fun BenefitCard(
             ) {
                 Icon(
                     painter = painterResource(iconRes),
-                    contentDescription = title,
+                    contentDescription = null,
                     tint = iconTint,
                     modifier = Modifier.size(28.dp)
                 )

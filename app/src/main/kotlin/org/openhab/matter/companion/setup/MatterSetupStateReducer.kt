@@ -88,11 +88,25 @@ object MatterSetupStateReducer {
                 }
             },
             primaryAction = returnAction,
-            primaryActionLabel = if (returnAction == MatterSetupAction.BackToRequiredSetup) {
-                "Back to setup"
-            } else {
-                "Back to settings"
-            }
+            primaryActionLabel = returnAction.phoneDeviceReturnLabel()
+        )
+    }
+
+    fun phoneDeviceDetails(
+        device: PhoneMatterDevice,
+        fetching: Boolean = false,
+        message: String = "",
+        returnAction: MatterSetupAction = MatterSetupAction.BackToSettings
+    ): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.PhoneDeviceDetails,
+            title = "Device details",
+            message = "Helpful information for advanced setup and troubleshooting.",
+            phoneDeviceDetails = device.initialDetails(),
+            phoneDeviceDetailsFetching = fetching,
+            phoneDeviceDetailsMessage = message,
+            primaryAction = returnAction,
+            primaryActionLabel = returnAction.phoneDeviceReturnLabel()
         )
     }
 
@@ -145,5 +159,13 @@ object MatterSetupStateReducer {
             failure = current.failure,
             diagnostics = current.diagnostics
         )
+    }
+
+    private fun MatterSetupAction.phoneDeviceReturnLabel(): String {
+        return if (this == MatterSetupAction.BackToRequiredSetup) {
+            "Back to setup"
+        } else {
+            "Back to settings"
+        }
     }
 }

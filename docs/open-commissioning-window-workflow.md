@@ -206,7 +206,8 @@ flowchart TD
 ```
 
 - In the Compose automated flow, if the openHAB scan starts but no Inbox entry is detected before timeout, the app shows recovery guidance for IPv6 routing, OTBR reachability, mDNS/Avahi visibility, stale Matter records, and retrying setup to request a fresh commissioning window.
-- The Compose settings flow exposes a dedicated **Devices on this phone** submenu for the currently staged bootstrap device. From there, users can retry OpenCommissioningWindow and continue the openHAB scan/Inbox handoff, or clear this app's stored bootstrap state. This submenu reflects the app's persisted bootstrap state only; full connectedhomeip fabric enumeration is still future work.
+- The Compose settings flow exposes a dedicated **Devices on this phone** submenu for the currently staged bootstrap device. From there, users can expand local staging diagnostics, retry OpenCommissioningWindow and continue the openHAB scan/Inbox handoff, open a details screen, or clear this app's stored bootstrap state. This submenu reflects the app's persisted bootstrap state only; full connectedhomeip fabric enumeration is still future work.
+- The staged-device details screen starts from the lightweight data already stored by the app, currently the staged node id plus vendor/product names when available. Additional rows such as firmware, hardware, part number, battery, Thread network, IPv6 address, and OTA status are read from Matter clusters only after the user taps **Fetch additional data from device**. That fetch uses the same connectedhomeip readiness gate as OCW and fails closed when the native controller is unavailable.
 - The Compose advanced troubleshooting screen keeps visible recovery navigation near the top of the screen so users can return from long diagnostic output without scrolling to the bottom.
 - The advanced screen includes phone-side network tools: Matter mDNS browsing for `_matterc._udp` and `_matter._tcp`, and a best-effort IPv6 reachability check for a user-entered device IPv6 address. These results are appended to the captured diagnostics log and are explicitly described as phone-side checks, not proof of what openHAB/Avahi can see.
 
@@ -217,6 +218,7 @@ flowchart TD
 | UI entry point and result display | `MainActivity.runOpenCommissioningWindow()`, `MainActivity.showTemporaryQrCode()` |
 | Compose automated setup entry point | `MatterSetupActivity`, `MatterSetupViewModel`, `MatterSetupApp` |
 | Compose workflow state and ports | `MatterSetupWorkflow`, `MatterSetupStateReducer`, `WorkflowExecutionGate`, `AndroidMatterSetupPorts` |
+| Compose staged-device screens | `PhoneDeviceListScreen`, `PhoneDeviceDetailsScreen`, `PhoneMatterDevice`, `PhoneMatterDeviceDetails`, `MatterDeviceDetailFormatter` |
 | Bootstrap state resolution | `MatterBootstrapStateRepository`, `MatterBootstrapStateResolver`, `MatterBootstrapState` |
 | Native-controller gate | `NativeChipControllerSession`, `MatterControllerSelector`, `ConnectedHomeIpMatterControllerFactory` |
 | connectedhomeip controller facade | `ConnectedHomeIpMatterController` |

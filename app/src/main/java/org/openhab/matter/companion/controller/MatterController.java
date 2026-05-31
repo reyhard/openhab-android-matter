@@ -21,4 +21,11 @@ public interface MatterController {
             int discriminator,
             String controllerState,
             ProgressListener listener) throws Exception;
+
+    default MatterDeviceDetails readDeviceDetails(
+            long nodeId,
+            String controllerState,
+            ProgressListener listener) throws Exception {
+        throw new UnsupportedOperationException("Matter device details are not supported by this controller.");
+    }
 }

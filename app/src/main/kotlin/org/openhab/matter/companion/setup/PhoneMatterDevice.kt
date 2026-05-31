@@ -16,8 +16,34 @@ data class PhoneMatterDevice(
             .joinToString(" ")
             .ifBlank { displayNodeId }
 
+    val displayProductName: String
+        get() = MatterDeviceDetailFormatter.display(
+            productName,
+            MatterDeviceDetailFormatter.UNKNOWN_PRODUCT
+        )
+
+    val displayVendorName: String
+        get() = MatterDeviceDetailFormatter.display(
+            vendorName,
+            MatterDeviceDetailFormatter.UNKNOWN_VENDOR
+        )
+
     val displayNodeId: String
-        get() = nodeId?.let { "0x${java.lang.Long.toUnsignedString(it, 16).uppercase()}" } ?: "Unknown node"
+        get() = MatterDeviceDetailFormatter.nodeId(nodeId)
+
+    val displayControllerState: String
+        get() = if (controllerStateStored) {
+            "stored"
+        } else {
+            "missing"
+        }
+
+    val displayStateReadable: String
+        get() = if (stateReadable) {
+            "yes"
+        } else {
+            "no"
+        }
 
     val status: String
         get() = when {
@@ -31,6 +57,15 @@ data class PhoneMatterDevice(
 
     val canAttemptCommissioningWindowForDebug: Boolean
         get() = nodeId != null && stateReadable
+
+    fun initialDetails(): PhoneMatterDeviceDetails {
+        return PhoneMatterDeviceDetails(
+            deviceName = displayProductName,
+            vendor = displayVendorName,
+            product = MatterDeviceDetailFormatter.display(productName),
+            nodeId = displayNodeId
+        )
+    }
 
     companion object {
         fun fromBootstrapState(state: MatterBootstrapState): PhoneMatterDevice? {

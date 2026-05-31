@@ -22,5 +22,6 @@ enum class MatterSetupStage {
     ChangeToken,
     ThreadNetworkEditor,
     PhoneDeviceList,
+    PhoneDeviceDetails,
     AdvancedTroubleshooting
 }

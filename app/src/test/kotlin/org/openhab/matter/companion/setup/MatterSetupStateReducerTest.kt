@@ -126,6 +126,48 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
+    fun phoneDeviceDetailsUsesInitialDeviceDetails() {
+        val device = PhoneMatterDevice(
+            nodeId = 0x4D2,
+            controllerStateStored = true,
+            stateReadable = true,
+            vendorName = "Aqara",
+            productName = "U200"
+        )
+
+        val state = MatterSetupStateReducer.phoneDeviceDetails(
+            device = device,
+            fetching = true,
+            message = "Reading device details"
+        )
+
+        assertEquals(MatterSetupStage.PhoneDeviceDetails, state.stage)
+        assertEquals("Device details", state.title)
+        assertEquals("U200", state.phoneDeviceDetails.deviceName)
+        assertEquals("Aqara", state.phoneDeviceDetails.vendor)
+        assertEquals("U200", state.phoneDeviceDetails.product)
+        assertEquals("0x4D2", state.phoneDeviceDetails.nodeId)
+        assertTrue(state.phoneDeviceDetailsFetching)
+        assertEquals("Reading device details", state.phoneDeviceDetailsMessage)
+        assertEquals(MatterSetupAction.BackToSettings, state.primaryAction)
+    }
+
+    @Test
+    fun phoneDeviceDetailsPreservesReturnActionFromPhoneDeviceList() {
+        val state = MatterSetupStateReducer.phoneDeviceDetails(
+            device = PhoneMatterDevice(
+                nodeId = 0x4D2,
+                controllerStateStored = true,
+                stateReadable = true
+            ),
+            returnAction = MatterSetupAction.BackToRequiredSetup
+        )
+
+        assertEquals(MatterSetupAction.BackToRequiredSetup, state.primaryAction)
+        assertEquals("Back to setup", state.primaryActionLabel)
+    }
+
+    @Test
     fun advancedTroubleshootingPreservesFailureAndDiagnostics() {
         val failure = MatterSetupFailure(
             step = MatterSetupStage.WatchingOpenHabInbox,

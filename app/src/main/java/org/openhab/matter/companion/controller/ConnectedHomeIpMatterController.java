@@ -79,6 +79,20 @@ public final class ConnectedHomeIpMatterController implements MatterControllerCa
     }
 
     @Override
+    public MatterDeviceDetails readDeviceDetails(
+            long nodeId,
+            String controllerState,
+            ProgressListener listener) throws Exception {
+        requireArtifactsReady();
+        emit(listener, "Reading connectedhomeip Java device details", false);
+        MatterDeviceDetails result = ConnectedHomeIpDiagnostics.withListener(
+                message -> emit(listener, message, false),
+                () -> gateway.readDeviceDetails(nodeId));
+        emit(listener, "connectedhomeip Java device details read complete", true);
+        return result == null ? MatterDeviceDetails.empty() : result;
+    }
+
+    @Override
     public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) throws Exception {
         requireArtifactsReady();
         return gateway.checkFabricRestore(bootstrapNodeId);

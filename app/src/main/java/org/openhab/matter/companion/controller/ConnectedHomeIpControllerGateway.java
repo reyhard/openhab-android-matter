@@ -5,4 +5,8 @@ public interface ConnectedHomeIpControllerGateway extends ConnectedHomeIpFabricR
 
     MatterOpenCommissioningWindowResult openCommissioningWindow(
             ConnectedHomeIpOpenCommissioningWindowRequest request) throws Exception;
+
+    default MatterDeviceDetails readDeviceDetails(long nodeId) throws Exception {
+        throw new UnsupportedOperationException("Matter device details are not supported by this gateway.");
+    }
 }

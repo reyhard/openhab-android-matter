@@ -1,13 +1,18 @@
 package org.openhab.matter.companion.ui
 
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -32,11 +37,11 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Get started").assertIsDisplayed()
         composeRule.onNodeWithText("Easy and guided").assertIsDisplayed()
         composeRule.onNodeWithText("Clear steps to get you set up quickly.").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Easy and guided").assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Easy and guided").assertCountEquals(0)
         composeRule.onNodeWithText("Private and local").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Private and local").assertIsDisplayed()
-        composeRule.onNodeWithText("One home, everything together").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("One home, everything together").assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Private and local").assertCountEquals(0)
+        composeRule.onAllNodesWithText("One home, everything together").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("One home, everything together").assertCountEquals(0)
     }
 
     @Test
@@ -418,24 +423,102 @@ class MatterSetupAppTest {
     }
 
     @Test
-    fun phoneDeviceListShowsStoredDeviceActions() {
+    fun phoneDeviceListShowsRedesignedStoredDeviceCard() {
         render(
             state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true),
             phoneDevices = listOf(
                 PhoneMatterDevice(
                     nodeId = 1234L,
                     controllerStateStored = true,
-                    stateReadable = true
+                    stateReadable = true,
+                    vendorName = "IKEA of Sweden",
+                    productName = "BILRESA scroll wheel"
                 )
             )
         )
 
         composeRule.onNodeWithText("Devices on this phone").assertIsDisplayed()
+        composeRule.onNodeWithText("Matter devices staged by this app for openHAB handoff.").assertIsDisplayed()
+        composeRule.onNodeWithText("Stored Matter staging").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "This list only shows devices staged by this app on the Android fabric for openHAB handoff."
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText("BILRESA scroll wheel").assertIsDisplayed()
+        composeRule.onNodeWithText("IKEA of Sweden").assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Product image").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("Device image").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("More options").assertCountEquals(0)
+        composeRule.onAllNodesWithText("...").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Send code to openHAB").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Send command to openHAB").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Node").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Show diagnostics").performClick()
+        composeRule.onNodeWithText("Node").assertIsDisplayed()
         composeRule.onNodeWithText("0x4D2").assertIsDisplayed()
-        composeRule.onNodeWithText("Open pairing window again").assertIsDisplayed()
+        composeRule.onNodeWithText("Controller state").assertIsDisplayed()
+        composeRule.onNodeWithText("stored").assertIsDisplayed()
+        composeRule.onNodeWithText("State readable").assertIsDisplayed()
+        composeRule.onNodeWithText("yes").assertIsDisplayed()
+        composeRule.onNodeWithText("Open commissioning window").assertIsDisplayed()
+        composeRule.onNodeWithText("Details").assertIsDisplayed()
         composeRule.onNodeWithText("Forget from this phone").assertIsDisplayed()
         composeRule.onAllNodesWithText("Back to settings").assertCountEquals(0)
         composeRule.onAllNodesWithText("Back to main menu").assertCountEquals(0)
+    }
+
+    @Test
+    fun phoneDeviceListShowsDebugInformationForMissingControllerStateWhenExpanded() {
+        render(
+            state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true),
+            phoneDevices = listOf(
+                PhoneMatterDevice(
+                    nodeId = 1234L,
+                    controllerStateStored = false,
+                    stateReadable = true,
+                    vendorName = "IKEA of Sweden",
+                    productName = "BILRESA scroll wheel"
+                )
+            )
+        )
+
+        composeRule.onAllNodesWithText("Debug information").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Show diagnostics").performClick()
+
+        composeRule.onNodeWithText("Debug information").assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Debug attempt: controller state is missing, so connectedhomeip may still fail to open the commissioning window."
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun phoneDeviceListCardActionsDispatchExpectedActions() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.phoneDeviceList(hasDevices = true),
+            phoneDevices = listOf(
+                PhoneMatterDevice(
+                    nodeId = 1234L,
+                    controllerStateStored = true,
+                    stateReadable = true,
+                    vendorName = "IKEA of Sweden",
+                    productName = "BILRESA scroll wheel"
+                )
+            ),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Open commissioning window").performClick()
+        composeRule.onNodeWithText("Details").performClick()
+        composeRule.onNodeWithText("Forget from this phone").performClick()
+
+        assertEquals(
+            listOf(
+                MatterSetupAction.OpenCommissioningWindowAgain,
+                MatterSetupAction.ShowPhoneDeviceDetails(1234L),
+                MatterSetupAction.ForgetFromPhone
+            ),
+            actions
+        )
     }
 
     @Test
@@ -451,9 +534,10 @@ class MatterSetupAppTest {
             )
         )
 
-        composeRule.onNodeWithText("Stored state is unreadable").assertIsDisplayed()
-        composeRule.onNodeWithText("Pairing window retry needs a readable stored node and controller state.")
-            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Show diagnostics").performClick()
+
+        composeRule.onNodeWithText("State readable").assertIsDisplayed()
+        composeRule.onNodeWithText("no").assertIsDisplayed()
     }
 
     @Test
@@ -471,10 +555,109 @@ class MatterSetupAppTest {
             onAction = actions::add
         )
 
-        composeRule.onNodeWithText("Controller state is missing").assertIsDisplayed()
-        composeRule.onNodeWithText("Open pairing window again").performClick()
+        composeRule.onNodeWithText("Open commissioning window").performClick()
 
         assertTrue(actions.contains(MatterSetupAction.OpenCommissioningWindowAgain))
+    }
+
+    @Test
+    fun phoneDeviceDetailsShowsHeaderRowsFetchAndActions() {
+        render(
+            state = MatterSetupStateReducer.phoneDeviceDetails(
+                PhoneMatterDevice(
+                    nodeId = 0x165BC267A7E344D0L,
+                    controllerStateStored = false,
+                    stateReadable = true,
+                    vendorName = "IKEA of Sweden",
+                    productName = "BILRESA scroll wheel"
+                )
+            )
+        )
+
+        composeRule.onNodeWithText("Advanced").assertIsDisplayed()
+        composeRule.onNodeWithText("Device details").assertIsDisplayed()
+        composeRule.onNodeWithText("Helpful information for advanced setup and troubleshooting.").assertIsDisplayed()
+        composeRule.onAllNodesWithText("BILRESA scroll wheel").assertCountEquals(3)
+        composeRule.onNodeWithText("Not yet added to openHAB").assertIsDisplayed()
+        composeRule.onNodeWithText("Device name").assertIsDisplayed()
+        composeRule.onNodeWithText("Vendor").assertIsDisplayed()
+        composeRule.onNodeWithText("IKEA of Sweden").assertIsDisplayed()
+        composeRule.onNodeWithText("Product").assertIsDisplayed()
+        composeRule.onNodeWithText("Firmware version").assertIsDisplayed()
+        composeRule.onNodeWithText("Hardware version").assertIsDisplayed()
+        composeRule.onNodeWithText("Part number").assertIsDisplayed()
+        composeRule.onNodeWithText("Node ID").assertIsDisplayed()
+        composeRule.onNodeWithText("0x165BC267A7E344D0").assertIsDisplayed()
+        composeRule.onNodeWithText("Battery").assertIsDisplayed()
+        composeRule.onNodeWithText("Thread network").assertIsDisplayed()
+        composeRule.onNodeWithText("IPv6 address").assertIsDisplayed()
+        composeRule.onNodeWithText("OTA update").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Unknown").assertCountEquals(7)
+        composeRule.onNodeWithText("Fetch additional data from device").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Fetched from Matter clusters").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("Product image").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("Device image").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Open commissioning window").assertCountEquals(1)
+        composeRule.onAllNodesWithText("Forget from this phone").assertCountEquals(1)
+    }
+
+    @Test
+    fun phoneDeviceDetailsFetchCopyAndBottomActionsDispatchExpectedActions() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.phoneDeviceDetails(
+                PhoneMatterDevice(
+                    nodeId = 1234L,
+                    controllerStateStored = true,
+                    stateReadable = true,
+                    vendorName = "IKEA of Sweden",
+                    productName = "BILRESA scroll wheel"
+                )
+            ),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithText("Fetch additional data from device").performClick()
+        composeRule.onNodeWithContentDescription("Copy Vendor").performClick()
+        composeRule.onNodeWithText("Copied Vendor").assertIsDisplayed()
+        assertEquals("IKEA of Sweden", clipboardText())
+        composeRule.onNodeWithText("Advanced").performClick()
+        composeRule.onNodeWithText("Open commissioning window").performClick()
+        composeRule.onNodeWithText("Forget from this phone").performClick()
+
+        assertEquals(
+            listOf(
+                MatterSetupAction.FetchPhoneDeviceDetails,
+                MatterSetupAction.BackToSettings,
+                MatterSetupAction.OpenCommissioningWindowAgain,
+                MatterSetupAction.ForgetFromPhone
+            ),
+            actions
+        )
+    }
+
+    @Test
+    fun phoneDeviceDetailsShowsFetchFailureAsSnackbarAndKeepsDetailsVisible() {
+        val actions = mutableListOf<MatterSetupAction>()
+        render(
+            state = MatterSetupStateReducer.phoneDeviceDetails(
+                PhoneMatterDevice(
+                    nodeId = 1234L,
+                    controllerStateStored = true,
+                    stateReadable = true,
+                    vendorName = "IKEA of Sweden",
+                    productName = "BILRESA scroll wheel"
+                ),
+                message = "Could not fetch data from device"
+            ),
+            onAction = actions::add
+        )
+
+        composeRule.onNodeWithContentDescription("Device details fetch error").assertIsDisplayed()
+        composeRule.onNodeWithText("Could not fetch data from device").assertIsDisplayed()
+        composeRule.onNodeWithText("IKEA of Sweden").assertIsDisplayed()
+        composeRule.onNodeWithText("0x4D2").assertIsDisplayed()
+        assertTrue(actions.contains(MatterSetupAction.AcknowledgePhoneDeviceDetailsMessage))
     }
 
     @Test
@@ -496,6 +679,8 @@ class MatterSetupAppTest {
         threadDataset: String = "",
         otbrBaseUrl: String = "",
         scanReadiness: ScanReadinessUiState = ScanReadinessUiState.ready(),
+        threadNetworkState: ThreadNetworkUiState = ThreadNetworkUiState.notChecked(threadDataset, otbrBaseUrl),
+        openHabConnectionState: OpenHabConnectionUiState = OpenHabConnectionUiState.notChecked(openHabTokenStored),
         onAction: (MatterSetupAction) -> Unit = {}
     ) {
         composeRule.setContent {
@@ -508,6 +693,8 @@ class MatterSetupAppTest {
                 otbrBaseUrl = otbrBaseUrl,
                 attestationBypassEnabled = false,
                 threadSettingsMessage = "",
+                threadNetworkState = threadNetworkState,
+                openHabConnectionState = openHabConnectionState,
                 threadBorderRouters = emptyList(),
                 threadBorderRouterDiscoveryInProgress = false,
                 phoneDevices = phoneDevices,
@@ -528,5 +715,17 @@ class MatterSetupAppTest {
 
     private fun assertOpenHabLogoAndMatterVisualsCanRender() {
         composeRule.onNodeWithText("Set up Matter with openHAB").assertIsDisplayed()
+    }
+
+    private fun clipboardText(): String {
+        composeRule.waitForIdle()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        return clipboard.primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(context)
+            ?.toString()
+            .orEmpty()
     }
 }

@@ -34,6 +34,14 @@ public final class FakeMatterController implements MatterController {
                 "fake-controller-state:" + nodeId);
     }
 
+    @Override
+    public MatterDeviceDetails readDeviceDetails(
+            long nodeId,
+            String controllerState,
+            ProgressListener listener) {
+        return MatterDeviceDetails.empty();
+    }
+
     private static void emit(ProgressListener listener, String message, boolean complete) {
         if (listener != null) {
             listener.onProgress(new CommissioningStep(message, complete));

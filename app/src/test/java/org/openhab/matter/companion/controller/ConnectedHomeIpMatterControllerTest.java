@@ -85,6 +85,49 @@ public final class ConnectedHomeIpMatterControllerTest {
     }
 
     @Test
+    public void readDeviceDetailsRequiresReadyArtifactsAndDelegatesToGateway() throws Exception {
+        CapturingGateway gateway = new CapturingGateway();
+        gateway.details = new MatterDeviceDetails.Builder()
+                .vendorName("IKEA of Sweden")
+                .productName("BILRESA scroll wheel")
+                .softwareVersionString("1.8.7")
+                .build();
+        ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
+                readyArtifacts(),
+                gateway,
+                false);
+        List<String> steps = new ArrayList<>();
+
+        MatterDeviceDetails details = controller.readDeviceDetails(
+                0x165BC267A7E344D0L,
+                "controller-state",
+                step -> steps.add(step.message()));
+
+        assertEquals(0x165BC267A7E344D0L, gateway.detailsNodeId);
+        assertEquals("IKEA of Sweden", details.vendorName());
+        assertEquals("BILRESA scroll wheel", details.productName());
+        assertEquals("1.8.7", details.softwareVersionString());
+        assertEquals("Reading connectedhomeip Java device details", steps.get(0));
+        assertEquals("connectedhomeip Java device details read complete", steps.get(1));
+    }
+
+    @Test
+    public void readDeviceDetailsRejectsMissingArtifactsBeforeCallingGateway() {
+        CapturingGateway gateway = new CapturingGateway();
+        ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
+                missingArtifacts(),
+                gateway,
+                false);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> controller.readDeviceDetails(1234L, "state", ignored -> { }));
+
+        assertEquals("Missing connectedhomeip controller class: chip.devicecontroller.ChipDeviceController",
+                error.getMessage());
+        assertEquals(0, gateway.callCount);
+    }
+
+    @Test
     public void checkFabricRestoreDelegatesToGateway() throws Exception {
         CapturingGateway gateway = new CapturingGateway();
         ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
@@ -176,6 +219,8 @@ public final class ConnectedHomeIpMatterControllerTest {
         private int runtimePreflightCalls;
         private int callCount;
         private String commissioningDiagnostic;
+        private MatterDeviceDetails details = MatterDeviceDetails.empty();
+        private long detailsNodeId = -1L;
 
         @Override
         public MatterCommissioningResult commissionBleThread(ConnectedHomeIpCommissioningRequest request) {
@@ -193,6 +238,13 @@ public final class ConnectedHomeIpMatterControllerTest {
             callCount++;
             openCommissioningWindowRequest = request;
             return new MatterOpenCommissioningWindowResult("3497-0112-332", "ocw-state");
+        }
+
+        @Override
+        public MatterDeviceDetails readDeviceDetails(long nodeId) {
+            callCount++;
+            detailsNodeId = nodeId;
+            return details;
         }
 
         public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) {

@@ -136,6 +136,13 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
     }
 
     @Override
+    public MatterDeviceDetails readDeviceDetails(long nodeId) throws Exception {
+        Object controller = controllerProvider.controller();
+        MatterDeviceDetails details = metadataReader.readDeviceDetails(controller, nodeId);
+        return details == null ? MatterDeviceDetails.empty() : details;
+    }
+
+    @Override
     public MatterOpenCommissioningWindowResult openCommissioningWindow(
             ConnectedHomeIpOpenCommissioningWindowRequest request) throws Exception {
         if (request == null) {
@@ -194,7 +201,8 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
     private MatterDeviceMetadata readVendorAndProduct(Object controller, long nodeId) {
         try {
             MatterDeviceMetadata metadata = metadataReader.readVendorAndProduct(controller, nodeId);
-            if (metadata != null && !metadata.isEmpty()) {
+            metadata = metadata == null ? MatterDeviceMetadata.empty() : metadata;
+            if (!metadata.isEmpty()) {
                 ConnectedHomeIpDiagnostics.emit("Read Matter Basic Information vendor/product metadata");
             }
             return metadata;
