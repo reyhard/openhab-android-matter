@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.net.InetAddress;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -44,7 +45,7 @@ public final class HttpOtbrClientTest {
         OtbrStatus status = new HttpOtbrClient().checkReadiness("127.0.0.1");
 
         assertTrue(status.reachable());
-        assertEquals("OTBR address is accepted", status.message());
+        assertEquals("OTBR address is reachable", status.message());
         assertTrue(status.details().contains("127.0.0.1"));
     }
 
@@ -53,7 +54,7 @@ public final class HttpOtbrClientTest {
         OtbrStatus status = new HttpOtbrClient().checkReadiness("127.0.0.1:49154");
 
         assertTrue(status.reachable());
-        assertEquals("OTBR address is accepted", status.message());
+        assertEquals("OTBR address is reachable", status.message());
         assertTrue(status.details().contains("127.0.0.1:49154"));
     }
 
@@ -68,11 +69,43 @@ public final class HttpOtbrClientTest {
 
     @Test
     public void acceptsScopedIpv6AddressAsNetworkAddress() {
-        OtbrStatus status = new HttpOtbrClient().checkReadiness("fe80::abcd%wlan0");
+        HttpOtbrClient client = new HttpOtbrClient(
+                target -> InetAddress.getByName("fe80::abcd"),
+                (inetAddress, timeoutMillis) -> true);
+
+        OtbrStatus status = client.checkReadiness("fe80::abcd%wlan0");
 
         assertTrue(status.reachable());
-        assertEquals("OTBR address is accepted", status.message());
+        assertEquals("OTBR address is reachable", status.message());
         assertTrue(status.details().contains("fe80::abcd%wlan0"));
+    }
+
+    @Test
+    public void reportsUnreachableWhenPlainIpDoesNotRespond() throws Exception {
+        InetAddress address = InetAddress.getByName("fd00::1");
+        HttpOtbrClient client = new HttpOtbrClient(
+                target -> address,
+                (inetAddress, timeoutMillis) -> false);
+
+        OtbrStatus status = client.checkReadiness("fd00::1");
+
+        assertFalse(status.reachable());
+        assertEquals("OTBR address is not reachable", status.message());
+        assertTrue(status.details().contains("fd00::1"));
+    }
+
+    @Test
+    public void reportsReachableWhenPlainIpResponds() throws Exception {
+        InetAddress address = InetAddress.getByName("fd00::1");
+        HttpOtbrClient client = new HttpOtbrClient(
+                target -> address,
+                (inetAddress, timeoutMillis) -> true);
+
+        OtbrStatus status = client.checkReadiness("fd00::1");
+
+        assertTrue(status.reachable());
+        assertEquals("OTBR address is reachable", status.message());
+        assertTrue(status.details().contains("fd00::1"));
     }
 
     @Test

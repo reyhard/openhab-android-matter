@@ -73,6 +73,36 @@ internal fun threadSettingsConfigForSave(
     )
 }
 
+internal fun openHabConnectionConfigForSave(
+    existingConfig: AppConfig,
+    openHabBaseUrl: String,
+    editableToken: String
+): AppConfig {
+    val trimmedToken = editableToken.trim()
+    return AppConfig(
+        existingConfig.threadDataset(),
+        existingConfig.setupPayload(),
+        openHabBaseUrl,
+        trimmedToken.ifBlank { existingConfig.openHabApiToken() },
+        existingConfig.otbrBaseUrl(),
+        existingConfig.threadDatasetUnreadable(),
+        existingConfig.setupPayloadUnreadable(),
+        if (trimmedToken.isBlank()) existingConfig.openHabApiTokenUnreadable() else false,
+        existingConfig.attestationBypassEnabled()
+    )
+}
+
+internal fun shouldRefreshOpenHabConnectionAfterAction(action: MatterSetupAction): Boolean {
+    return action in setOf(
+        MatterSetupAction.AddAnotherDevice,
+        MatterSetupAction.BackToMainMenu,
+        MatterSetupAction.BackToSettings,
+        MatterSetupAction.EditSettings,
+        MatterSetupAction.SaveOpenHabAddress,
+        MatterSetupAction.SaveChangedToken
+    )
+}
+
 class MatterSetupViewModel(application: Application) : AndroidViewModel(application) {
     var uiState by mutableStateOf(MatterSetupUiState.initial(openHabConfigured = false))
         private set
@@ -89,6 +119,10 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     var attestationBypassEnabled by mutableStateOf(false)
         private set
     var threadSettingsMessage by mutableStateOf("")
+        private set
+    var threadNetworkState by mutableStateOf(ThreadNetworkUiState.notChecked("", ""))
+        private set
+    var openHabConnectionState by mutableStateOf(OpenHabConnectionUiState.notChecked(tokenSet = false))
         private set
     var threadBorderRouters by mutableStateOf<List<ThreadBorderRouterRecord>>(emptyList())
         private set
@@ -128,11 +162,14 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     init {
         restorePersistedConfig(maskToken = true)
         refreshScanReadiness()
+        refreshOpenHabConnectionStatus()
+        refreshThreadNetworkStatus()
         uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
     }
 
     fun onOpenHabUrlChange(value: String) {
         openHabUrl = value
+        openHabConnectionState = OpenHabConnectionUiState.notChecked(openHabTokenStored || token.trim().isNotBlank())
         if (uiState.stage == MatterSetupStage.NeedsOpenHabSetup) {
             val failure = uiState.failure
             uiState = if (failure == null) {
@@ -150,14 +187,17 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
     fun onTokenChange(value: String) {
         token = value
+        openHabConnectionState = OpenHabConnectionUiState.notChecked(openHabTokenStored || value.trim().isNotBlank())
     }
 
     fun onThreadDatasetChange(value: String) {
         threadDataset = value
+        threadNetworkState = ThreadNetworkUiState.notChecked(threadDataset, otbrBaseUrl)
     }
 
     fun onOtbrBaseUrlChange(value: String) {
         otbrBaseUrl = value
+        threadNetworkState = ThreadNetworkUiState.notChecked(threadDataset, otbrBaseUrl)
     }
 
     fun onAttestationBypassChange(value: Boolean) {
@@ -205,6 +245,8 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 scannedPayload = ""
                 manualSetupCode = ""
                 uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
+                refreshOpenHabConnectionAfterNavigation(action)
+                refreshThreadNetworkStatus()
             }
 
             MatterSetupAction.BackToMainMenu -> {
@@ -212,12 +254,16 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 manualSetupCode = ""
                 restorePersistedConfig(maskToken = true)
                 uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
+                refreshOpenHabConnectionAfterNavigation(action)
+                refreshThreadNetworkStatus()
             }
 
             MatterSetupAction.BackToSettings -> {
                 restorePersistedConfig(maskToken = true)
                 refreshPhoneDevices()
                 uiState = MatterSetupStateReducer.settings()
+                refreshOpenHabConnectionAfterNavigation(action)
+                refreshThreadNetworkStatus()
             }
 
             MatterSetupAction.BackToRequiredSetup -> {
@@ -225,9 +271,12 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.SaveOpenHab,
-            MatterSetupAction.TestOpenHab,
             MatterSetupAction.TestSettings -> {
                 startFirstRunSettingsCheck()
+            }
+
+            MatterSetupAction.TestOpenHab -> {
+                startOpenHabConnectionTest()
             }
 
             MatterSetupAction.GetStarted -> {
@@ -239,23 +288,26 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 restorePersistedConfig(maskToken = true)
                 refreshPhoneDevices()
                 uiState = MatterSetupStateReducer.settings()
+                refreshOpenHabConnectionAfterNavigation(action)
+                refreshThreadNetworkStatus()
             }
 
             MatterSetupAction.EditOpenHabAddress -> {
-                uiState = MatterSetupStateReducer.openHabAddressEditor()
+                prepareOpenHabConnectionEditor()
             }
 
             MatterSetupAction.SaveOpenHabAddress -> {
-                saveOpenHabAddress()
+                saveOpenHabConnection()
+                refreshOpenHabConnectionAfterNavigation(action)
             }
 
             MatterSetupAction.ChangeToken -> {
-                token = ""
-                uiState = MatterSetupStateReducer.changeToken()
+                prepareOpenHabConnectionEditor()
             }
 
             MatterSetupAction.SaveChangedToken -> {
-                startChangedTokenCheck()
+                saveOpenHabConnection()
+                refreshOpenHabConnectionAfterNavigation(action)
             }
 
             MatterSetupAction.EditThreadNetwork -> {
@@ -272,7 +324,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             MatterSetupAction.CheckThreadDataset -> {
-                updateThreadDatasetValidationMessage()
+                refreshThreadNetworkStatus()
             }
 
             MatterSetupAction.SaveThreadSettings -> {
@@ -286,6 +338,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             is MatterSetupAction.SelectThreadBorderRouter -> {
                 otbrBaseUrl = action.endpoint
                 threadSettingsMessage = "Selected Thread Border Router: ${action.endpoint}"
+                threadNetworkState = ThreadNetworkUiState.notChecked(threadDataset, otbrBaseUrl)
             }
 
             MatterSetupAction.EnterCodeManually -> {
@@ -362,6 +415,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 val openHabStatus = openHabClient.checkReadiness(baseUrl, apiToken)
                 val otbrStatus = otbrClient.checkReadiness(otbrTarget)
+                postThreadNetworkResult(ThreadNetworkUiState.fromInputs(datasetInput, otbrTarget, otbrStatus))
                 val validation = FirstRunSettingsValidator.validate(
                     openHabUrl = baseUrl,
                     token = apiToken,
@@ -386,21 +440,24 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                         )
                     )
                     controllerSession.syncAttestationBypass(attestationBypassEnabled)
-                    postState {
-                        openHabUrl = baseUrl
-                        token = ""
-                        openHabTokenStored = true
-                        threadDataset = safeDataset
-                        otbrBaseUrl = otbrTarget
-                        openHabConfigured = true
+                postState {
+                    openHabUrl = baseUrl
+                    token = ""
+                    openHabTokenStored = true
+                    openHabConnectionState = OpenHabConnectionUiState.connected()
+                    threadDataset = safeDataset
+                    otbrBaseUrl = otbrTarget
+                    openHabConfigured = true
                         threadSettingsMessage = ThreadDatasetSettingsValidator.validate(safeDataset).title
                         uiState = MatterSetupUiState.addMatterDevice()
                     }
                 } else {
+                    postOpenHabConnectionTestResult(OpenHabConnectionUiState.fromStatus(openHabStatus))
                     emitFirstRunSettingsFailure(baseUrl, existingConfig, apiToken, validation.warnings, validation.details)
                 }
             } catch (error: Exception) {
                 val existingConfig = runCatching { configRepository.load() }.getOrDefault(AppConfig("", ""))
+                postOpenHabConnectionTestResult(OpenHabConnectionUiState.addressError())
                 emitOpenHabSetupError(error, existingConfig, baseUrl, apiToken)
             } finally {
                 executionGate.finish()
@@ -477,26 +534,68 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         return validation.status == ThreadDatasetSettingsStatus.Valid
     }
 
-    private fun saveOpenHabAddress() {
+    private fun prepareOpenHabConnectionEditor() {
+        token = ""
+        uiState = MatterSetupStateReducer.openHabAddressEditor()
+    }
+
+    private fun saveOpenHabConnection() {
         val baseUrl = effectiveOpenHabUrl()
         val existingConfig = configRepository.load()
-        configRepository.save(
-            AppConfig(
-                existingConfig.threadDataset(),
-                existingConfig.setupPayload(),
-                baseUrl,
-                existingConfig.openHabApiToken(),
-                existingConfig.otbrBaseUrl(),
-                existingConfig.threadDatasetUnreadable(),
-                existingConfig.setupPayloadUnreadable(),
-                existingConfig.openHabApiTokenUnreadable(),
-                existingConfig.attestationBypassEnabled()
-            )
+        val updatedConfig = openHabConnectionConfigForSave(
+            existingConfig = existingConfig,
+            openHabBaseUrl = baseUrl,
+            editableToken = token
         )
+        configRepository.save(updatedConfig)
         openHabUrl = baseUrl
-        openHabTokenStored = existingConfig.openHabApiToken().isNotBlank()
+        token = ""
+        openHabTokenStored = updatedConfig.openHabApiToken().isNotBlank()
+        openHabConnectionState = OpenHabConnectionUiState.notChecked(openHabTokenStored)
         openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
         uiState = MatterSetupStateReducer.settings()
+    }
+
+    private fun startOpenHabConnectionTest() {
+        refreshOpenHabConnectionStatus()
+    }
+
+    private fun refreshOpenHabConnectionStatus() {
+        val baseUrl = effectiveOpenHabUrl()
+        val existingConfig = configRepository.load()
+        val apiToken = resolveEffectiveSetupToken(token, existingConfig.openHabApiToken())
+        if (apiToken.isBlank()) {
+            openHabConnectionState = OpenHabConnectionUiState.missingToken()
+            return
+        }
+        if (!executionGate.tryStart()) {
+            return
+        }
+
+        openHabConnectionState = OpenHabConnectionUiState.checking()
+        workerThread = Thread({
+            try {
+                val status = openHabClient.checkReadiness(baseUrl, apiToken)
+                postOpenHabConnectionTestResult(OpenHabConnectionUiState.fromStatus(status))
+            } catch (error: Exception) {
+                postOpenHabConnectionTestResult(OpenHabConnectionUiState.addressError())
+            } finally {
+                executionGate.finish()
+            }
+        }, "openhab-connection-test")
+        workerThread?.start()
+    }
+
+    private fun refreshOpenHabConnectionAfterNavigation(action: MatterSetupAction) {
+        if (shouldRefreshOpenHabConnectionAfterAction(action)) {
+            refreshOpenHabConnectionStatus()
+        }
+    }
+
+    private fun postOpenHabConnectionTestResult(state: OpenHabConnectionUiState) {
+        mainHandler.post {
+            openHabConnectionState = state
+        }
     }
 
     private fun saveAttestationBypass(value: Boolean) {
@@ -538,6 +637,34 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         controllerSession.syncAttestationBypass(attestationBypassEnabled)
         openHabConfigured = MatterSetupConfigCompleteness.isComplete(configRepository.load())
         threadSettingsMessage = "Saved Thread settings. Dataset value is stored encrypted and not shown in logs."
+        refreshThreadNetworkStatus()
+    }
+
+    private fun refreshThreadNetworkStatus() {
+        val datasetInput = threadDataset
+        val otbrTarget = otbrBaseUrl.trim()
+        val initialState = ThreadNetworkUiState.notChecked(datasetInput, otbrTarget)
+        if (initialState.kind != ThreadNetworkStateKind.Unknown) {
+            threadNetworkState = initialState
+            threadSettingsMessage = "${initialState.title} ${initialState.message}"
+            return
+        }
+
+        threadNetworkState = ThreadNetworkUiState.checking()
+        threadSettingsMessage = "Checking Thread dataset and Border Router address."
+        Thread({
+            val status = otbrClient.checkReadiness(otbrTarget)
+            postThreadNetworkResult(ThreadNetworkUiState.fromInputs(datasetInput, otbrTarget, status))
+        }, "thread-network-check").start()
+    }
+
+    private fun postThreadNetworkResult(state: ThreadNetworkUiState) {
+        mainHandler.post {
+            if (executionGate.canEmit()) {
+                threadNetworkState = state
+                threadSettingsMessage = "${state.title} ${state.message}"
+            }
+        }
     }
 
     private fun detectThreadBorderRouters() {
@@ -924,6 +1051,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         openHabUrl = config.openHabBaseUrl().trim().ifBlank { MatterSetupConfigCompleteness.DefaultOpenHabUrl }
         token = if (maskToken) "" else config.openHabApiToken()
         openHabTokenStored = config.openHabApiToken().isNotBlank()
+        openHabConnectionState = OpenHabConnectionUiState.notChecked(openHabTokenStored)
         threadDataset = config.threadDataset()
         otbrBaseUrl = config.otbrBaseUrl()
         attestationBypassEnabled = config.attestationBypassEnabled()
@@ -932,6 +1060,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             threadDataset,
             config.threadDatasetUnreadable()
         ).title
+        threadNetworkState = ThreadNetworkUiState.notChecked(threadDataset, otbrBaseUrl)
     }
 
     private fun phoneDeviceReturnAction(): MatterSetupAction {

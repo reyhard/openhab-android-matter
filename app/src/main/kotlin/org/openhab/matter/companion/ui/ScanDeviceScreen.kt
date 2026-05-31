@@ -38,6 +38,8 @@ import org.openhab.matter.companion.ui.components.SettingsCard
 fun ScanDeviceScreen(
     state: MatterSetupUiState,
     scanReadiness: ScanReadinessUiState,
+    openHabConnectionState: OpenHabConnectionUiState,
+    threadNetworkState: ThreadNetworkUiState,
     onAction: (MatterSetupAction) -> Unit
 ) {
     MatterSetupScaffold(
@@ -57,7 +59,7 @@ fun ScanDeviceScreen(
                 .clip(RoundedCornerShape(8.dp))
         )
         Spacer(Modifier.height(24.dp))
-        ReadinessGuideCard(scanReadiness, onAction)
+        ReadinessGuideCard(scanReadiness, openHabConnectionState, threadNetworkState, onAction)
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = { onAction(MatterSetupAction.StartScan) },
@@ -80,17 +82,19 @@ fun ScanDeviceScreen(
 @Composable
 private fun ReadinessGuideCard(
     scanReadiness: ScanReadinessUiState,
+    openHabConnectionState: OpenHabConnectionUiState,
+    threadNetworkState: ThreadNetworkUiState,
     onAction: (MatterSetupAction) -> Unit
 ) {
     SettingsCard {
         SectionLabel("Ready to pair")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ReadinessRow("openHAB connected", ready = true)
-            ReadinessRow("Thread network ready", ready = true)
+            ReadinessRow(openHabConnectionState.title, ready = openHabConnectionState.ready)
+            ReadinessRow(threadNetworkState.title, ready = threadNetworkState.ready)
             ReadinessRow("Bluetooth and location ready", ready = scanReadiness.ready)
         }
-        if (!scanReadiness.ready) {
-            ReadinessDetails(scanReadiness, onAction)
+        if (!openHabConnectionState.ready || !threadNetworkState.ready || !scanReadiness.ready) {
+            ReadinessDetails(scanReadiness, openHabConnectionState, threadNetworkState, onAction)
         }
     }
 }
@@ -119,9 +123,31 @@ private fun ReadinessRow(
 @Composable
 private fun ReadinessDetails(
     scanReadiness: ScanReadinessUiState,
+    openHabConnectionState: OpenHabConnectionUiState,
+    threadNetworkState: ThreadNetworkUiState,
     onAction: (MatterSetupAction) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!openHabConnectionState.ready) {
+            Text(
+                text = openHabConnectionState.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            HelperButton("Fix openHAB settings") {
+                onAction(MatterSetupAction.EditSettings)
+            }
+        }
+        if (!threadNetworkState.ready) {
+            Text(
+                text = threadNetworkState.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            HelperButton("Fix Thread settings") {
+                onAction(MatterSetupAction.EditSettings)
+            }
+        }
         listOf(
             scanReadiness.bluetoothMessage,
             scanReadiness.locationMessage,

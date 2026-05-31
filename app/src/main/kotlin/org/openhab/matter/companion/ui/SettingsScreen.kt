@@ -31,7 +31,8 @@ fun SettingsScreen(
     state: MatterSetupUiState,
     openHabUrl: String,
     tokenSet: Boolean,
-    threadDatasetSet: Boolean,
+    openHabConnectionState: OpenHabConnectionUiState,
+    threadNetworkState: ThreadNetworkUiState,
     otbrBaseUrl: String,
     phoneDeviceCount: Int,
     attestationBypassEnabled: Boolean,
@@ -50,14 +51,30 @@ fun SettingsScreen(
             SettingsRow(
                 title = "openHAB address",
                 value = openHabUrl.ifBlank { "Not set" },
-                status = "Ready",
+                status = if (openHabConnectionState.kind == OpenHabConnectionStateKind.TokenError) {
+                    "Address set"
+                } else {
+                    openHabConnectionState.statusLabel
+                },
                 onClick = { onAction(MatterSetupAction.EditOpenHabAddress) }
             )
             SettingsRow(
                 title = "Access token",
-                value = if (tokenSet) "Stored securely" else "Not set",
-                status = if (tokenSet) "Set" else "Missing",
-                onClick = { onAction(MatterSetupAction.ChangeToken) }
+                value = if (tokenSet) {
+                    if (openHabConnectionState.kind == OpenHabConnectionStateKind.TokenError) {
+                        openHabConnectionState.message
+                    } else {
+                        "Stored securely"
+                    }
+                } else {
+                    "Not set"
+                },
+                status = when (openHabConnectionState.kind) {
+                    OpenHabConnectionStateKind.TokenError,
+                    OpenHabConnectionStateKind.MissingToken -> openHabConnectionState.statusLabel
+                    else -> if (tokenSet) "Set" else "Missing"
+                },
+                onClick = { onAction(MatterSetupAction.EditOpenHabAddress) }
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -66,12 +83,18 @@ fun SettingsScreen(
         SettingsCard {
             SettingsRow(
                 title = "Thread network settings",
-                value = if (threadDatasetSet) {
+                value = if (threadNetworkState.kind == ThreadNetworkStateKind.DatasetError) {
+                    threadNetworkState.message
+                } else if (threadNetworkState.kind == ThreadNetworkStateKind.MissingBorderRouter ||
+                    threadNetworkState.kind == ThreadNetworkStateKind.BorderRouterError) {
+                    threadNetworkState.message
+                } else if (threadNetworkState.ready || threadNetworkState.kind == ThreadNetworkStateKind.Unknown ||
+                    threadNetworkState.kind == ThreadNetworkStateKind.Checking) {
                     "Dataset stored. Border router: ${otbrBaseUrl.ifBlank { "not set" }}"
                 } else {
                     "Dataset not set"
                 },
-                status = if (threadDatasetSet) "Valid" else "Missing",
+                status = threadNetworkState.statusLabel,
                 onClick = { onAction(MatterSetupAction.EditThreadNetwork) }
             )
         }

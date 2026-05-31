@@ -20,6 +20,8 @@ fun MatterSetupApp(
     otbrBaseUrl: String,
     attestationBypassEnabled: Boolean,
     threadSettingsMessage: String,
+    threadNetworkState: ThreadNetworkUiState,
+    openHabConnectionState: OpenHabConnectionUiState,
     threadBorderRouters: List<ThreadBorderRouterRecord>,
     threadBorderRouterDiscoveryInProgress: Boolean,
     phoneDevices: List<PhoneMatterDevice>,
@@ -69,7 +71,8 @@ fun MatterSetupApp(
                 state = state,
                 openHabUrl = openHabUrl,
                 tokenSet = openHabTokenStored,
-                threadDatasetSet = threadDataset.isNotBlank(),
+                openHabConnectionState = openHabConnectionState,
+                threadNetworkState = threadNetworkState,
                 otbrBaseUrl = otbrBaseUrl,
                 phoneDeviceCount = phoneDevices.size,
                 attestationBypassEnabled = attestationBypassEnabled,
@@ -77,16 +80,14 @@ fun MatterSetupApp(
                 onAction = onAction
             )
 
-            MatterSetupStage.OpenHabAddressEditor -> OpenHabAddressScreen(
+            MatterSetupStage.OpenHabAddressEditor,
+            MatterSetupStage.ChangeToken -> OpenHabAddressScreen(
                 state = state,
                 openHabUrl = openHabUrl,
-                onUrlChange = onOpenHabUrlChange,
-                onAction = onAction
-            )
-
-            MatterSetupStage.ChangeToken -> ChangeTokenScreen(
-                state = state,
                 token = token,
+                tokenSet = openHabTokenStored,
+                openHabConnectionState = openHabConnectionState,
+                onUrlChange = onOpenHabUrlChange,
                 onTokenChange = onTokenChange,
                 onAction = onAction
             )
@@ -108,6 +109,8 @@ fun MatterSetupApp(
             MatterSetupStage.QrScanned -> ScanDeviceScreen(
                 state = state,
                 scanReadiness = scanReadiness,
+                openHabConnectionState = openHabConnectionState,
+                threadNetworkState = threadNetworkState,
                 onAction = onAction
             )
 

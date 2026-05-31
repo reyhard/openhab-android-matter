@@ -30,8 +30,8 @@ class MatterSetupBackNavigationTest {
     }
 
     @Test
-    fun tokenEditorBackReturnsToSettings() {
-        val state = MatterSetupStateReducer.changeToken()
+    fun openHabConnectionEditorBackReturnsToSettings() {
+        val state = MatterSetupStateReducer.openHabAddressEditor()
 
         assertEquals(MatterSetupAction.BackToSettings, MatterSetupBackNavigation.systemBackAction(state))
     }

@@ -71,13 +71,13 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
-    fun changeTokenCheckingUsesChangeTokenStageAndDisablesSave() {
-        val state = MatterSetupStateReducer.changeTokenChecking()
+    fun openHabConnectionEditorUsesOneScreenForAddressTokenAndTesting() {
+        val state = MatterSetupStateReducer.openHabAddressEditor()
 
-        assertEquals(MatterSetupStage.ChangeToken, state.stage)
-        assertEquals(MatterSetupAction.SaveChangedToken, state.primaryAction)
-        assertEquals("Checking...", state.primaryActionLabel)
-        assertFalse(state.primaryActionEnabled)
+        assertEquals(MatterSetupStage.OpenHabAddressEditor, state.stage)
+        assertEquals("openHAB connection", state.title)
+        assertEquals(MatterSetupAction.SaveOpenHabAddress, state.primaryAction)
+        assertEquals("Save", state.primaryActionLabel)
     }
 
     @Test

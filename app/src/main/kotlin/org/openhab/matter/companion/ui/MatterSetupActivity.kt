@@ -60,6 +60,8 @@ class MatterSetupActivity : ComponentActivity() {
                 otbrBaseUrl = viewModel.otbrBaseUrl,
                 attestationBypassEnabled = viewModel.attestationBypassEnabled,
                 threadSettingsMessage = viewModel.threadSettingsMessage,
+                threadNetworkState = viewModel.threadNetworkState,
+                openHabConnectionState = viewModel.openHabConnectionState,
                 threadBorderRouters = viewModel.threadBorderRouters,
                 threadBorderRouterDiscoveryInProgress = viewModel.threadBorderRouterDiscoveryInProgress,
                 phoneDevices = viewModel.phoneDevices,
