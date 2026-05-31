@@ -144,11 +144,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release view "$CHIP_ARTIFACT_TAG" >/dev/null 2>&1 || \
+          gh release view "$CHIP_ARTIFACT_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$CHIP_ARTIFACT_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
               --title "CHIP Controller Artifacts (latest)" \
               --notes "Auto-published connectedhomeip artifacts for openhab-android-matter CI."
 
           gh release upload "$CHIP_ARTIFACT_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
             "$RUNNER_TEMP/$CHIP_ARTIFACT_NAME#$CHIP_ARTIFACT_NAME" \
             --clobber
