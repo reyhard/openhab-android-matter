@@ -101,30 +101,29 @@ jobs:
 
           python3 scripts/build/build_examples.py \
             --target android-arm64-chip-tool \
-            build \
-            --copy-artifacts-to "$RUNNER_TEMP/chip-artifacts-raw"
+            build
 
       - name: Package artifact layout for openhab-android-matter
         shell: bash
         run: |
           set -euo pipefail
-          RAW_DIR="$RUNNER_TEMP/chip-artifacts-raw/android-arm64-chip-tool"
+          BUILD_LIB_DIR="$GITHUB_WORKSPACE/connectedhomeip/out/android-arm64-chip-tool/lib"
           OUT_ROOT="$RUNNER_TEMP/$CHIP_ARTIFACT_DIR_NAME"
           OUT_ARCHIVE="$RUNNER_TEMP/$CHIP_ARTIFACT_NAME"
 
           rm -rf "$OUT_ROOT" "$OUT_ARCHIVE"
           mkdir -p "$OUT_ROOT/jniLibs/arm64-v8a"
 
-          cp "$RAW_DIR/CHIPController.jar" "$OUT_ROOT/"
-          cp "$RAW_DIR/CHIPInteractionModel.jar" "$OUT_ROOT/"
-          cp "$RAW_DIR/CHIPClusterID.jar" "$OUT_ROOT/"
-          cp "$RAW_DIR/CHIPClusters.jar" "$OUT_ROOT/"
-          cp "$RAW_DIR/AndroidPlatform.jar" "$OUT_ROOT/"
-          cp "$RAW_DIR/OnboardingPayload.jar" "$OUT_ROOT/"
-          cp "$RAW_DIR/libMatterTlv.jar" "$OUT_ROOT/"
-          cp "$RAW_DIR/libMatterJson.jar" "$OUT_ROOT/"
-          cp "$RAW_DIR/jni/arm64-v8a/libCHIPController.so" "$OUT_ROOT/jniLibs/arm64-v8a/"
-          cp "$RAW_DIR/jni/arm64-v8a/libc++_shared.so" "$OUT_ROOT/jniLibs/arm64-v8a/"
+          cp "$BUILD_LIB_DIR/src/controller/java/CHIPController.jar" "$OUT_ROOT/"
+          cp "$BUILD_LIB_DIR/src/controller/java/CHIPInteractionModel.jar" "$OUT_ROOT/"
+          cp "$BUILD_LIB_DIR/src/controller/java/CHIPClusterID.jar" "$OUT_ROOT/"
+          cp "$BUILD_LIB_DIR/src/controller/java/CHIPClusters.jar" "$OUT_ROOT/"
+          cp "$BUILD_LIB_DIR/src/platform/android/AndroidPlatform.jar" "$OUT_ROOT/"
+          cp "$BUILD_LIB_DIR/src/controller/java/OnboardingPayload.jar" "$OUT_ROOT/"
+          cp "$BUILD_LIB_DIR/src/controller/java/libMatterTlv.jar" "$OUT_ROOT/"
+          cp "$BUILD_LIB_DIR/src/controller/java/libMatterJson.jar" "$OUT_ROOT/"
+          cp "$BUILD_LIB_DIR/jni/arm64-v8a/libCHIPController.so" "$OUT_ROOT/jniLibs/arm64-v8a/"
+          cp "$BUILD_LIB_DIR/jni/arm64-v8a/libc++_shared.so" "$OUT_ROOT/jniLibs/arm64-v8a/"
 
           (
             cd "$OUT_ROOT"
