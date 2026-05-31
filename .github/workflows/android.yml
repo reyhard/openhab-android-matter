@@ -20,11 +20,11 @@ jobs:
 
     env:
       APK_PATH: app/build/outputs/apk/debug/openhab-matter-helper.apk
-      CHIP_CONTROLLER_ARTIFACTS_DIR: ${{ runner.temp }}/connectedhomeip-controller-artifacts
+      CHIP_CONTROLLER_ARTIFACTS_DIR: /tmp/connectedhomeip-controller-artifacts
       CHIP_CONTROLLER_ABIS: arm64-v8a
       CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG: chip-controller-artifacts-latest
       CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME: openhab-chip-artifacts-arm64.zip
-      CHIP_GRADLE_ARGS: -PopenhabMatterChipControllerArtifactsDir=${{ runner.temp }}/connectedhomeip-controller-artifacts -PopenhabMatterChipControllerAbis=arm64-v8a
+      CHIP_GRADLE_ARGS: -PopenhabMatterChipControllerArtifactsDir=/tmp/connectedhomeip-controller-artifacts -PopenhabMatterChipControllerAbis=arm64-v8a
 
     steps:
       - name: Check out repository
