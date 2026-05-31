@@ -27,6 +27,21 @@ class MatterSetupIconResourceTest {
         assertSourceReferences("MatterSetupScaffold.kt", "R.drawable.ic_material_settings")
     }
 
+    @Test
+    fun launcherForegroundUsesOpenhabIconSvgArtwork() {
+        val sourceSvg = interfaceFile("openhab-icon.svg").readText()
+        val launcherVector = drawableFile("ic_launcher_foreground.xml").readText()
+
+        assertTrue(sourceSvg.contains("id=\"orange_arrow\""), "Source SVG should contain the openHAB arrow path")
+        assertTrue(sourceSvg.contains("inkscape:label=\"beta_background\""), "Source SVG should contain the beta badge")
+        assertTrue(launcherVector.contains("M5.242,21.133"), "Launcher should use the requested openHAB arrow geometry")
+        assertTrue(launcherVector.contains("M16,4C22.61,4"), "Launcher should use the requested openHAB circle geometry")
+        assertTrue(launcherVector.contains("M16.10709,17.280769"), "Launcher should include the requested beta badge")
+        assertTrue(launcherVector.contains("M15.617096,18.96373"), "Launcher should include the beta text paths")
+        assertTrue(!launcherVector.contains("android:strokeColor"), "Launcher icon should not keep the old app-frame strokes")
+        assertTrue(!launcherVector.contains("#1F67BF"), "Launcher icon should not keep the old blue app-frame color")
+    }
+
     private fun assertVectorDrawable(resourceName: String) {
         val file = drawableFile("$resourceName.xml")
         assertTrue(file.isFile, "Missing drawable resource ${file.path}")
@@ -65,5 +80,13 @@ class MatterSetupIconResourceTest {
             File("app/src/main/kotlin/org/openhab/matter/companion/ui", name),
             File("app/src/main/kotlin/org/openhab/matter/companion/ui/components", name)
         ).firstOrNull(File::isFile) ?: File("src/main/kotlin/org/openhab/matter/companion/ui", name)
+    }
+
+    private fun interfaceFile(name: String): File {
+        return listOf(
+            File("docs/interface", name),
+            File("../docs/interface", name),
+            File("app/../docs/interface", name)
+        ).firstOrNull(File::isFile) ?: File("docs/interface", name)
     }
 }
