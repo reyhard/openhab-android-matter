@@ -22,6 +22,7 @@ import org.openhab.matter.companion.setup.MatterSetupStage
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
@@ -81,6 +82,50 @@ class MatterSetupViewModelPhoneDeviceTest {
     }
 
     @Test
+    fun fetchPhoneDeviceDetailsFailsClosedWhenBootstrapNodeChangedBeforeFetch() {
+        val nativeController = RecordingNativeController(
+            details = MatterDeviceDetails.Builder()
+                .softwareVersionString("1.8.7")
+                .build()
+        )
+        val bootstrapStateRepository = FakeBootstrapStateRepository(
+            MatterBootstrapState(
+                0x4D2,
+                "controller-state",
+                false,
+                "Staged vendor",
+                "Staged product"
+            )
+        )
+        val viewModel = viewModelWith(
+            bootstrapStateRepository = bootstrapStateRepository,
+            nativeController = nativeController
+        )
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDeviceDetails(0x4D2))
+        bootstrapStateRepository.save(
+            MatterBootstrapState(
+                0x162E,
+                "new-controller-state",
+                false,
+                "Other vendor",
+                "Other product"
+            )
+        )
+        viewModel.handleAction(MatterSetupAction.FetchPhoneDeviceDetails)
+        drainMainThread()
+
+        assertEquals(MatterSetupStage.PhoneDeviceDetails, viewModel.uiState.stage)
+        assertEquals("Staged product", viewModel.uiState.phoneDeviceDetails.deviceName)
+        assertEquals("Staged vendor", viewModel.uiState.phoneDeviceDetails.vendor)
+        assertEquals("", viewModel.uiState.phoneDeviceDetails.firmwareVersion)
+        assertFalse(viewModel.uiState.phoneDeviceDetailsFetching)
+        assertEquals("Could not fetch data from device", viewModel.uiState.phoneDeviceDetailsMessage)
+        assertEquals(0, nativeController.readDeviceDetailsCalls)
+    }
+
+    @Test
     fun fetchPhoneDeviceDetailsMergesNativeDetailsWhenControllerStateIsStoredAndNativeIsReady() {
         val nativeController = RecordingNativeController(
             details = MatterDeviceDetails.Builder()
@@ -118,13 +163,61 @@ class MatterSetupViewModelPhoneDeviceTest {
         assertEquals("Device data refreshed", viewModel.uiState.phoneDeviceDetailsMessage)
     }
 
+    @Test
+    fun fetchPhoneDeviceDetailsDropsCompletionAfterLeavingDetailsStage() {
+        val readStarted = CountDownLatch(1)
+        val releaseRead = CountDownLatch(1)
+        val nativeController = RecordingNativeController(
+            details = MatterDeviceDetails.Builder()
+                .softwareVersionString("1.8.7")
+                .build(),
+            beforeReadReturns = {
+                readStarted.countDown()
+                assertTrue(
+                    "Timed out waiting to release device details read",
+                    releaseRead.await(5, TimeUnit.SECONDS)
+                )
+            }
+        )
+        val viewModel = viewModelWith(
+            bootstrapState = MatterBootstrapState(
+                0x4D2,
+                "controller-state",
+                false,
+                "Staged vendor",
+                "Staged product"
+            ),
+            nativeController = nativeController
+        )
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDeviceDetails(0x4D2))
+        viewModel.handleAction(MatterSetupAction.FetchPhoneDeviceDetails)
+        assertTrue("Timed out waiting for device details read", readStarted.await(5, TimeUnit.SECONDS))
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        releaseRead.countDown()
+        waitForFetchToFinish(viewModel)
+
+        assertEquals(MatterSetupStage.PhoneDeviceList, viewModel.uiState.stage)
+        assertEquals("", viewModel.uiState.phoneDeviceDetails.firmwareVersion)
+        assertEquals("", viewModel.uiState.phoneDeviceDetailsMessage)
+    }
+
     private fun viewModelWith(
         bootstrapState: MatterBootstrapState,
         nativeController: RecordingNativeController = RecordingNativeController()
     ): MatterSetupViewModel {
+        return viewModelWith(FakeBootstrapStateRepository(bootstrapState), nativeController)
+    }
+
+    private fun viewModelWith(
+        bootstrapStateRepository: MatterBootstrapStateRepository,
+        nativeController: RecordingNativeController = RecordingNativeController()
+    ): MatterSetupViewModel {
         return MatterSetupViewModel(
             application = RuntimeEnvironment.getApplication(),
-            bootstrapStateRepositoryOverride = FakeBootstrapStateRepository(bootstrapState),
+            bootstrapStateRepositoryOverride = bootstrapStateRepository,
             controllerSessionOverride = NativeChipControllerSession(
                 ThrowingMatterController,
                 false
@@ -168,7 +261,8 @@ class MatterSetupViewModelPhoneDeviceTest {
 
     private class RecordingNativeController(
         private val details: MatterDeviceDetails = MatterDeviceDetails.empty(),
-        private val ready: Boolean = true
+        private val ready: Boolean = true,
+        private val beforeReadReturns: () -> Unit = {}
     ) : MatterControllerCandidate {
         var readDeviceDetailsCalls = 0
             private set
@@ -209,6 +303,7 @@ class MatterSetupViewModelPhoneDeviceTest {
             lastNodeId = nodeId
             lastControllerState = controllerState
             listener.onProgress(CommissioningStep("Reading device details", false))
+            beforeReadReturns()
             return details
         }
     }

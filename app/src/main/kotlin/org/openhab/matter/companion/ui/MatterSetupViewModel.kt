@@ -191,6 +191,15 @@ internal fun phoneDeviceDetailsFetchFailed(state: MatterSetupUiState): MatterSet
     )
 }
 
+internal fun isCurrentPhoneDeviceDetailsRequest(
+    state: MatterSetupUiState,
+    selectedDevice: PhoneMatterDevice?,
+    requestNodeId: Long
+): Boolean {
+    return state.stage == MatterSetupStage.PhoneDeviceDetails &&
+        selectedDevice?.nodeId == requestNodeId
+}
+
 class MatterSetupViewModel @JvmOverloads constructor(
     application: Application,
     private val bootstrapStateRepositoryOverride: MatterBootstrapStateRepository? = null,
@@ -831,21 +840,21 @@ class MatterSetupViewModel @JvmOverloads constructor(
         if (uiState.stage != MatterSetupStage.PhoneDeviceDetails) {
             return
         }
-        val device = selectedPhoneDevice ?: run {
+        val requestNodeId = selectedPhoneDevice?.nodeId ?: run {
             uiState = phoneDeviceDetailsFetchFailed(uiState)
             return
         }
-        val nodeId = device.nodeId
-        if (nodeId == null || !device.stateReadable) {
+        val bootstrapState = bootstrapStateRepository.load()
+        val device = PhoneMatterDevice.fromBootstrapState(bootstrapState) ?: run {
             uiState = phoneDeviceDetailsFetchFailed(uiState)
             return
         }
-        if (!device.controllerStateStored) {
-            uiState = phoneDeviceDetailsFetchFailed(uiState)
-            return
-        }
-        val controllerState = bootstrapStateRepository.load().controllerState()
-        if (controllerState.isBlank()) {
+        val controllerState = bootstrapState.controllerState()
+        if (!device.stateReadable ||
+            !device.controllerStateStored ||
+            device.nodeId != requestNodeId ||
+            controllerState.isBlank()
+        ) {
             uiState = phoneDeviceDetailsFetchFailed(uiState)
             return
         }
@@ -860,17 +869,21 @@ class MatterSetupViewModel @JvmOverloads constructor(
                     throw IllegalStateException("connectedhomeip is not ready for device metadata.")
                 }
                 val details = selection.controller().readDeviceDetails(
-                    nodeId,
+                    requestNodeId,
                     controllerState,
                     { _ -> }
                 )
                 val update = phoneDeviceDetailsFromControllerDetails(details, device)
                 postState {
-                    uiState = phoneDeviceDetailsFetchSucceeded(uiState, update)
+                    if (isCurrentPhoneDeviceDetailsRequest(uiState, selectedPhoneDevice, requestNodeId)) {
+                        uiState = phoneDeviceDetailsFetchSucceeded(uiState, update)
+                    }
                 }
             } catch (error: Exception) {
                 postState {
-                    uiState = phoneDeviceDetailsFetchFailed(uiState)
+                    if (isCurrentPhoneDeviceDetailsRequest(uiState, selectedPhoneDevice, requestNodeId)) {
+                        uiState = phoneDeviceDetailsFetchFailed(uiState)
+                    }
                 }
             } finally {
                 executionGate.finish()
