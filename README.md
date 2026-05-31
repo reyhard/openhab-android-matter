@@ -44,60 +44,6 @@ Keep the phone, Thread Border Router, and openHAB host on networks where IPv6
 Matter traffic can work. IPv4 reachability to the Thread Border Router is not
 enough for openHAB Matter pairing.
 
-## User Inputs
-
-```mermaid
-flowchart TD
-    A[User opens app] --> B[openHAB address]
-    B --> C{REST authentication required?}
-    C -- Yes --> D[openHAB access token]
-    C -- No --> E[No token]
-    D --> F[Thread settings]
-    E --> F
-    F --> G[Active Operational Dataset]
-    F --> H[Optional Thread Border Router diagnostic address]
-    G --> I[Matter setup code]
-    H --> I
-    I --> J{Input method}
-    J -- Camera --> K[Scan Matter QR code]
-    J -- Manual --> L[Enter manual setup code]
-```
-
-The access token and Thread dataset are stored in app-private encrypted storage.
-Setup payloads, setup PINs, QR payloads, and temporary OpenCommissioningWindow
-codes are not persisted as permanent app configuration.
-
-## Guided Setup Flow
-
-```mermaid
-flowchart TD
-    A[Connect to openHAB] --> B[Save or verify Thread settings]
-    B --> C[Scan QR code or enter manual code]
-    C --> D[Confirm device is in pairing mode]
-    D --> E[Check phone, network, permissions, and openHAB]
-    E --> F{Ready?}
-    F -- No --> G[Show diagnostics and recovery guidance]
-    F -- Yes --> H[Commission device to this phone over BLE Thread]
-    H --> I[Open a 300 second commissioning window]
-    I --> J[Send returned manual setup code to openHAB Scan Input]
-    J --> K[Watch openHAB Inbox]
-    K --> L{Matter Inbox entry found?}
-    L -- Yes --> M[Setup complete]
-    L -- No --> N[Show troubleshooting for IPv6, mDNS, OTBR, and retry]
-```
-
-During setup, the app shows progress for:
-
-- Checking setup.
-- Adding the device to this phone.
-- Opening the pairing window.
-- Sending the setup code to openHAB.
-- Waiting for openHAB.
-
-When connectedhomeip returns a temporary commissioning window, the app shows a
-300-second countdown. openHAB must discover the device before that window
-expires.
-
 ## Troubleshooting in the App
 
 The app includes advanced troubleshooting screens for:
@@ -247,3 +193,9 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\test_apk_badging.ps1
 - [docs/research.md](docs/research.md): architecture and research background.
 - [docs/chip-jni-integration.md](docs/chip-jni-integration.md): native bridge
   notes.
+
+## Trademark Disclaimer
+
+Product names, logos, brands and other trademarks referred to within the openHAB website are the property of their respective  trademark holders. These trademark holders are not affiliated with  openHAB or our website. They do not sponsor or endorse our materials.
+
+Matter logo is trademark of Connectivity Standards Alliance
