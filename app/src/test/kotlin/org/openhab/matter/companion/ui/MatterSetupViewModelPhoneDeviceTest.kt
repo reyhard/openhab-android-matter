@@ -189,6 +189,33 @@ class MatterSetupViewModelPhoneDeviceTest {
     }
 
     @Test
+    fun fetchPhoneDeviceDetailsReportsFailureWhenNativeDetailsAreEmpty() {
+        val nativeController = RecordingNativeController(details = MatterDeviceDetails.empty())
+        val viewModel = viewModelWith(
+            bootstrapState = MatterBootstrapState(
+                0x4D2,
+                "controller-state",
+                false,
+                "Staged vendor",
+                "Staged product"
+            ),
+            nativeController = nativeController
+        )
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDeviceDetails(0x4D2))
+        viewModel.handleAction(MatterSetupAction.FetchPhoneDeviceDetails)
+
+        waitForFetchToFinish(viewModel)
+
+        assertEquals(1, nativeController.readDeviceDetailsCalls)
+        assertEquals("Staged vendor", viewModel.uiState.phoneDeviceDetails.vendor)
+        assertEquals("Staged product", viewModel.uiState.phoneDeviceDetails.product)
+        assertEquals("", viewModel.uiState.phoneDeviceDetails.firmwareVersion)
+        assertEquals("Could not fetch data from device", viewModel.uiState.phoneDeviceDetailsMessage)
+    }
+
+    @Test
     fun fetchPhoneDeviceDetailsDropsCompletionAfterLeavingDetailsStage() {
         val readStarted = CountDownLatch(1)
         val releaseRead = CountDownLatch(1)

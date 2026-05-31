@@ -621,12 +621,14 @@ class MatterSetupAppTest {
         composeRule.onNodeWithContentDescription("Copy Vendor").performClick()
         composeRule.onNodeWithText("Copied Vendor").assertIsDisplayed()
         assertEquals("IKEA of Sweden", clipboardText())
+        composeRule.onNodeWithText("Advanced").performClick()
         composeRule.onNodeWithText("Open commissioning window").performClick()
         composeRule.onNodeWithText("Forget from this phone").performClick()
 
         assertEquals(
             listOf(
                 MatterSetupAction.FetchPhoneDeviceDetails,
+                MatterSetupAction.BackToSettings,
                 MatterSetupAction.OpenCommissioningWindowAgain,
                 MatterSetupAction.ForgetFromPhone
             ),

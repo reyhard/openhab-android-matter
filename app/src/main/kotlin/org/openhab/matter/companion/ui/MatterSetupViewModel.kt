@@ -877,6 +877,9 @@ class MatterSetupViewModel @JvmOverloads constructor(
                     controllerState,
                     { _ -> }
                 )
+                if (details.isEmpty) {
+                    throw IllegalStateException("No Matter device details were returned.")
+                }
                 val update = phoneDeviceDetailsFromControllerDetails(details, device)
                 postState {
                     if (isCurrentPhoneDeviceDetailsRequest(uiState, selectedPhoneDevice, requestNodeId)) {

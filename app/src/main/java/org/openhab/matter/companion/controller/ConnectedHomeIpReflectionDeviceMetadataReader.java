@@ -1,9 +1,12 @@
 package org.openhab.matter.companion.controller;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +27,8 @@ public final class ConnectedHomeIpReflectionDeviceMetadataReader implements Conn
     private static final String BOOLEAN_CALLBACK_CLASS = CLUSTER_PREFIX + "BooleanAttributeCallback";
     private static final String NETWORK_INTERFACES_CALLBACK_CLASS =
             CLUSTER_PREFIX + "NetworkInterfacesAttributeCallback";
+    private static final String[] IPV6_ADDRESS_MEMBER_NAMES =
+            {"iPv6Addresses", "ipv6Addresses", "IPv6Addresses", "getIPv6Addresses", "getIpv6Addresses"};
 
     private final ConnectedHomeIpDevicePointerProvider devicePointerProvider;
     private final ClassLoader classLoader;
@@ -237,8 +242,137 @@ public final class ConnectedHomeIpReflectionDeviceMetadataReader implements Conn
         if (!(value instanceof List<?>)) {
             return "";
         }
-        ConnectedHomeIpDiagnostics.emit("Matter network interfaces were read, but IPv6 decoding is not yet mapped safely");
-        return "";
+        String fallback = "";
+        for (Object networkInterface : (List<?>) value) {
+            Object addresses = ipv6AddressMember(networkInterface);
+            for (Object candidate : addressCandidates(addresses)) {
+                byte[] bytes = ipv6Bytes(candidate);
+                if (bytes == null) {
+                    continue;
+                }
+                String formatted = formatIpv6(bytes);
+                if (fallback.isEmpty()) {
+                    fallback = formatted;
+                }
+                if (isUsefulStableIpv6(bytes)) {
+                    return formatted;
+                }
+            }
+        }
+        return fallback;
+    }
+
+    private static Object ipv6AddressMember(Object networkInterface) {
+        if (networkInterface == null) {
+            return null;
+        }
+        Class<?> valueClass = networkInterface.getClass();
+        for (String name : IPV6_ADDRESS_MEMBER_NAMES) {
+            try {
+                Method method = valueClass.getMethod(name);
+                if (method.getParameterTypes().length == 0) {
+                    return method.invoke(networkInterface);
+                }
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                // Try the generated field shape next.
+            }
+            try {
+                Field field = valueClass.getField(name);
+                return field.get(networkInterface);
+            } catch (ReflectiveOperationException | LinkageError ignored) {
+                // Continue through known generated member spellings.
+            }
+        }
+        return null;
+    }
+
+    private static List<Object> addressCandidates(Object value) {
+        List<Object> candidates = new ArrayList<>();
+        if (value == null) {
+            return candidates;
+        }
+        byte[] singleAddress = ipv6Bytes(value);
+        if (singleAddress != null) {
+            candidates.add(singleAddress);
+            return candidates;
+        }
+        if (value instanceof List<?>) {
+            candidates.addAll((List<?>) value);
+            return candidates;
+        }
+        Class<?> valueClass = value.getClass();
+        if (valueClass.isArray()) {
+            int length = Array.getLength(value);
+            for (int index = 0; index < length; index++) {
+                candidates.add(Array.get(value, index));
+            }
+        }
+        return candidates;
+    }
+
+    private static byte[] ipv6Bytes(Object value) {
+        if (value instanceof byte[] && ((byte[]) value).length == 16) {
+            return (byte[]) value;
+        }
+        if (value instanceof List<?> && ((List<?>) value).size() == 16) {
+            byte[] bytes = new byte[16];
+            for (int index = 0; index < bytes.length; index++) {
+                Object item = ((List<?>) value).get(index);
+                if (!(item instanceof Number)) {
+                    return null;
+                }
+                bytes[index] = ((Number) item).byteValue();
+            }
+            return bytes;
+        }
+        Class<?> valueClass = value == null ? null : value.getClass();
+        if (valueClass != null && valueClass.isArray() && Array.getLength(value) == 16) {
+            byte[] bytes = new byte[16];
+            for (int index = 0; index < bytes.length; index++) {
+                Object item = Array.get(value, index);
+                if (!(item instanceof Number)) {
+                    return null;
+                }
+                bytes[index] = ((Number) item).byteValue();
+            }
+            return bytes;
+        }
+        return null;
+    }
+
+    private static String formatIpv6(byte[] bytes) {
+        StringBuilder builder = new StringBuilder(39);
+        for (int index = 0; index < 8; index++) {
+            if (index > 0) {
+                builder.append(':');
+            }
+            int value = ((bytes[index * 2] & 0xff) << 8) | (bytes[index * 2 + 1] & 0xff);
+            String hex = Integer.toHexString(value);
+            for (int padding = hex.length(); padding < 4; padding++) {
+                builder.append('0');
+            }
+            builder.append(hex);
+        }
+        return builder.toString();
+    }
+
+    private static boolean isUsefulStableIpv6(byte[] bytes) {
+        boolean unspecified = true;
+        boolean loopback = bytes[15] == 1;
+        for (int index = 0; index < bytes.length; index++) {
+            unspecified &= bytes[index] == 0;
+            if (index < bytes.length - 1) {
+                loopback &= bytes[index] == 0;
+            }
+        }
+        if (unspecified || loopback) {
+            return false;
+        }
+        int first = bytes[0] & 0xff;
+        int second = bytes[1] & 0xff;
+        boolean linkLocal = first == 0xfe && (second & 0xc0) == 0x80;
+        boolean multicast = first == 0xff;
+        return !linkLocal && !multicast;
     }
 
     private static String shortClassName(String className) {

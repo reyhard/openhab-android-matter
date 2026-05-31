@@ -88,7 +88,9 @@ fun PhoneDeviceDetailsScreen(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable { onAction(MatterSetupAction.ShowPhoneDevices) }
+                modifier = Modifier.clickable {
+                    onAction(state.primaryAction ?: MatterSetupAction.BackToSettings)
+                }
             )
             Spacer(Modifier.height(16.dp))
             DeviceHeaderCard(details)
