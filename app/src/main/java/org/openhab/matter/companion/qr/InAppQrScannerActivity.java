@@ -3,20 +3,24 @@ package org.openhab.matter.companion.qr;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.media.Image;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
+import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
+import androidx.camera.core.ZoomState;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
@@ -40,6 +44,10 @@ public final class InAppQrScannerActivity extends ComponentActivity {
                     .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
                     .build());
     private ProcessCameraProvider cameraProvider;
+    private Camera camera;
+    private Button zoomOne;
+    private Button zoomTwo;
+    private QrScannerZoomOption selectedZoomOption = QrScannerZoomOption.ONE_X;
     private volatile boolean resultDelivered;
 
     @Override
@@ -85,6 +93,29 @@ public final class InAppQrScannerActivity extends ComponentActivity {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP);
 
+        QrScannerOverlayView overlay = new QrScannerOverlayView(this);
+        overlay.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        LinearLayout zoomControls = new LinearLayout(this);
+        zoomControls.setOrientation(LinearLayout.HORIZONTAL);
+        zoomControls.setGravity(Gravity.CENTER);
+        zoomControls.setPadding(dp(4), dp(4), dp(4), dp(4));
+        zoomControls.setBackground(roundedColor(Color.argb(118, 0, 0, 0), dp(22)));
+        zoomOne = zoomButton("1x");
+        zoomTwo = zoomButton("2x");
+        zoomOne.setOnClickListener(view -> applyZoom(QrScannerZoomOption.ONE_X));
+        zoomTwo.setOnClickListener(view -> applyZoom(QrScannerZoomOption.TWO_X));
+        zoomControls.addView(zoomOne);
+        zoomControls.addView(zoomTwo);
+        updateZoomButtons();
+        FrameLayout.LayoutParams zoomParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        zoomParams.setMargins(0, 0, 0, dp(88));
+
         Button cancel = new Button(this);
         cancel.setText("Cancel");
         cancel.setAllCaps(false);
@@ -100,7 +131,9 @@ public final class InAppQrScannerActivity extends ComponentActivity {
 
         FrameLayout root = new FrameLayout(this);
         root.addView(previewView);
+        root.addView(overlay);
         root.addView(instructions, instructionsParams);
+        root.addView(zoomControls, zoomParams);
         root.addView(cancel, cancelParams);
         setContentView(root);
 
@@ -140,11 +173,12 @@ public final class InAppQrScannerActivity extends ComponentActivity {
         analysis.setAnalyzer(cameraExecutor, this::analyzeImage);
 
         cameraProvider.unbindAll();
-        cameraProvider.bindToLifecycle(
+        camera = cameraProvider.bindToLifecycle(
                 this,
                 CameraSelector.DEFAULT_BACK_CAMERA,
                 preview,
                 analysis);
+        applyZoom(selectedZoomOption);
     }
 
     @ExperimentalGetImage
@@ -193,5 +227,60 @@ public final class InAppQrScannerActivity extends ComponentActivity {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private Button zoomButton(String label) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setMinWidth(dp(58));
+        button.setMinHeight(dp(40));
+        button.setMinimumWidth(dp(58));
+        button.setMinimumHeight(dp(40));
+        button.setPadding(dp(12), 0, dp(12), 0);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(dp(2), 0, dp(2), 0);
+        button.setLayoutParams(params);
+        return button;
+    }
+
+    private void applyZoom(QrScannerZoomOption option) {
+        selectedZoomOption = option;
+        updateZoomButtons();
+        if (camera == null) {
+            return;
+        }
+
+        ZoomState zoomState = camera.getCameraInfo().getZoomState().getValue();
+        float minZoomRatio = zoomState == null ? 1f : zoomState.getMinZoomRatio();
+        float maxZoomRatio = zoomState == null ? option.zoomRatio(1f, 2f) : zoomState.getMaxZoomRatio();
+        camera.getCameraControl().setZoomRatio(option.zoomRatio(minZoomRatio, maxZoomRatio));
+    }
+
+    private void updateZoomButtons() {
+        updateZoomButton(zoomOne, selectedZoomOption == QrScannerZoomOption.ONE_X);
+        updateZoomButton(zoomTwo, selectedZoomOption == QrScannerZoomOption.TWO_X);
+    }
+
+    private void updateZoomButton(Button button, boolean active) {
+        if (button == null) {
+            return;
+        }
+        if (active) {
+            button.setTextColor(Color.rgb(17, 17, 17));
+            button.setBackground(roundedColor(Color.WHITE, dp(20)));
+        } else {
+            button.setTextColor(Color.WHITE);
+            button.setBackground(roundedColor(Color.TRANSPARENT, dp(20)));
+        }
+    }
+
+    private GradientDrawable roundedColor(int color, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        return drawable;
     }
 }
