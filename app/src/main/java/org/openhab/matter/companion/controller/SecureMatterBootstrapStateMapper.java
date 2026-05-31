@@ -17,7 +17,8 @@ public final class SecureMatterBootstrapStateMapper {
                 safeState.bootstrapNodeId(),
                 secretCodec.encode(safeState.controllerState()),
                 safeState.vendorName(),
-                safeState.productName());
+                safeState.productName(),
+                safeState.deviceDetails());
     }
 
     public MatterBootstrapState fromStoredValues(long bootstrapNodeId, String controllerState) {
@@ -29,9 +30,18 @@ public final class SecureMatterBootstrapStateMapper {
             String controllerState,
             String vendorName,
             String productName) {
+        return fromStoredValues(bootstrapNodeId, controllerState, vendorName, productName, MatterDeviceDetails.empty());
+    }
+
+    public MatterBootstrapState fromStoredValues(
+            long bootstrapNodeId,
+            String controllerState,
+            String vendorName,
+            String productName,
+            MatterDeviceDetails deviceDetails) {
         String safeControllerState = controllerState == null ? "" : controllerState;
         if (safeControllerState.isEmpty()) {
-            return new MatterBootstrapState(bootstrapNodeId, "", false, vendorName, productName);
+            return new MatterBootstrapState(bootstrapNodeId, "", false, vendorName, productName, deviceDetails);
         }
 
         try {
@@ -40,7 +50,8 @@ public final class SecureMatterBootstrapStateMapper {
                     secretCodec.decode(safeControllerState),
                     false,
                     vendorName,
-                    productName);
+                    productName,
+                    deviceDetails);
         } catch (GeneralSecurityException e) {
             return new MatterBootstrapState(-1L, "", true);
         }
@@ -51,12 +62,19 @@ public final class SecureMatterBootstrapStateMapper {
         private final String controllerState;
         private final String vendorName;
         private final String productName;
+        private final MatterDeviceDetails deviceDetails;
 
-        StoredBootstrapState(long bootstrapNodeId, String controllerState, String vendorName, String productName) {
+        StoredBootstrapState(
+                long bootstrapNodeId,
+                String controllerState,
+                String vendorName,
+                String productName,
+                MatterDeviceDetails deviceDetails) {
             this.bootstrapNodeId = bootstrapNodeId;
             this.controllerState = controllerState == null ? "" : controllerState;
             this.vendorName = vendorName == null ? "" : vendorName.trim();
             this.productName = productName == null ? "" : productName.trim();
+            this.deviceDetails = deviceDetails == null ? MatterDeviceDetails.empty() : deviceDetails;
         }
 
         public long bootstrapNodeId() {
@@ -73,6 +91,10 @@ public final class SecureMatterBootstrapStateMapper {
 
         public String productName() {
             return productName;
+        }
+
+        public MatterDeviceDetails deviceDetails() {
+            return deviceDetails;
         }
     }
 }

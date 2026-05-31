@@ -43,6 +43,38 @@ public class SharedPreferencesMatterBootstrapStateRepositoryTest {
     }
 
     @Test
+    public void loadIncludesFetchedDeviceDetails() {
+        FakeSharedPreferences preferences = new FakeSharedPreferences();
+        SharedPreferencesMatterBootstrapStateRepository repository = repository(preferences);
+        MatterDeviceDetails details = new MatterDeviceDetails.Builder()
+                .softwareVersionString("1.8.7")
+                .hardwareVersionString("P2.0")
+                .partNumber("PN-1")
+                .batteryPercentRemaining(98)
+                .batteryQuantity(2)
+                .batteryDesignation("AAA")
+                .threadNetworkName("OpenThread")
+                .threadChannel(25)
+                .ipv6Address("fd88:9326:57d6:1:a3b:edad:e81e:1f1e")
+                .otaUpdatePossible(false)
+                .build();
+        repository.save(new MatterBootstrapState(1234L, "opaque-state", false, "Aqara", "U200", details));
+
+        MatterDeviceDetails loaded = repository.load().deviceDetails();
+
+        assertEquals("1.8.7", loaded.softwareVersionString());
+        assertEquals("P2.0", loaded.hardwareVersionString());
+        assertEquals("PN-1", loaded.partNumber());
+        assertEquals(Integer.valueOf(98), loaded.batteryPercentRemaining());
+        assertEquals(Integer.valueOf(2), loaded.batteryQuantity());
+        assertEquals("AAA", loaded.batteryDesignation());
+        assertEquals("OpenThread", loaded.threadNetworkName());
+        assertEquals(Integer.valueOf(25), loaded.threadChannel());
+        assertEquals("fd88:9326:57d6:1:a3b:edad:e81e:1f1e", loaded.ipv6Address());
+        assertEquals(Boolean.FALSE, loaded.otaUpdatePossible());
+    }
+
+    @Test
     public void clearCommitsSynchronously() {
         FakeSharedPreferences preferences = new FakeSharedPreferences();
         SharedPreferencesMatterBootstrapStateRepository repository = repository(preferences);
@@ -54,6 +86,10 @@ public class SharedPreferencesMatterBootstrapStateRepositoryTest {
         assertEquals(0, preferences.applyCount);
         assertEquals(false, preferences.contains("bootstrap_node_id"));
         assertEquals(false, preferences.contains("controller_state"));
+        assertEquals(false, preferences.contains("software_version_string"));
+        assertEquals(false, preferences.contains("battery_percent_remaining"));
+        assertEquals(false, preferences.contains("thread_channel"));
+        assertEquals(false, preferences.contains("ota_update_possible"));
     }
 
     @Test

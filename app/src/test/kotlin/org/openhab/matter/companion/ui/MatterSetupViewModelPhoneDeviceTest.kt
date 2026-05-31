@@ -192,6 +192,46 @@ class MatterSetupViewModelPhoneDeviceTest {
     }
 
     @Test
+    fun fetchPhoneDeviceDetailsPersistsNativeDetailsForLaterNavigation() {
+        val nativeController = RecordingNativeController(
+            details = MatterDeviceDetails.Builder()
+                .softwareVersionString("1.8.7")
+                .hardwareVersionString("P2.0")
+                .batteryPercentRemaining(98)
+                .batteryQuantity(2)
+                .batteryDesignation("AAA")
+                .threadNetworkName("OpenThread")
+                .threadChannel(25)
+                .ipv6Address("fd88:9326:57d6:1:a3b:edad:e81e:1f1e")
+                .build()
+        )
+        val viewModel = viewModelWith(
+            bootstrapState = MatterBootstrapState(
+                0x4D2,
+                "controller-state",
+                false,
+                "Staged vendor",
+                "Staged product"
+            ),
+            nativeController = nativeController
+        )
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDeviceDetails(0x4D2))
+        viewModel.handleAction(MatterSetupAction.FetchPhoneDeviceDetails)
+        waitForFetchToFinish(viewModel)
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDeviceDetails(0x4D2))
+
+        assertEquals("1.8.7", viewModel.uiState.phoneDeviceDetails.firmwareVersion)
+        assertEquals("P2.0", viewModel.uiState.phoneDeviceDetails.hardwareVersion)
+        assertEquals("49% · 2×AAA", viewModel.uiState.phoneDeviceDetails.battery)
+        assertEquals("OpenThread · Channel 25", viewModel.uiState.phoneDeviceDetails.threadNetwork)
+        assertEquals("fd88:9326:57d6:1:a3b:edad:e81e:1f1e", viewModel.uiState.phoneDeviceDetails.ipv6Address)
+    }
+
+    @Test
     fun fetchPhoneDeviceDetailsReportsFailureWhenNativeDetailsAreEmpty() {
         val nativeController = RecordingNativeController(details = MatterDeviceDetails.empty())
         val viewModel = viewModelWith(

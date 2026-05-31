@@ -1,13 +1,15 @@
 package org.openhab.matter.companion.setup
 
 import org.openhab.matter.companion.controller.MatterBootstrapState
+import org.openhab.matter.companion.controller.MatterDeviceDetails
 
 data class PhoneMatterDevice(
     val nodeId: Long?,
     val controllerStateStored: Boolean,
     val stateReadable: Boolean,
     val vendorName: String = "",
-    val productName: String = ""
+    val productName: String = "",
+    val fetchedDetails: MatterDeviceDetails = MatterDeviceDetails.empty()
 ) {
     val displayName: String
         get() = listOf(vendorName, productName)
@@ -59,12 +61,17 @@ data class PhoneMatterDevice(
         get() = nodeId != null && stateReadable
 
     fun initialDetails(): PhoneMatterDeviceDetails {
-        return PhoneMatterDeviceDetails(
+        val baseDetails = PhoneMatterDeviceDetails(
             deviceName = displayProductName,
             vendor = displayVendorName,
             product = MatterDeviceDetailFormatter.display(productName),
             nodeId = displayNodeId
         )
+        return if (fetchedDetails.isEmpty) {
+            baseDetails
+        } else {
+            baseDetails.merge(phoneMatterDeviceDetailsFromControllerDetails(fetchedDetails, this))
+        }
     }
 
     companion object {
@@ -79,8 +86,49 @@ data class PhoneMatterDevice(
                 controllerStateStored = hasControllerState,
                 stateReadable = !state.stateUnreadable(),
                 vendorName = state.vendorName(),
-                productName = state.productName()
+                productName = state.productName(),
+                fetchedDetails = state.deviceDetails()
             )
         }
     }
+}
+
+internal fun phoneMatterDeviceDetailsFromControllerDetails(
+    details: MatterDeviceDetails,
+    device: PhoneMatterDevice
+): PhoneMatterDeviceDetails {
+    val product = details.productName().ifBlank { device.productName.trim() }
+    val vendor = details.vendorName().ifBlank { device.vendorName.trim() }
+    return PhoneMatterDeviceDetails(
+        deviceName = product.takeIf { it.isNotBlank() }?.let {
+            MatterDeviceDetailFormatter.display(it, MatterDeviceDetailFormatter.UNKNOWN_PRODUCT)
+        }.orEmpty(),
+        vendor = vendor.takeIf { it.isNotBlank() }?.let {
+            MatterDeviceDetailFormatter.display(it, MatterDeviceDetailFormatter.UNKNOWN_VENDOR)
+        }.orEmpty(),
+        product = product.takeIf { it.isNotBlank() }?.let(MatterDeviceDetailFormatter::display).orEmpty(),
+        firmwareVersion = details.softwareVersionString(),
+        hardwareVersion = details.hardwareVersionString(),
+        partNumber = details.partNumber(),
+        nodeId = device.displayNodeId,
+        battery = if (details.batteryPercentRemaining() != null) {
+            MatterDeviceDetailFormatter.battery(
+                details.batteryPercentRemaining(),
+                details.batteryQuantity(),
+                details.batteryDesignation()
+            )
+        } else {
+            ""
+        },
+        threadNetwork = if (details.threadNetworkName().isNotBlank() || details.threadChannel() != null) {
+            MatterDeviceDetailFormatter.threadNetwork(
+                details.threadNetworkName(),
+                details.threadChannel()
+            )
+        } else {
+            ""
+        },
+        ipv6Address = details.ipv6Address(),
+        otaUpdate = details.otaUpdatePossible()?.let(MatterDeviceDetailFormatter::otaUpdate).orEmpty()
+    )
 }

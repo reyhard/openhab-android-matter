@@ -51,6 +51,7 @@ import org.openhab.matter.companion.setup.PhoneMatterDeviceDetails
 import org.openhab.matter.companion.setup.ThreadDatasetSettingsStatus
 import org.openhab.matter.companion.setup.ThreadDatasetSettingsValidator
 import org.openhab.matter.companion.setup.WorkflowExecutionGate
+import org.openhab.matter.companion.setup.phoneMatterDeviceDetailsFromControllerDetails
 import org.openhab.matter.companion.setup.sanitizeLogUrls
 import org.openhab.matter.companion.setup.toLogSafeUrl
 
@@ -133,40 +134,27 @@ internal fun phoneDeviceDetailsFromControllerDetails(
     details: MatterDeviceDetails,
     device: PhoneMatterDevice
 ): PhoneMatterDeviceDetails {
-    val product = details.productName().ifBlank { device.productName.trim() }
-    val vendor = details.vendorName().ifBlank { device.vendorName.trim() }
-    return PhoneMatterDeviceDetails(
-        deviceName = product.takeIf { it.isNotBlank() }?.let {
-            MatterDeviceDetailFormatter.display(it, MatterDeviceDetailFormatter.UNKNOWN_PRODUCT)
-        }.orEmpty(),
-        vendor = vendor.takeIf { it.isNotBlank() }?.let {
-            MatterDeviceDetailFormatter.display(it, MatterDeviceDetailFormatter.UNKNOWN_VENDOR)
-        }.orEmpty(),
-        product = product.takeIf { it.isNotBlank() }?.let(MatterDeviceDetailFormatter::display).orEmpty(),
-        firmwareVersion = details.softwareVersionString(),
-        hardwareVersion = details.hardwareVersionString(),
-        partNumber = details.partNumber(),
-        nodeId = device.displayNodeId,
-        battery = if (details.batteryPercentRemaining() != null) {
-            MatterDeviceDetailFormatter.battery(
-                details.batteryPercentRemaining(),
-                details.batteryQuantity(),
-                details.batteryDesignation()
-            )
-        } else {
-            ""
-        },
-        threadNetwork = if (details.threadNetworkName().isNotBlank() || details.threadChannel() != null) {
-            MatterDeviceDetailFormatter.threadNetwork(
-                details.threadNetworkName(),
-                details.threadChannel()
-            )
-        } else {
-            ""
-        },
-        ipv6Address = details.ipv6Address(),
-        otaUpdate = details.otaUpdatePossible()?.let(MatterDeviceDetailFormatter::otaUpdate).orEmpty()
-    )
+    return phoneMatterDeviceDetailsFromControllerDetails(details, device)
+}
+
+internal fun mergeMatterDeviceDetails(
+    existing: MatterDeviceDetails,
+    update: MatterDeviceDetails
+): MatterDeviceDetails {
+    return MatterDeviceDetails.Builder()
+        .vendorName(update.vendorName().ifBlank { existing.vendorName() })
+        .productName(update.productName().ifBlank { existing.productName() })
+        .softwareVersionString(update.softwareVersionString().ifBlank { existing.softwareVersionString() })
+        .hardwareVersionString(update.hardwareVersionString().ifBlank { existing.hardwareVersionString() })
+        .partNumber(update.partNumber().ifBlank { existing.partNumber() })
+        .batteryPercentRemaining(update.batteryPercentRemaining() ?: existing.batteryPercentRemaining())
+        .batteryQuantity(update.batteryQuantity() ?: existing.batteryQuantity())
+        .batteryDesignation(update.batteryDesignation().ifBlank { existing.batteryDesignation() })
+        .threadNetworkName(update.threadNetworkName().ifBlank { existing.threadNetworkName() })
+        .threadChannel(update.threadChannel() ?: existing.threadChannel())
+        .ipv6Address(update.ipv6Address().ifBlank { existing.ipv6Address() })
+        .otaUpdatePossible(update.otaUpdatePossible() ?: existing.otaUpdatePossible())
+        .build()
 }
 
 internal fun phoneDeviceDetailsFetchStarted(state: MatterSetupUiState): MatterSetupUiState {
@@ -907,6 +895,7 @@ class MatterSetupViewModel @JvmOverloads constructor(
                     throw IllegalStateException("No Matter device details were returned.")
                 }
                 val update = phoneDeviceDetailsFromControllerDetails(details, device)
+                persistFetchedPhoneDeviceDetails(requestNodeId, details)
                 postState {
                     if (isCurrentPhoneDeviceDetailsRequest(uiState, selectedPhoneDevice, requestNodeId)) {
                         uiState = phoneDeviceDetailsFetchSucceeded(uiState, update)
@@ -924,6 +913,31 @@ class MatterSetupViewModel @JvmOverloads constructor(
             }
         }, "matter-device-details-fetch")
         workerThread?.start()
+    }
+
+    private fun persistFetchedPhoneDeviceDetails(requestNodeId: Long, details: MatterDeviceDetails) {
+        val currentState = bootstrapStateRepository.load()
+        if (currentState.stateUnreadable() || currentState.bootstrapNodeId() != requestNodeId) {
+            Log.w(
+                TAG,
+                "Phone device details persistence skipped: " +
+                    "stateUnreadable=${currentState.stateUnreadable()}, " +
+                    "storedNode=${MatterDeviceDetailFormatter.nodeId(currentState.bootstrapNodeId())}, " +
+                    "requestedNode=${MatterDeviceDetailFormatter.nodeId(requestNodeId)}"
+            )
+            return
+        }
+        val mergedDetails = mergeMatterDeviceDetails(currentState.deviceDetails(), details)
+        bootstrapStateRepository.save(
+            MatterBootstrapState(
+                currentState.bootstrapNodeId(),
+                currentState.controllerState(),
+                false,
+                mergedDetails.vendorName().ifBlank { currentState.vendorName() },
+                mergedDetails.productName().ifBlank { currentState.productName() },
+                mergedDetails
+            )
+        )
     }
 
     private fun acknowledgePhoneDeviceDetailsMessage() {
