@@ -27,6 +27,20 @@ public class HttpOpenHabInboxClientTest {
     }
 
     @Test
+    public void extractsMatterInboxEntryIdsFromSuccessfulResponse() throws Exception {
+        OneShotHttpServer server = new OneShotHttpServer(200,
+                "[{\"thingUID\":\"matter:node:controller:old\"},{\"thingUID\":\"zwave:device:1\"},"
+                        + "{\"bindingId\":\"matter\",\"thingUID\":\"matter:node:controller:new\"}]");
+        server.start();
+
+        OpenHabInboxStatus status = new HttpOpenHabInboxClient().checkInbox(server.baseUrl());
+
+        assertTrue(status.matterEntryIds().contains("matter:node:controller:old"));
+        assertTrue(status.matterEntryIds().contains("matter:node:controller:new"));
+        assertFalse(status.matterEntryIds().contains("zwave:device:1"));
+    }
+
+    @Test
     public void treatsRedirectAsUnreachable() throws Exception {
         OneShotHttpServer server = new OneShotHttpServer(302, "");
         server.start();

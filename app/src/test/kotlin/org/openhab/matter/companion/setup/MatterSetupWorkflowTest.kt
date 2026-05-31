@@ -43,6 +43,27 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
+    fun automatedFlowIgnoresMatterInboxEntriesThatExistedBeforeOpenHabScan() {
+        val staleEntryId = "matter:node:controller:old"
+        val ports = FakeMatterSetupPorts().apply {
+            baselineMatterEntryIds = setOf(staleEntryId)
+            inboxMatterEntryIds = setOf(staleEntryId)
+            inboxMatterEntryDetected = true
+            inboxDetails = "Only stale Matter Inbox entry detected"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        assertTrue(ports.baselineInboxCalled)
+        assertEquals(setOf(staleEntryId), ports.waitForInboxBaselineMatterEntryIds)
+        assertEquals(MatterSetupStage.Failed, states.last().stage)
+        assertEquals(MatterSetupStage.WatchingOpenHabInbox, states.last().failure?.step)
+        assertEquals("openHAB did not report the device yet", states.last().failure?.message)
+    }
+
+    @Test
     fun openPairingWindowStatesIncludeCommissionedDeviceIdentity() {
         val ports = FakeMatterSetupPorts().apply {
             vendorName = "Aqara"
@@ -621,6 +642,7 @@ class MatterSetupWorkflowTest {
         var openWindowCalled = false
         var scanCalled = false
         var inboxCalled = false
+        var baselineInboxCalled = false
         var scanStarted = true
         var scanDetails = "scan accepted"
         var scanTimeoutSeconds = 120
@@ -630,6 +652,7 @@ class MatterSetupWorkflowTest {
         var openWindowControllerState: String? = null
         var scanManualCode: String? = null
         var waitForInboxTimeoutSeconds: Int? = null
+        var waitForInboxBaselineMatterEntryIds: Set<String> = emptySet()
         var diagnosticsCalled = false
         var diagnosticsFailure: MatterSetupFailure? = null
         var diagnosticsContext: MatterSetupDiagnosticsContext? = null
@@ -651,6 +674,8 @@ class MatterSetupWorkflowTest {
         var readinessWarnings = emptyList<String>()
         var inboxMatterEntryDetected = true
         var inboxDetails = "Matter Inbox entry detected"
+        var baselineMatterEntryIds = emptySet<String>()
+        var inboxMatterEntryIds = setOf("matter:node:controller:device")
         var commissionProgressMessages = emptyList<String>()
 
         override fun loadConfig(): MatterSetupConfig {
@@ -723,9 +748,37 @@ class MatterSetupWorkflowTest {
             config: MatterSetupConfig,
             timeoutSeconds: Int
         ): MatterSetupPorts.InboxResult {
+            return waitForOpenHabInbox(config, timeoutSeconds, emptySet())
+        }
+
+        override fun waitForOpenHabInbox(
+            config: MatterSetupConfig,
+            timeoutSeconds: Int,
+            baselineMatterEntryIds: Set<String>
+        ): MatterSetupPorts.InboxResult {
             inboxCalled = true
             waitForInboxTimeoutSeconds = timeoutSeconds
-            return MatterSetupPorts.InboxResult(matterEntryDetected = inboxMatterEntryDetected, details = inboxDetails)
+            waitForInboxBaselineMatterEntryIds = baselineMatterEntryIds
+            val newEntryIds = inboxMatterEntryIds - baselineMatterEntryIds
+            val detected = if (baselineMatterEntryIds.isEmpty()) {
+                inboxMatterEntryDetected
+            } else {
+                newEntryIds.isNotEmpty()
+            }
+            return MatterSetupPorts.InboxResult(
+                matterEntryDetected = detected,
+                details = inboxDetails,
+                matterEntryIds = inboxMatterEntryIds
+            )
+        }
+
+        override fun readOpenHabInbox(config: MatterSetupConfig): MatterSetupPorts.InboxResult {
+            baselineInboxCalled = true
+            return MatterSetupPorts.InboxResult(
+                matterEntryDetected = baselineMatterEntryIds.isNotEmpty(),
+                details = "Baseline Matter Inbox entries",
+                matterEntryIds = baselineMatterEntryIds
+            )
         }
 
         override fun runDiagnostics(

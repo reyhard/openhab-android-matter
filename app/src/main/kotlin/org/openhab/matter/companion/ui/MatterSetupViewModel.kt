@@ -1003,6 +1003,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
                 activeStage = MatterSetupStage.SendingCodeToOpenHab
                 emitState(MatterSetupUiState.progress(activeStage, window.timeoutSeconds, deviceIdentity = windowIdentity))
+                val baselineInbox = ports.readOpenHabInbox(workflowConfig)
                 val scan = ports.sendCodeToOpenHab(window.manualCode, workflowConfig)
                 if (!scan.started) {
                     emitWorkflowFailure(
@@ -1017,7 +1018,11 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
 
                 activeStage = MatterSetupStage.WatchingOpenHabInbox
                 emitState(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds))
-                val inbox = ports.waitForOpenHabInbox(workflowConfig, scan.timeoutSeconds)
+                val inbox = ports.waitForOpenHabInbox(
+                    workflowConfig,
+                    scan.timeoutSeconds,
+                    baselineInbox.matterEntryIds
+                )
                 if (!inbox.matterEntryDetected) {
                     emitWorkflowFailure(
                         activeStage,
@@ -1189,13 +1194,21 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             discoveryScan = { baseUrl, manualCode, apiToken ->
                 openHabMatterDiscoveryClient.startMatterScan(baseUrl, manualCode, apiToken)
             },
-            inboxWaiter = ::waitForOpenHabInbox,
+            inboxWaiter = { baseUrl, apiToken, timeoutSeconds ->
+                waitForOpenHabInbox(baseUrl, apiToken, timeoutSeconds)
+            },
             diagnosticsRunner = ::runBasicDiagnostics,
             readinessDiagnostics = {
                 listOf(readinessProbe.bluetoothDiagnostic(), readinessProbe.locationServicesDiagnostic()) +
                     readinessProbe.permissionDiagnostics()
             },
-            networkTransportSummary = readinessProbe::networkTransportSummary
+            networkTransportSummary = readinessProbe::networkTransportSummary,
+            inboxReader = { baseUrl, apiToken ->
+                readOpenHabInbox(baseUrl, apiToken)
+            },
+            baselineAwareInboxWaiter = { baseUrl, apiToken, timeoutSeconds, baselineMatterEntryIds ->
+                waitForOpenHabInbox(baseUrl, apiToken, timeoutSeconds, baselineMatterEntryIds)
+            }
         )
     }
 
@@ -1215,17 +1228,20 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private fun waitForOpenHabInbox(
         baseUrl: String,
         apiToken: String,
-        timeoutSeconds: Int
+        timeoutSeconds: Int,
+        baselineMatterEntryIds: Set<String> = emptySet()
     ): MatterSetupPorts.InboxResult {
         val deadlineMillis = System.currentTimeMillis() + (timeoutSeconds.coerceAtLeast(30) * 1000L)
         var last = OpenHabInboxStatus(false, false, "openHAB Inbox was not checked", "")
+        var detected = false
         do {
             last = runCatching {
                 openHabInboxClient.checkInbox(baseUrl, apiToken)
             }.getOrElse { error ->
                 OpenHabInboxStatus(false, false, "openHAB Inbox check failed", error.message.orEmpty())
             }
-            if (last.matterEntryDetected()) {
+            detected = matterEntryDetectedAfterBaseline(last, baselineMatterEntryIds)
+            if (detected) {
                 break
             }
             val remainingMillis = deadlineMillis - System.currentTimeMillis()
@@ -1243,7 +1259,39 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         val details = listOf(last.message().orEmpty(), last.details().orEmpty())
             .filter { it.isNotBlank() }
             .joinToString(": ")
-        return MatterSetupPorts.InboxResult(last.matterEntryDetected(), details)
+        val baselineDetails = if (!detected && baselineMatterEntryIds.isNotEmpty() && last.matterEntryDetected()) {
+            listOf(details, "Only pre-existing Matter Inbox entries were detected.")
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+        } else {
+            details
+        }
+        return MatterSetupPorts.InboxResult(detected, baselineDetails, last.matterEntryIds())
+    }
+
+    private fun readOpenHabInbox(
+        baseUrl: String,
+        apiToken: String
+    ): MatterSetupPorts.InboxResult {
+        val status = runCatching {
+            openHabInboxClient.checkInbox(baseUrl, apiToken)
+        }.getOrElse { error ->
+            OpenHabInboxStatus(false, false, "openHAB Inbox check failed", error.message.orEmpty())
+        }
+        val details = listOf(status.message().orEmpty(), status.details().orEmpty())
+            .filter { it.isNotBlank() }
+            .joinToString(": ")
+        return MatterSetupPorts.InboxResult(status.matterEntryDetected(), details, status.matterEntryIds())
+    }
+
+    private fun matterEntryDetectedAfterBaseline(
+        status: OpenHabInboxStatus,
+        baselineMatterEntryIds: Set<String>
+    ): Boolean {
+        if (baselineMatterEntryIds.isEmpty()) {
+            return status.matterEntryDetected()
+        }
+        return (status.matterEntryIds() - baselineMatterEntryIds).isNotEmpty()
     }
 
     private fun runBasicDiagnostics(

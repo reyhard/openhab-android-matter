@@ -70,6 +70,7 @@ class MatterSetupWorkflow(
 
             activeStage = MatterSetupStage.SendingCodeToOpenHab
             emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds, deviceIdentity = windowIdentity))
+            val baselineInbox = ports.readOpenHabInbox(config)
             val scan = ports.sendCodeToOpenHab(window.manualCode, config)
             if (!scan.started) {
                 fail(
@@ -84,7 +85,7 @@ class MatterSetupWorkflow(
 
             activeStage = MatterSetupStage.WatchingOpenHabInbox
             emit(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds))
-            val inbox = ports.waitForOpenHabInbox(config, scan.timeoutSeconds)
+            val inbox = ports.waitForOpenHabInbox(config, scan.timeoutSeconds, baselineInbox.matterEntryIds)
             if (!inbox.matterEntryDetected) {
                 fail(
                     activeStage,

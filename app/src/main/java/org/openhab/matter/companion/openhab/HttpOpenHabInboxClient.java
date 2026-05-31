@@ -7,10 +7,16 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
     private static final int TIMEOUT_MILLIS = 3000;
     private static final int MAX_RESPONSE_BYTES = 16 * 1024;
+    private static final Pattern THING_UID_PATTERN = Pattern.compile(
+            "\"thingUID\"\\s*:\\s*\"([^\"]+)\"");
 
     @Override
     public OpenHabInboxStatus checkInbox(String baseUrl) {
@@ -35,9 +41,11 @@ public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
             int responseCode = connection.getResponseCode();
             if (responseCode >= 200 && responseCode < 300) {
                 String responseText = readBoundedResponse(connection.getInputStream());
-                boolean detected = containsMatterEntry(responseText);
+                Set<String> matterEntryIds = extractMatterEntryIds(responseText);
+                boolean detected = !matterEntryIds.isEmpty() || containsMatterEntry(responseText);
                 String message = detected ? "Matter Inbox entry detected" : "No Matter Inbox entry detected";
-                return new OpenHabInboxStatus(true, detected, message, "HTTP " + responseCode + " from " + url);
+                return new OpenHabInboxStatus(true, detected, message, "HTTP " + responseCode + " from " + url,
+                        matterEntryIds);
             }
             return unreachable("openHAB Inbox is not reachable", "HTTP " + responseCode + " from " + url);
         } catch (MalformedURLException e) {
@@ -67,6 +75,21 @@ public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
 
     private static boolean containsMatterEntry(String responseText) {
         return responseText.contains("matter:") || responseText.contains("\"bindingId\":\"matter\"");
+    }
+
+    private static Set<String> extractMatterEntryIds(String responseText) {
+        Set<String> ids = new LinkedHashSet<>();
+        Matcher matcher = THING_UID_PATTERN.matcher(responseText);
+        while (matcher.find()) {
+            String thingUid = matcher.group(1);
+            if (thingUid != null && thingUid.startsWith("matter:")) {
+                ids.add(thingUid);
+            }
+        }
+        if (ids.isEmpty() && containsMatterEntry(responseText)) {
+            ids.add("response:" + Integer.toHexString(responseText.hashCode()));
+        }
+        return ids;
     }
 
     private static String readBoundedResponse(InputStream stream) throws IOException {

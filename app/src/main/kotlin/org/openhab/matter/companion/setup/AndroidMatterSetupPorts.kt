@@ -13,7 +13,32 @@ class AndroidMatterSetupPorts(
     private val inboxWaiter: (String, String, Int) -> MatterSetupPorts.InboxResult,
     private val diagnosticsRunner: (MatterSetupFailure, MatterSetupDiagnosticsContext) -> MatterSetupDiagnosticsSummary,
     private val readinessDiagnostics: () -> List<ReadinessDiagnostic> = { emptyList() },
-    private val networkTransportSummary: () -> NetworkTransportSummary? = { null }
+    private val networkTransportSummary: () -> NetworkTransportSummary? = { null },
+    private val inboxReader: (String, String) -> MatterSetupPorts.InboxResult = { baseUrl, apiToken ->
+        inboxWaiter(baseUrl, apiToken, 1)
+    },
+    private val baselineAwareInboxWaiter: (String, String, Int, Set<String>) -> MatterSetupPorts.InboxResult = {
+            baseUrl,
+            apiToken,
+            timeoutSeconds,
+            baselineMatterEntryIds ->
+        val result = inboxWaiter(baseUrl, apiToken, timeoutSeconds)
+        if (baselineMatterEntryIds.isEmpty()) {
+            result
+        } else {
+            val newEntryIds = result.matterEntryIds - baselineMatterEntryIds
+            result.copy(
+                matterEntryDetected = newEntryIds.isNotEmpty(),
+                details = if (newEntryIds.isNotEmpty()) {
+                    result.details
+                } else {
+                    listOf(result.details, "Only pre-existing Matter Inbox entries were detected.")
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                }
+            )
+        }
+    }
 ) : MatterSetupPorts {
     interface MatterRunner {
         fun commissionToPhone(
@@ -104,6 +129,23 @@ class AndroidMatterSetupPorts(
         timeoutSeconds: Int
     ): MatterSetupPorts.InboxResult {
         return inboxWaiter(config.openHabBaseUrl, config.openHabApiToken, timeoutSeconds)
+    }
+
+    override fun readOpenHabInbox(config: MatterSetupConfig): MatterSetupPorts.InboxResult {
+        return inboxReader(config.openHabBaseUrl, config.openHabApiToken)
+    }
+
+    override fun waitForOpenHabInbox(
+        config: MatterSetupConfig,
+        timeoutSeconds: Int,
+        baselineMatterEntryIds: Set<String>
+    ): MatterSetupPorts.InboxResult {
+        return baselineAwareInboxWaiter(
+            config.openHabBaseUrl,
+            config.openHabApiToken,
+            timeoutSeconds,
+            baselineMatterEntryIds
+        )
     }
 
     override fun runDiagnostics(
