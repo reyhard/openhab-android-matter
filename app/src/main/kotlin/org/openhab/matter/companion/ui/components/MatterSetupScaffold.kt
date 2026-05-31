@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -120,7 +121,10 @@ private fun MatterSetupTopRow(
         ) {
             if (showBack) {
                 IconButton(onClick = onBack) {
-                    Text("←")
+                    Icon(
+                        painter = painterResource(R.drawable.ic_material_arrow_back),
+                        contentDescription = "Back"
+                    )
                 }
             }
         }
@@ -137,7 +141,10 @@ private fun MatterSetupTopRow(
         ) {
             if (showSettings) {
                 IconButton(onClick = onSettings) {
-                    Text("⚙")
+                    Icon(
+                        painter = painterResource(R.drawable.ic_material_settings),
+                        contentDescription = "Settings"
+                    )
                 }
             }
         }

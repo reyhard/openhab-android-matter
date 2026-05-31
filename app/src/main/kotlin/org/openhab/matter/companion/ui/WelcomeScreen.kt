@@ -1,21 +1,29 @@
 package org.openhab.matter.companion.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,12 +54,26 @@ fun WelcomeScreen(
         Spacer(Modifier.height(24.dp))
         BenefitCard(
             title = "Easy and guided",
-            message = "Step-by-step pairing keeps each setup stage clear."
+            message = "Clear steps to get you set up quickly.",
+            iconRes = R.drawable.ic_welcome_easy,
+            iconTint = Color(0xFFEF7B18),
+            iconBackground = Color(0xFFFFF3E7)
         )
         Spacer(Modifier.height(12.dp))
         BenefitCard(
             title = "Private and local",
-            message = "Device handoff stays focused on your phone and openHAB home."
+            message = "Your devices stay in your home.",
+            iconRes = R.drawable.ic_welcome_private,
+            iconTint = Color(0xFF1F8B46),
+            iconBackground = Color(0xFFEAF6EE)
+        )
+        Spacer(Modifier.height(12.dp))
+        BenefitCard(
+            title = "One home, everything together",
+            message = "Matter devices work beautifully with openHAB.",
+            iconRes = R.drawable.ic_welcome_home,
+            iconTint = Color(0xFF5B56B3),
+            iconBackground = Color(0xFFF0EEFF)
         )
         Spacer(Modifier.height(24.dp))
         Button(
@@ -66,7 +88,10 @@ fun WelcomeScreen(
 @Composable
 private fun BenefitCard(
     title: String,
-    message: String
+    message: String,
+    iconRes: Int,
+    iconTint: Color,
+    iconBackground: Color
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -75,22 +100,42 @@ private fun BenefitCard(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
         )
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(iconBackground),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = title,
+                    tint = iconTint,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
