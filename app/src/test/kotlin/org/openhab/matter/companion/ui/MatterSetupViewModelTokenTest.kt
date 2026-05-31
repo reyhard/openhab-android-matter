@@ -50,4 +50,54 @@ class MatterSetupViewModelTokenTest {
         assertEquals("persisted.token", result.openHabApiToken())
         assertEquals(true, result.openHabApiTokenUnreadable())
     }
+
+    @Test
+    fun openHabConnectionSavePreservesPersistedTokenWhenEditableTokenIsBlank() {
+        val existingConfig = AppConfig(
+            "hex:old",
+            "MT:old",
+            "http://old-openhab:8080",
+            "persisted.token",
+            "fd00::1",
+            false,
+            false,
+            true,
+            false
+        )
+
+        val result = openHabConnectionConfigForSave(
+            existingConfig = existingConfig,
+            openHabBaseUrl = "http://new-openhab:8080",
+            editableToken = "   "
+        )
+
+        assertEquals("http://new-openhab:8080", result.openHabBaseUrl())
+        assertEquals("persisted.token", result.openHabApiToken())
+        assertEquals(true, result.openHabApiTokenUnreadable())
+    }
+
+    @Test
+    fun openHabConnectionSaveStoresEditedTokenAndClearsUnreadableState() {
+        val existingConfig = AppConfig(
+            "hex:old",
+            "MT:old",
+            "http://old-openhab:8080",
+            "persisted.token",
+            "fd00::1",
+            false,
+            false,
+            true,
+            false
+        )
+
+        val result = openHabConnectionConfigForSave(
+            existingConfig = existingConfig,
+            openHabBaseUrl = "http://new-openhab:8080",
+            editableToken = "  edited.token  "
+        )
+
+        assertEquals("http://new-openhab:8080", result.openHabBaseUrl())
+        assertEquals("edited.token", result.openHabApiToken())
+        assertEquals(false, result.openHabApiTokenUnreadable())
+    }
 }

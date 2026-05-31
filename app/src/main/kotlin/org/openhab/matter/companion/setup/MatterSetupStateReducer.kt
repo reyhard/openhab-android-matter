@@ -31,27 +31,21 @@ object MatterSetupStateReducer {
     }
 
     fun changeToken(): MatterSetupUiState {
-        return MatterSetupUiState(
-            stage = MatterSetupStage.ChangeToken,
-            title = "Change token",
-            message = "Enter a new openHAB access token and test it before saving.",
-            primaryAction = MatterSetupAction.SaveChangedToken,
-            primaryActionLabel = "Save token"
-        )
+        return openHabAddressEditor()
     }
 
     fun openHabAddressEditor(): MatterSetupUiState {
         return MatterSetupUiState(
             stage = MatterSetupStage.OpenHabAddressEditor,
-            title = "openHAB address",
-            message = "Address of your openHAB instance.",
+            title = "openHAB connection",
+            message = "Edit the openHAB address and access token, then test them before saving.",
             primaryAction = MatterSetupAction.SaveOpenHabAddress,
-            primaryActionLabel = "Save address"
+            primaryActionLabel = "Save"
         )
     }
 
     fun changeTokenChecking(): MatterSetupUiState {
-        return changeToken().copy(
+        return openHabAddressEditor().copy(
             message = "Checking openHAB access token.",
             primaryActionLabel = "Checking...",
             primaryActionEnabled = false

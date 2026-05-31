@@ -32,6 +32,10 @@ public final class HttpOpenHabClient implements OpenHabClient {
             }
 
             HttpResponse restResponse = get(restUrl, apiToken);
+            if (restResponse.statusCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                return new OpenHabStatus(false, true, false, "openHAB access token was rejected",
+                        "HTTP 401 from " + restUrl);
+            }
             if (!restResponse.success()) {
                 return new OpenHabStatus(false, false, false, "openHAB REST API is not reachable",
                         "HTTP " + restResponse.statusCode + " from " + restUrl);
@@ -49,6 +53,9 @@ public final class HttpOpenHabClient implements OpenHabClient {
             }
             String details = "HTTP " + restResponse.statusCode + " from " + restUrl
                     + "; HTTP " + thingsResponse.statusCode + " from " + thingsUrl;
+            if (thingsResponse.statusCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                return new OpenHabStatus(false, true, false, "openHAB access token was rejected", details);
+            }
             if (!thingsResponse.success()) {
                 return new OpenHabStatus(false, true, false,
                         "openHAB Matter controller readiness could not be verified", details);

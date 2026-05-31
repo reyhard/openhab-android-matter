@@ -9,6 +9,17 @@ import java.util.Locale;
 
 public final class HttpOtbrClient implements OtbrClient {
     private static final int TIMEOUT_MILLIS = 3000;
+    private final AddressResolver addressResolver;
+    private final ReachabilityChecker reachabilityChecker;
+
+    public HttpOtbrClient() {
+        this(InetAddress::getByName, InetAddress::isReachable);
+    }
+
+    HttpOtbrClient(AddressResolver addressResolver, ReachabilityChecker reachabilityChecker) {
+        this.addressResolver = addressResolver;
+        this.reachabilityChecker = reachabilityChecker;
+    }
 
     @Override
     public OtbrStatus checkReadiness(String baseUrl) {
@@ -44,7 +55,7 @@ public final class HttpOtbrClient implements OtbrClient {
         }
     }
 
-    private static OtbrStatus checkAddressReachability(String target) {
+    private OtbrStatus checkAddressReachability(String target) {
         String address = normalizeAddress(target);
         if (address.isEmpty()) {
             return new OtbrStatus(false, "OTBR address is invalid", "OTBR address is required");
@@ -58,9 +69,16 @@ public final class HttpOtbrClient implements OtbrClient {
             }
         }
         try {
-            String resolvableAddress = stripEndpointPort(stripIpv6Zone(stripIpv6Brackets(address)));
-            InetAddress inetAddress = InetAddress.getByName(resolvableAddress);
-            return new OtbrStatus(true, "OTBR address is accepted",
+            String unbracketedAddress = stripIpv6Brackets(address);
+            String resolvableAddress = stripEndpointPort(stripIpv6Zone(unbracketedAddress));
+            InetAddress inetAddress = addressResolver.resolve(resolvableAddress);
+            if (isIpLiteral(unbracketedAddress) && !reachabilityChecker.isReachable(inetAddress, TIMEOUT_MILLIS)) {
+                return new OtbrStatus(false, "OTBR address is not reachable",
+                        "Address " + address + " resolves to " + inetAddress.getHostAddress()
+                                + " but did not respond before timeout.");
+            }
+            String message = isIpLiteral(unbracketedAddress) ? "OTBR address is reachable" : "OTBR address is accepted";
+            return new OtbrStatus(true, message,
                     "Address " + address + " resolves to " + inetAddress.getHostAddress()
                             + ". No HTTP service is required for a pure OpenThread Border Router.");
         } catch (IOException e) {
@@ -107,6 +125,14 @@ public final class HttpOtbrClient implements OtbrClient {
             value = value.substring(0, zoneIndex);
         }
         return value.matches("[0-9A-Fa-f:.]+");
+    }
+
+    private static boolean isIpLiteral(String target) {
+        String value = stripIpv6Zone(stripIpv6Brackets(target));
+        if (looksLikeIpv6Address(value)) {
+            return true;
+        }
+        return value != null && value.matches("\\d{1,3}(?:\\.\\d{1,3}){3}(?::[0-9]+)?");
     }
 
     private static String normalizeAddress(String target) {
@@ -159,5 +185,13 @@ public final class HttpOtbrClient implements OtbrClient {
             normalizedBaseUrl = normalizedBaseUrl.substring(0, normalizedBaseUrl.length() - 1);
         }
         return new URL(normalizedBaseUrl);
+    }
+
+    interface AddressResolver {
+        InetAddress resolve(String target) throws IOException;
+    }
+
+    interface ReachabilityChecker {
+        boolean isReachable(InetAddress address, int timeoutMillis) throws IOException;
     }
 }

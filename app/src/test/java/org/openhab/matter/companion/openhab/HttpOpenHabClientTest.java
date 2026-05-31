@@ -136,6 +136,38 @@ public final class HttpOpenHabClientTest {
     }
 
     @Test
+    public void reportsUnauthorizedRestResponseAsTokenError() throws Exception {
+        RouteHttpServer server = new RouteHttpServer()
+                .route("/rest/", 401, "unauthorized")
+                .route("/rest/things", 200, "[]");
+        server.start(1);
+
+        OpenHabStatus status = new HttpOpenHabClient().checkReadiness(server.baseUrl(), "wrong.token");
+
+        assertFalse(status.online());
+        assertTrue(status.restReachable());
+        assertFalse(status.matterControllerReady());
+        assertEquals("openHAB access token was rejected", status.message());
+        assertTrue(status.details().contains("HTTP 401"));
+    }
+
+    @Test
+    public void reportsUnauthorizedThingsResponseAsTokenError() throws Exception {
+        RouteHttpServer server = new RouteHttpServer()
+                .route("/rest/", 200, "{}")
+                .route("/rest/things", 401, "unauthorized");
+        server.start(2);
+
+        OpenHabStatus status = new HttpOpenHabClient().checkReadiness(server.baseUrl(), "wrong.token");
+
+        assertFalse(status.online());
+        assertTrue(status.restReachable());
+        assertFalse(status.matterControllerReady());
+        assertEquals("openHAB access token was rejected", status.message());
+        assertTrue(status.details().contains("HTTP 401"));
+    }
+
+    @Test
     public void preservesRestReachabilityWhenThingsEndpointCannotBeRead() throws Exception {
         RouteHttpServer server = new RouteHttpServer()
                 .route("/rest/", 200, "{}");
