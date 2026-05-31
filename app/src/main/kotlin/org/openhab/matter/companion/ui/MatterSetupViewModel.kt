@@ -12,6 +12,7 @@ import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository
 import org.openhab.matter.companion.controller.ConnectedHomeIpMatterControllerFactory
 import org.openhab.matter.companion.controller.FakeMatterController
 import org.openhab.matter.companion.controller.MatterBootstrapState
+import org.openhab.matter.companion.controller.MatterBootstrapStateRepository
 import org.openhab.matter.companion.controller.MatterDeviceDetails
 import org.openhab.matter.companion.controller.NativeChipControllerSession
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository
@@ -190,7 +191,12 @@ internal fun phoneDeviceDetailsFetchFailed(state: MatterSetupUiState): MatterSet
     )
 }
 
-class MatterSetupViewModel(application: Application) : AndroidViewModel(application) {
+class MatterSetupViewModel @JvmOverloads constructor(
+    application: Application,
+    private val bootstrapStateRepositoryOverride: MatterBootstrapStateRepository? = null,
+    private val controllerSessionOverride: NativeChipControllerSession? = null,
+    initialize: Boolean = true
+) : AndroidViewModel(application) {
     var uiState by mutableStateOf(MatterSetupUiState.initial(openHabConfigured = false))
         private set
     var openHabUrl by mutableStateOf("")
@@ -232,7 +238,9 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private var selectedPhoneDevice: PhoneMatterDevice? = null
 
     private val configRepository by lazy { SharedPreferencesAppConfigRepository(appContext) }
-    private val bootstrapStateRepository by lazy { SharedPreferencesMatterBootstrapStateRepository(appContext) }
+    private val bootstrapStateRepository by lazy {
+        bootstrapStateRepositoryOverride ?: SharedPreferencesMatterBootstrapStateRepository(appContext)
+    }
     private val openHabClient by lazy { HttpOpenHabClient() }
     private val otbrClient by lazy { HttpOtbrClient() }
     private val openHabMatterDiscoveryClient by lazy { HttpOpenHabMatterDiscoveryClient() }
@@ -244,15 +252,17 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private val threadBorderRouterBrowser by lazy { AndroidThreadBorderRouterBrowser(appContext) }
     private var openHabConfigured = false
     private val controllerSession by lazy {
-        newNativeControllerSession(loadMatterSetupConfig().attestationBypassEnabled)
+        controllerSessionOverride ?: newNativeControllerSession(loadMatterSetupConfig().attestationBypassEnabled)
     }
 
     init {
-        restorePersistedConfig(maskToken = true)
-        refreshScanReadiness()
-        refreshOpenHabConnectionStatus()
-        refreshThreadNetworkStatus()
-        uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
+        if (initialize) {
+            restorePersistedConfig(maskToken = true)
+            refreshScanReadiness()
+            refreshOpenHabConnectionStatus()
+            refreshThreadNetworkStatus()
+            uiState = MatterSetupStateReducer.reset(openHabConfigured, openHabUrl)
+        }
     }
 
     fun onOpenHabUrlChange(value: String) {
@@ -830,6 +840,15 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             uiState = phoneDeviceDetailsFetchFailed(uiState)
             return
         }
+        if (!device.controllerStateStored) {
+            uiState = phoneDeviceDetailsFetchFailed(uiState)
+            return
+        }
+        val controllerState = bootstrapStateRepository.load().controllerState()
+        if (controllerState.isBlank()) {
+            uiState = phoneDeviceDetailsFetchFailed(uiState)
+            return
+        }
         if (!executionGate.tryStart()) {
             return
         }
@@ -842,7 +861,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 val details = selection.controller().readDeviceDetails(
                     nodeId,
-                    bootstrapStateRepository.load().controllerState(),
+                    controllerState,
                     { _ -> }
                 )
                 val update = phoneDeviceDetailsFromControllerDetails(details, device)
