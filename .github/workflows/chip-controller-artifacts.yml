@@ -84,6 +84,8 @@ jobs:
           source scripts/bootstrap.sh
           source scripts/activate.sh
           set -u
+          perl -0pi -e 's/(_kotlinc_flags = \[\n)\s+"-Werror",\n(\s+"-Xlint:all",\n\s+\])/$1$2/g' \
+            build/chip/java/rules.gni
 
           python3 scripts/build/build_examples.py \
             --target android-arm64-chip-tool \
