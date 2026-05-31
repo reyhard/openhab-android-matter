@@ -441,6 +441,10 @@ class MatterSetupViewModel @JvmOverloads constructor(
                 fetchPhoneDeviceDetails()
             }
 
+            MatterSetupAction.AcknowledgePhoneDeviceDetailsMessage -> {
+                acknowledgePhoneDeviceDetailsMessage()
+            }
+
             MatterSetupAction.CheckThreadDataset -> {
                 refreshThreadNetworkStatus()
             }
@@ -890,6 +894,10 @@ class MatterSetupViewModel @JvmOverloads constructor(
             }
         }, "matter-device-details-fetch")
         workerThread?.start()
+    }
+
+    private fun acknowledgePhoneDeviceDetailsMessage() {
+        uiState = uiState.copy(phoneDeviceDetailsMessage = "")
     }
 
     fun refreshScanReadiness() {

@@ -21,6 +21,7 @@ sealed interface MatterSetupAction {
     data object ShowPhoneDevices : MatterSetupAction
     data class ShowPhoneDeviceDetails(val nodeId: Long?) : MatterSetupAction
     data object FetchPhoneDeviceDetails : MatterSetupAction
+    data object AcknowledgePhoneDeviceDetailsMessage : MatterSetupAction
     data object StartScan : MatterSetupAction
     data object OpenBluetoothSettings : MatterSetupAction
     data object OpenLocationSettings : MatterSetupAction

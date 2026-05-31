@@ -109,7 +109,7 @@ private fun BenefitCard(
             ) {
                 Icon(
                     painter = painterResource(iconRes),
-                    contentDescription = title,
+                    contentDescription = null,
                     tint = iconTint,
                     modifier = Modifier.size(28.dp)
                 )

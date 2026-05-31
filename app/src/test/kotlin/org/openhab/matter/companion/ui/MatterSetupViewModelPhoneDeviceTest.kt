@@ -82,6 +82,31 @@ class MatterSetupViewModelPhoneDeviceTest {
     }
 
     @Test
+    fun acknowledgePhoneDeviceDetailsMessageClearsMessageWithoutDroppingDetails() {
+        val viewModel = viewModelWith(
+            bootstrapState = MatterBootstrapState(
+                0x4D2,
+                "",
+                false,
+                "Staged vendor",
+                "Staged product"
+            )
+        )
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDeviceDetails(0x4D2))
+        viewModel.handleAction(MatterSetupAction.FetchPhoneDeviceDetails)
+        drainMainThread()
+        viewModel.handleAction(MatterSetupAction.AcknowledgePhoneDeviceDetailsMessage)
+
+        assertEquals(MatterSetupStage.PhoneDeviceDetails, viewModel.uiState.stage)
+        assertEquals("Staged product", viewModel.uiState.phoneDeviceDetails.deviceName)
+        assertEquals("Staged vendor", viewModel.uiState.phoneDeviceDetails.vendor)
+        assertEquals("0x4D2", viewModel.uiState.phoneDeviceDetails.nodeId)
+        assertEquals("", viewModel.uiState.phoneDeviceDetailsMessage)
+    }
+
+    @Test
     fun fetchPhoneDeviceDetailsFailsClosedWhenBootstrapNodeChangedBeforeFetch() {
         val nativeController = RecordingNativeController(
             details = MatterDeviceDetails.Builder()

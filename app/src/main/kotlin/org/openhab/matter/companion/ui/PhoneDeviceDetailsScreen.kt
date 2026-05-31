@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.openhab.matter.companion.R
 import org.openhab.matter.companion.setup.MatterDeviceDetailFormatter
 import org.openhab.matter.companion.setup.MatterSetupAction
@@ -62,10 +64,15 @@ fun PhoneDeviceDetailsScreen(
     val details = state.phoneDeviceDetails
     var copyFeedback by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
 
     LaunchedEffect(state.phoneDeviceDetailsMessage) {
-        if (state.phoneDeviceDetailsMessage == DEVICE_DATA_FETCH_ERROR_MESSAGE) {
-            snackbarHostState.showSnackbar(state.phoneDeviceDetailsMessage)
+        val message = state.phoneDeviceDetailsMessage
+        if (message == DEVICE_DATA_FETCH_ERROR_MESSAGE) {
+            snackbarScope.launch {
+                snackbarHostState.showSnackbar(message)
+            }
+            onAction(MatterSetupAction.AcknowledgePhoneDeviceDetailsMessage)
         }
     }
 

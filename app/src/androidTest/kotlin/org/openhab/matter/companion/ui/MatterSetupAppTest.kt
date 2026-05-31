@@ -1,5 +1,7 @@
 package org.openhab.matter.companion.ui
 
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -9,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -34,9 +37,9 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Get started").assertIsDisplayed()
         composeRule.onNodeWithText("Easy and guided").assertIsDisplayed()
         composeRule.onNodeWithText("Clear steps to get you set up quickly.").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Easy and guided").assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Easy and guided").assertCountEquals(0)
         composeRule.onNodeWithText("Private and local").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Private and local").assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Private and local").assertCountEquals(0)
         composeRule.onAllNodesWithText("One home, everything together").assertCountEquals(0)
         composeRule.onAllNodesWithContentDescription("One home, everything together").assertCountEquals(0)
     }
@@ -617,6 +620,7 @@ class MatterSetupAppTest {
         composeRule.onNodeWithText("Fetch additional data from device").performClick()
         composeRule.onNodeWithContentDescription("Copy Vendor").performClick()
         composeRule.onNodeWithText("Copied Vendor").assertIsDisplayed()
+        assertEquals("IKEA of Sweden", clipboardText())
         composeRule.onNodeWithText("Open commissioning window").performClick()
         composeRule.onNodeWithText("Forget from this phone").performClick()
 
@@ -632,6 +636,7 @@ class MatterSetupAppTest {
 
     @Test
     fun phoneDeviceDetailsShowsFetchFailureAsSnackbarAndKeepsDetailsVisible() {
+        val actions = mutableListOf<MatterSetupAction>()
         render(
             state = MatterSetupStateReducer.phoneDeviceDetails(
                 PhoneMatterDevice(
@@ -642,13 +647,15 @@ class MatterSetupAppTest {
                     productName = "BILRESA scroll wheel"
                 ),
                 message = "Could not fetch data from device"
-            )
+            ),
+            onAction = actions::add
         )
 
         composeRule.onNodeWithContentDescription("Device details fetch error").assertIsDisplayed()
         composeRule.onNodeWithText("Could not fetch data from device").assertIsDisplayed()
         composeRule.onNodeWithText("IKEA of Sweden").assertIsDisplayed()
         composeRule.onNodeWithText("0x4D2").assertIsDisplayed()
+        assertTrue(actions.contains(MatterSetupAction.AcknowledgePhoneDeviceDetailsMessage))
     }
 
     @Test
@@ -706,5 +713,17 @@ class MatterSetupAppTest {
 
     private fun assertOpenHabLogoAndMatterVisualsCanRender() {
         composeRule.onNodeWithText("Set up Matter with openHAB").assertIsDisplayed()
+    }
+
+    private fun clipboardText(): String {
+        composeRule.waitForIdle()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        return clipboard.primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(context)
+            ?.toString()
+            .orEmpty()
     }
 }
