@@ -1,0 +1,86 @@
+name: Bump App Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version segment to bump"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    name: Bump versionCode and versionName
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump app version
+        shell: bash
+        env:
+          BUMP_KIND: ${{ github.event.inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          FILE="app/build.gradle"
+          CURRENT_CODE="$(awk '/^[[:space:]]*versionCode[[:space:]]+[0-9]+/{print $2; exit}' "$FILE")"
+          CURRENT_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([0-9]+\.[0-9]+\.[0-9]+)".*$/\1/p' "$FILE" | head -n1)"
+
+          if [[ -z "${CURRENT_CODE}" || -z "${CURRENT_NAME}" ]]; then
+            echo "Could not parse versionCode/versionName from ${FILE}" >&2
+            exit 1
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT_NAME}"
+          case "${BUMP_KIND}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+            *)
+              echo "Unsupported bump kind: ${BUMP_KIND}" >&2
+              exit 1
+              ;;
+          esac
+
+          NEW_NAME="${MAJOR}.${MINOR}.${PATCH}"
+          NEW_CODE=$((CURRENT_CODE + 1))
+
+          perl -i -pe "s/^(\s*versionCode\s+)\d+/\${1}${NEW_CODE}/" "$FILE"
+          perl -i -pe "s/^(\s*versionName\s+\")\d+\.\d+\.\d+(\".*)/\${1}${NEW_NAME}\$2/" "$FILE"
+
+          echo "Bumped versionCode: ${CURRENT_CODE} -> ${NEW_CODE}"
+          echo "Bumped versionName: ${CURRENT_NAME} -> ${NEW_NAME}"
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add app/build.gradle
+          git commit -m "ci: bump app version"
+          git push origin HEAD:main
