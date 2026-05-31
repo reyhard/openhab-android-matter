@@ -13,7 +13,6 @@ class MatterSetupIconResourceTest {
             "ic_material_arrow_back",
             "ic_material_settings",
             "ic_welcome_easy",
-            "ic_welcome_home",
             "ic_welcome_private"
         ).forEach { assertVectorDrawable(it) }
     }
@@ -22,7 +21,6 @@ class MatterSetupIconResourceTest {
     fun welcomeAndTopBarUseDrawableIconResources() {
         assertSourceReferences("WelcomeScreen.kt", "R.drawable.ic_welcome_easy")
         assertSourceReferences("WelcomeScreen.kt", "R.drawable.ic_welcome_private")
-        assertSourceReferences("WelcomeScreen.kt", "R.drawable.ic_welcome_home")
         assertSourceReferences("MatterSetupScaffold.kt", "R.drawable.ic_material_arrow_back")
         assertSourceReferences("MatterSetupScaffold.kt", "R.drawable.ic_material_settings")
     }
