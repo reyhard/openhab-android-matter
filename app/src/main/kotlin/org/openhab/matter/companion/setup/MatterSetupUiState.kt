@@ -14,7 +14,10 @@ data class MatterSetupUiState(
     val secondaryActions: List<MatterSetupAction> = emptyList(),
     val failure: MatterSetupFailure? = null,
     val diagnostics: MatterSetupDiagnosticsSummary = MatterSetupDiagnosticsSummary.empty(),
-    val openHabUrlFallback: String = ""
+    val openHabUrlFallback: String = "",
+    val phoneDeviceDetails: PhoneMatterDeviceDetails = PhoneMatterDeviceDetails(),
+    val phoneDeviceDetailsFetching: Boolean = false,
+    val phoneDeviceDetailsMessage: String = ""
 ) {
     companion object {
         fun initial(openHabConfigured: Boolean): MatterSetupUiState {

@@ -13,6 +13,7 @@ object MatterSetupBackNavigation {
             MatterSetupStage.ThreadNetworkEditor -> MatterSetupAction.BackToSettings
 
             MatterSetupStage.PhoneDeviceList -> state.primaryAction ?: MatterSetupAction.BackToSettings
+            MatterSetupStage.PhoneDeviceDetails -> MatterSetupAction.ShowPhoneDevices
 
             MatterSetupStage.AdvancedTroubleshooting -> state.primaryAction
 

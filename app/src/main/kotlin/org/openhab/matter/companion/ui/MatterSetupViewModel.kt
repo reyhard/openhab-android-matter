@@ -323,6 +323,18 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
                 )
             }
 
+            is MatterSetupAction.ShowPhoneDeviceDetails -> {
+                val device = phoneDevices.firstOrNull { it.nodeId == action.nodeId }
+                    ?: phoneDevices.singleOrNull()
+                if (device != null) {
+                    uiState = MatterSetupStateReducer.phoneDeviceDetails(device)
+                }
+            }
+
+            MatterSetupAction.FetchPhoneDeviceDetails -> {
+                uiState = uiState.copy(phoneDeviceDetailsMessage = "")
+            }
+
             MatterSetupAction.CheckThreadDataset -> {
                 refreshThreadNetworkStatus()
             }

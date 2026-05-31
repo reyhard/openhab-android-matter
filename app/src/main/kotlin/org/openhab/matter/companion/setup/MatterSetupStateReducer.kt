@@ -96,6 +96,23 @@ object MatterSetupStateReducer {
         )
     }
 
+    fun phoneDeviceDetails(
+        device: PhoneMatterDevice,
+        fetching: Boolean = false,
+        message: String = ""
+    ): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.PhoneDeviceDetails,
+            title = "Device details",
+            message = "Helpful information for advanced setup and troubleshooting.",
+            phoneDeviceDetails = device.initialDetails(),
+            phoneDeviceDetailsFetching = fetching,
+            phoneDeviceDetailsMessage = message,
+            primaryAction = MatterSetupAction.BackToSettings,
+            primaryActionLabel = "Advanced"
+        )
+    }
+
     fun openHabSetupChecking(): MatterSetupUiState {
         return MatterSetupUiState(
             stage = MatterSetupStage.OpenHabSetupChecking,

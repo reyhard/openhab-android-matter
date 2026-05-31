@@ -152,6 +152,12 @@ fun MatterSetupApp(
                 onAction = onAction
             )
 
+            MatterSetupStage.PhoneDeviceDetails -> PhoneDeviceListScreen(
+                state = state,
+                devices = phoneDevices,
+                onAction = onAction
+            )
+
             MatterSetupStage.AdvancedTroubleshooting -> AdvancedTroubleshootingScreen(
                 state = state,
                 ipv6DiagnosticAddress = ipv6DiagnosticAddress,
