@@ -143,6 +143,7 @@ class MatterSetupStateReducerTest {
 
         assertEquals(MatterSetupStage.PhoneDeviceDetails, state.stage)
         assertEquals("Device details", state.title)
+        assertEquals("U200", state.phoneDeviceDetails.deviceName)
         assertEquals("Aqara", state.phoneDeviceDetails.vendor)
         assertEquals("U200", state.phoneDeviceDetails.product)
         assertEquals("0x4D2", state.phoneDeviceDetails.nodeId)

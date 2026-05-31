@@ -12,6 +12,7 @@ import org.openhab.matter.companion.config.SharedPreferencesAppConfigRepository
 import org.openhab.matter.companion.controller.ConnectedHomeIpMatterControllerFactory
 import org.openhab.matter.companion.controller.FakeMatterController
 import org.openhab.matter.companion.controller.MatterBootstrapState
+import org.openhab.matter.companion.controller.MatterDeviceDetails
 import org.openhab.matter.companion.controller.NativeChipControllerSession
 import org.openhab.matter.companion.controller.SharedPreferencesMatterBootstrapStateRepository
 import org.openhab.matter.companion.diagnostics.AndroidReadinessProbe
@@ -30,6 +31,7 @@ import org.openhab.matter.companion.openhab.OpenHabStatus
 import org.openhab.matter.companion.otbr.HttpOtbrClient
 import org.openhab.matter.companion.setup.AndroidMatterSetupPorts
 import org.openhab.matter.companion.setup.FirstRunSettingsValidator
+import org.openhab.matter.companion.setup.MatterDeviceDetailFormatter
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupConfig
 import org.openhab.matter.companion.setup.MatterSetupConfigCompleteness
@@ -43,6 +45,7 @@ import org.openhab.matter.companion.setup.MatterSetupStateReducer
 import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.setup.MatterSetupWorkflow
 import org.openhab.matter.companion.setup.PhoneMatterDevice
+import org.openhab.matter.companion.setup.PhoneMatterDeviceDetails
 import org.openhab.matter.companion.setup.ThreadDatasetSettingsStatus
 import org.openhab.matter.companion.setup.ThreadDatasetSettingsValidator
 import org.openhab.matter.companion.setup.WorkflowExecutionGate
@@ -106,10 +109,85 @@ internal fun shouldRefreshOpenHabConnectionAfterAction(action: MatterSetupAction
 internal fun resolvePhoneDeviceReturnAction(state: MatterSetupUiState): MatterSetupAction {
     return when (state.stage) {
         MatterSetupStage.AdvancedTroubleshooting,
+        MatterSetupStage.PhoneDeviceList,
         MatterSetupStage.PhoneDeviceDetails -> state.primaryAction ?: MatterSetupAction.BackToSettings
 
         else -> MatterSetupAction.BackToSettings
     }
+}
+
+internal fun resolvePhoneDeviceDetailsSelection(
+    nodeId: Long?,
+    phoneDevices: List<PhoneMatterDevice>
+): PhoneMatterDevice? {
+    return nodeId?.let { requestedNodeId ->
+        phoneDevices.firstOrNull { it.nodeId == requestedNodeId }
+    } ?: phoneDevices.singleOrNull()
+}
+
+internal fun phoneDeviceDetailsFromControllerDetails(
+    details: MatterDeviceDetails,
+    device: PhoneMatterDevice
+): PhoneMatterDeviceDetails {
+    val product = details.productName().ifBlank { device.productName.trim() }
+    val vendor = details.vendorName().ifBlank { device.vendorName.trim() }
+    return PhoneMatterDeviceDetails(
+        deviceName = product.takeIf { it.isNotBlank() }?.let {
+            MatterDeviceDetailFormatter.display(it, MatterDeviceDetailFormatter.UNKNOWN_PRODUCT)
+        }.orEmpty(),
+        vendor = vendor.takeIf { it.isNotBlank() }?.let {
+            MatterDeviceDetailFormatter.display(it, MatterDeviceDetailFormatter.UNKNOWN_VENDOR)
+        }.orEmpty(),
+        product = product.takeIf { it.isNotBlank() }?.let(MatterDeviceDetailFormatter::display).orEmpty(),
+        firmwareVersion = details.softwareVersionString(),
+        hardwareVersion = details.hardwareVersionString(),
+        partNumber = details.partNumber(),
+        nodeId = device.displayNodeId,
+        battery = if (details.batteryPercentRemaining() != null) {
+            MatterDeviceDetailFormatter.battery(
+                details.batteryPercentRemaining(),
+                details.batteryQuantity(),
+                details.batteryDesignation()
+            )
+        } else {
+            ""
+        },
+        threadNetwork = if (details.threadNetworkName().isNotBlank() || details.threadChannel() != null) {
+            MatterDeviceDetailFormatter.threadNetwork(
+                details.threadNetworkName(),
+                details.threadChannel()
+            )
+        } else {
+            ""
+        },
+        ipv6Address = details.ipv6Address(),
+        otaUpdate = details.otaUpdatePossible()?.let(MatterDeviceDetailFormatter::otaUpdate).orEmpty()
+    )
+}
+
+internal fun phoneDeviceDetailsFetchStarted(state: MatterSetupUiState): MatterSetupUiState {
+    return state.copy(
+        phoneDeviceDetailsFetching = true,
+        phoneDeviceDetailsMessage = ""
+    )
+}
+
+internal fun phoneDeviceDetailsFetchSucceeded(
+    state: MatterSetupUiState,
+    update: PhoneMatterDeviceDetails
+): MatterSetupUiState {
+    return state.copy(
+        phoneDeviceDetails = state.phoneDeviceDetails.merge(update),
+        phoneDeviceDetailsFetching = false,
+        phoneDeviceDetailsMessage = "Device data refreshed"
+    )
+}
+
+internal fun phoneDeviceDetailsFetchFailed(state: MatterSetupUiState): MatterSetupUiState {
+    return state.copy(
+        phoneDeviceDetailsFetching = false,
+        phoneDeviceDetailsMessage = "Could not fetch data from device"
+    )
 }
 
 class MatterSetupViewModel(application: Application) : AndroidViewModel(application) {
@@ -151,6 +229,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executionGate = WorkflowExecutionGate()
     private var workerThread: Thread? = null
+    private var selectedPhoneDevice: PhoneMatterDevice? = null
 
     private val configRepository by lazy { SharedPreferencesAppConfigRepository(appContext) }
     private val bootstrapStateRepository by lazy { SharedPreferencesMatterBootstrapStateRepository(appContext) }
@@ -326,14 +405,22 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
             MatterSetupAction.ShowPhoneDevices -> {
                 val returnAction = phoneDeviceReturnAction()
                 refreshPhoneDevices()
+                if (phoneDevices.isEmpty()) {
+                    selectedPhoneDevice = null
+                }
                 uiState = MatterSetupStateReducer.phoneDeviceList(
                     hasDevices = phoneDevices.isNotEmpty(),
                     returnAction = returnAction
                 )
             }
 
-            is MatterSetupAction.ShowPhoneDeviceDetails,
-            MatterSetupAction.FetchPhoneDeviceDetails -> Unit
+            is MatterSetupAction.ShowPhoneDeviceDetails -> {
+                showPhoneDeviceDetails(action.nodeId)
+            }
+
+            MatterSetupAction.FetchPhoneDeviceDetails -> {
+                fetchPhoneDeviceDetails()
+            }
 
             MatterSetupAction.CheckThreadDataset -> {
                 refreshThreadNetworkStatus()
@@ -711,6 +798,66 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         phoneDevices = PhoneMatterDevice.fromBootstrapState(bootstrapStateRepository.load())
             ?.let(::listOf)
             .orEmpty()
+    }
+
+    private fun showPhoneDeviceDetails(nodeId: Long?) {
+        val returnAction = phoneDeviceReturnAction()
+        val device = resolvePhoneDeviceDetailsSelection(nodeId, phoneDevices) ?: run {
+            selectedPhoneDevice = null
+            uiState = MatterSetupStateReducer.phoneDeviceList(
+                hasDevices = phoneDevices.isNotEmpty(),
+                returnAction = returnAction
+            )
+            return
+        }
+        selectedPhoneDevice = device
+        uiState = MatterSetupStateReducer.phoneDeviceDetails(
+            device = device,
+            returnAction = returnAction
+        )
+    }
+
+    private fun fetchPhoneDeviceDetails() {
+        if (uiState.stage != MatterSetupStage.PhoneDeviceDetails) {
+            return
+        }
+        val device = selectedPhoneDevice ?: run {
+            uiState = phoneDeviceDetailsFetchFailed(uiState)
+            return
+        }
+        val nodeId = device.nodeId
+        if (nodeId == null || !device.stateReadable) {
+            uiState = phoneDeviceDetailsFetchFailed(uiState)
+            return
+        }
+        if (!executionGate.tryStart()) {
+            return
+        }
+        uiState = phoneDeviceDetailsFetchStarted(uiState)
+        workerThread = Thread({
+            try {
+                val selection = controllerSession.selectNativeIfReady()
+                if (!selection.nativeSelected()) {
+                    throw IllegalStateException("connectedhomeip is not ready for device metadata.")
+                }
+                val details = selection.controller().readDeviceDetails(
+                    nodeId,
+                    bootstrapStateRepository.load().controllerState(),
+                    { _ -> }
+                )
+                val update = phoneDeviceDetailsFromControllerDetails(details, device)
+                postState {
+                    uiState = phoneDeviceDetailsFetchSucceeded(uiState, update)
+                }
+            } catch (error: Exception) {
+                postState {
+                    uiState = phoneDeviceDetailsFetchFailed(uiState)
+                }
+            } finally {
+                executionGate.finish()
+            }
+        }, "matter-device-details-fetch")
+        workerThread?.start()
     }
 
     fun refreshScanReadiness() {
@@ -1200,6 +1347,7 @@ class MatterSetupViewModel(application: Application) : AndroidViewModel(applicat
         runCatching { bootstrapStateRepository.clear() }
             .onSuccess {
                 refreshPhoneDevices()
+                selectedPhoneDevice = null
                 uiState = MatterSetupStateReducer.phoneDeviceList(
                     hasDevices = false,
                     message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems.",
