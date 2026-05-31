@@ -49,6 +49,16 @@ public final class ConnectedHomeIpReflectionDeviceMetadataReader implements Conn
     }
 
     @Override
+    public MatterDeviceMetadata readVendorAndProduct(Object controller, long nodeId) throws Exception {
+        MatterDeviceDetails.Builder builder = new MatterDeviceDetails.Builder();
+        try (ConnectedHomeIpDevicePointer pointer = devicePointerProvider.acquire(controller, nodeId)) {
+            readBasicVendorAndProduct(pointer.value(), builder);
+        }
+        MatterDeviceDetails details = builder.build();
+        return new MatterDeviceMetadata(details.vendorName(), details.productName());
+    }
+
+    @Override
     public MatterDeviceDetails readDeviceDetails(Object controller, long nodeId) throws Exception {
         MatterDeviceDetails.Builder builder = new MatterDeviceDetails.Builder();
         try (ConnectedHomeIpDevicePointer pointer = devicePointerProvider.acquire(controller, nodeId)) {
@@ -66,8 +76,7 @@ public final class ConnectedHomeIpReflectionDeviceMetadataReader implements Conn
         if (cluster == null) {
             return;
         }
-        builder.vendorName(stringAttribute(cluster, "readVendorNameAttribute", "vendor name"));
-        builder.productName(stringAttribute(cluster, "readProductNameAttribute", "product name"));
+        readBasicVendorAndProduct(cluster, builder);
         builder.softwareVersionString(stringAttribute(
                 cluster,
                 "readSoftwareVersionStringAttribute",
@@ -77,6 +86,19 @@ public final class ConnectedHomeIpReflectionDeviceMetadataReader implements Conn
                 "readHardwareVersionStringAttribute",
                 "hardware version string"));
         builder.partNumber(stringAttribute(cluster, "readPartNumberAttribute", "part number"));
+    }
+
+    private void readBasicVendorAndProduct(long devicePointer, MatterDeviceDetails.Builder builder) {
+        Object cluster = newCluster(BASIC_INFORMATION_CLUSTER_CLASS, devicePointer, DEVICE_DETAILS_ENDPOINT);
+        if (cluster == null) {
+            return;
+        }
+        readBasicVendorAndProduct(cluster, builder);
+    }
+
+    private void readBasicVendorAndProduct(Object cluster, MatterDeviceDetails.Builder builder) {
+        builder.vendorName(stringAttribute(cluster, "readVendorNameAttribute", "vendor name"));
+        builder.productName(stringAttribute(cluster, "readProductNameAttribute", "product name"));
     }
 
     private void readPowerSource(long devicePointer, MatterDeviceDetails.Builder builder) {

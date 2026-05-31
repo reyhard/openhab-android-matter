@@ -54,6 +54,8 @@ public final class ConnectedHomeIpReflectionGatewayTest {
         assertEquals("commissioned-state", result.controllerState());
         assertSame(controller, metadataReader.controller);
         assertEquals(987654321L, metadataReader.nodeId);
+        assertEquals(1, metadataReader.vendorProductReads);
+        assertEquals(0, metadataReader.detailReads);
         assertEquals("Aqara", result.vendorName());
         assertEquals("U200", result.productName());
     }
@@ -106,6 +108,8 @@ public final class ConnectedHomeIpReflectionGatewayTest {
 
         assertSame(controller, metadataReader.controller);
         assertEquals(0x165BC267A7E344D0L, metadataReader.nodeId);
+        assertEquals(0, metadataReader.vendorProductReads);
+        assertEquals(1, metadataReader.detailReads);
         assertEquals("IKEA of Sweden", details.vendorName());
         assertEquals("BILRESA scroll wheel", details.productName());
     }
@@ -689,30 +693,46 @@ public final class ConnectedHomeIpReflectionGatewayTest {
     }
 
     private static final class CapturingMetadataReader implements ConnectedHomeIpDeviceMetadataReader {
+        private final MatterDeviceMetadata metadata;
         private final MatterDeviceDetails details;
         private Object controller;
         private long nodeId;
+        private int vendorProductReads;
+        private int detailReads;
 
         private CapturingMetadataReader(MatterDeviceMetadata metadata) {
-            this(new MatterDeviceDetails.Builder()
-                    .vendorName(metadata.vendorName())
-                    .productName(metadata.productName())
-                    .build());
+            this.metadata = metadata;
+            this.details = MatterDeviceDetails.empty();
         }
 
         private CapturingMetadataReader(MatterDeviceDetails details) {
+            this.metadata = MatterDeviceMetadata.empty();
             this.details = details;
+        }
+
+        @Override
+        public MatterDeviceMetadata readVendorAndProduct(Object controller, long nodeId) {
+            this.controller = controller;
+            this.nodeId = nodeId;
+            vendorProductReads++;
+            return metadata;
         }
 
         @Override
         public MatterDeviceDetails readDeviceDetails(Object controller, long nodeId) {
             this.controller = controller;
             this.nodeId = nodeId;
+            detailReads++;
             return details;
         }
     }
 
     private static final class ThrowingMetadataReader implements ConnectedHomeIpDeviceMetadataReader {
+        @Override
+        public MatterDeviceMetadata readVendorAndProduct(Object controller, long nodeId) {
+            throw new IllegalStateException("metadata read failed");
+        }
+
         @Override
         public MatterDeviceDetails readDeviceDetails(Object controller, long nodeId) {
             throw new IllegalStateException("metadata read failed");

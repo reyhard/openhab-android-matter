@@ -200,10 +200,8 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
 
     private MatterDeviceMetadata readVendorAndProduct(Object controller, long nodeId) {
         try {
-            MatterDeviceDetails details = metadataReader.readDeviceDetails(controller, nodeId);
-            MatterDeviceMetadata metadata = details == null
-                    ? MatterDeviceMetadata.empty()
-                    : new MatterDeviceMetadata(details.vendorName(), details.productName());
+            MatterDeviceMetadata metadata = metadataReader.readVendorAndProduct(controller, nodeId);
+            metadata = metadata == null ? MatterDeviceMetadata.empty() : metadata;
             if (!metadata.isEmpty()) {
                 ConnectedHomeIpDiagnostics.emit("Read Matter Basic Information vendor/product metadata");
             }
