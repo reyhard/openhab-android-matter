@@ -42,7 +42,9 @@ jobs:
         shell: bash
         run: |
           SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
           "$SDKMANAGER" \
             "platforms;android-36" \
             "build-tools;36.0.0" \
