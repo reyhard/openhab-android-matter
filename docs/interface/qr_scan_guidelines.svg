@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1448" height="1086" viewBox="0 0 1448 1086">
+  <defs>
+    <filter id="softGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="3.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <linearGradient id="topGuideFade" x1="508" y1="198" x2="944" y2="198" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="20%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="80%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.12"/>
+    </linearGradient>
+
+    <linearGradient id="bottomGuideFade" x1="508" y1="895" x2="944" y2="895" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="22%" stop-color="#ffffff" stop-opacity="0.36"/>
+      <stop offset="78%" stop-color="#ffffff" stop-opacity="0.36"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.10"/>
+    </linearGradient>
+
+    <linearGradient id="leftVerticalFade" x1="372" y1="326" x2="372" y2="770" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <linearGradient id="rightVerticalFade" x1="1083" y1="326" x2="1083" y2="800" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.15"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Faint connecting guide lines -->
+  <path d="M 508 198 H 944" stroke="url(#topGuideFade)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M 508 895 H 944" stroke="url(#bottomGuideFade)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M 372 326 V 770" stroke="url(#leftVerticalFade)" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <path d="M 1083 326 V 800" stroke="url(#rightVerticalFade)" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+  <!-- Bright rounded scan corners -->
+  <g filter="url(#softGlow)" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 372 318 V 267 Q 372 198 441 198 H 508"/>
+    <path d="M 944 198 H 1015 Q 1083 198 1083 266 V 318"/>
+    <path d="M 372 771 V 827 Q 372 895 440 895 H 508"/>
+    <path d="M 944 895 H 1015 Q 1083 895 1083 827 V 803"/>
+  </g>
+</svg>

@@ -59,7 +59,7 @@ jobs:
       - name: Build connectedhomeip Android controller artifacts
         shell: bash
         run: |
-          set -euo pipefail
+          set -eo pipefail
           export ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/28.2.13676358"
           if [[ ! -d "${ANDROID_NDK_HOME}" ]]; then
             echo "::error::Expected NDK directory not found: ${ANDROID_NDK_HOME}"
@@ -67,8 +67,10 @@ jobs:
           fi
 
           cd connectedhomeip
+          set +u
           source scripts/bootstrap.sh
           source scripts/activate.sh
+          set -u
 
           python3 scripts/build/build_examples.py \
             --target android-arm64-chip-tool \
