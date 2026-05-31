@@ -41,6 +41,19 @@ public final class ConnectedHomeIpAttestationTrustStoreLoaderTest {
     }
 
     @Test
+    public void deduplicatesCertificatesAfterPemDecoding() throws Exception {
+        FakeAssets assets = new FakeAssets();
+        assets.add("matter/truststore/cd", "cd1.der", new byte[] {9, 8, 7});
+        assets.add("matter/truststore/cd", "cd1.pem", pem("CQgH"));
+
+        ConnectedHomeIpAttestationTrustStore store =
+                new ConnectedHomeIpAttestationTrustStoreLoader(assets::list, assets::open)
+                        .load("matter/truststore/paa", "matter/truststore/cd");
+
+        assertEquals(1, store.cdTrustKeys().size());
+    }
+
+    @Test
     public void missingAssetDirectoriesReturnEmptyStore() throws Exception {
         FakeAssets assets = new FakeAssets();
 

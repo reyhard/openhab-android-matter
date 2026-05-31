@@ -205,6 +205,18 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
 }
 
 tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
+    inputs.property("openhabMatterChipPaaTrustStoreDir", chipPaaTrustStoreDir)
+    inputs.property("openhabMatterChipCdTrustStoreDir", chipCdTrustStoreDir)
+    if (!chipPaaTrustStoreDir.isEmpty()) {
+        inputs.dir(file(chipPaaTrustStoreDir))
+                .withPropertyName("paaTrustStoreDir")
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
+    if (!chipCdTrustStoreDir.isEmpty()) {
+        inputs.dir(file(chipCdTrustStoreDir))
+                .withPropertyName("cdTrustStoreDir")
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
     outputs.dir(generatedTrustStoreAssetsDir)
     doLast {
         File outRoot = generatedTrustStoreAssetsDir.get().asFile

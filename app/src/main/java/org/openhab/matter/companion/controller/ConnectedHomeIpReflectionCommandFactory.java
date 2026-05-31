@@ -25,6 +25,8 @@ public final class ConnectedHomeIpReflectionCommandFactory {
     private static final String ICD_REGISTRATION_INFO_CLASS = "chip.devicecontroller.ICDRegistrationInfo";
     private static final String CONCRETE_DEVICE_ATTESTATION_DELEGATE_CLASS =
             "org.openhab.matter.companion.controller.ConnectedHomeIpConcreteDeviceAttestationDelegate";
+    private static final String CONCRETE_ATTESTATION_TRUST_STORE_DELEGATE_CLASS =
+            "org.openhab.matter.companion.controller.ConnectedHomeIpConcreteAttestationTrustStoreDelegate";
     private static final String CONCRETE_CONNECTED_DEVICE_CALLBACK_CLASS =
             "org.openhab.matter.companion.controller.ConnectedHomeIpConcreteConnectedDeviceCallback";
     private static final String CONCRETE_OPEN_COMMISSIONING_WINDOW_CALLBACK_CLASS =
@@ -298,6 +300,10 @@ public final class ConnectedHomeIpReflectionCommandFactory {
     }
 
     public Object newAttestationTrustStoreDelegate(ConnectedHomeIpAttestationTrustStore store) {
+        Object concreteDelegate = newConcreteAttestationTrustStoreDelegate(store);
+        if (concreteDelegate != null) {
+            return concreteDelegate;
+        }
         return new ConnectedHomeIpAttestationTrustStoreDelegate(
                 requireAvailable(attestationTrustStoreDelegateClass, "attestationTrustStoreDelegateClass"),
                 requireAvailable(deviceAttestationClass, "deviceAttestationClass"),
@@ -458,6 +464,38 @@ public final class ConnectedHomeIpReflectionCommandFactory {
         } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
             ConnectedHomeIpDiagnostics.emit(
                     "Concrete connectedhomeip device attestation delegate unavailable: "
+                            + safeMessage(exception)
+                            + "; using proxy fallback");
+            return null;
+        }
+    }
+
+    private Object newConcreteAttestationTrustStoreDelegate(ConnectedHomeIpAttestationTrustStore store) {
+        Class<?> delegateInterface = requireAvailable(
+                attestationTrustStoreDelegateClass,
+                "attestationTrustStoreDelegateClass");
+        try {
+            ClassLoader classLoader = ConnectedHomeIpReflectionCommandFactory.class.getClassLoader();
+            Class<?> delegateClass = Class.forName(
+                    CONCRETE_ATTESTATION_TRUST_STORE_DELEGATE_CLASS,
+                    false,
+                    classLoader);
+            Constructor<?> constructor = delegateClass.getConstructor(ConnectedHomeIpAttestationTrustStore.class);
+            Object delegate = constructor.newInstance(store);
+            if (!delegateInterface.isInstance(delegate)) {
+                ConnectedHomeIpDiagnostics.emit(
+                        "Concrete attestation trust-store delegate is not compatible; using proxy fallback");
+                return null;
+            }
+            ConnectedHomeIpDiagnostics.emit("Using concrete connectedhomeip attestation trust-store delegate");
+            return delegate;
+        } catch (ClassNotFoundException exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "Concrete connectedhomeip attestation trust-store delegate not packaged; using proxy fallback");
+            return null;
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
+            ConnectedHomeIpDiagnostics.emit(
+                    "Concrete connectedhomeip attestation trust-store delegate unavailable: "
                             + safeMessage(exception)
                             + "; using proxy fallback");
             return null;

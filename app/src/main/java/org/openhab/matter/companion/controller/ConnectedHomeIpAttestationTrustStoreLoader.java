@@ -6,7 +6,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class ConnectedHomeIpAttestationTrustStoreLoader {
     public interface AssetLister {
@@ -39,6 +41,7 @@ public final class ConnectedHomeIpAttestationTrustStoreLoader {
 
     private List<byte[]> readCertificates(String rootPath) {
         List<byte[]> certificates = new ArrayList<>();
+        Set<String> certificateKeys = new HashSet<>();
         if (rootPath == null || rootPath.isEmpty()) {
             return certificates;
         }
@@ -55,7 +58,8 @@ public final class ConnectedHomeIpAttestationTrustStoreLoader {
                 try (InputStream input = openAsset.open(fullPath)) {
                     byte[] raw = readFully(input);
                     byte[] parsed = parseCertificate(raw);
-                    if (parsed.length > 0) {
+                    String certificateKey = Base64.getEncoder().encodeToString(parsed);
+                    if (parsed.length > 0 && certificateKeys.add(certificateKey)) {
                         certificates.add(parsed);
                     }
                 }
