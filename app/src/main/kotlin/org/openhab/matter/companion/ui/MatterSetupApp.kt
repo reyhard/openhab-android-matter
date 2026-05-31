@@ -6,7 +6,6 @@ import org.openhab.matter.companion.diagnostics.ThreadBorderRouterRecord
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupBackNavigation
 import org.openhab.matter.companion.setup.MatterSetupStage
-import org.openhab.matter.companion.setup.MatterSetupStateReducer
 import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.setup.PhoneMatterDevice
 import org.openhab.matter.companion.ui.theme.MatterSetupTheme
@@ -153,11 +152,8 @@ fun MatterSetupApp(
                 onAction = onAction
             )
 
-            MatterSetupStage.PhoneDeviceDetails -> PhoneDeviceListScreen(
-                state = MatterSetupStateReducer.phoneDeviceList(
-                    hasDevices = phoneDevices.isNotEmpty()
-                ),
-                devices = phoneDevices,
+            MatterSetupStage.PhoneDeviceDetails -> PhoneDeviceDetailsScreen(
+                state = state,
                 onAction = onAction
             )
 
