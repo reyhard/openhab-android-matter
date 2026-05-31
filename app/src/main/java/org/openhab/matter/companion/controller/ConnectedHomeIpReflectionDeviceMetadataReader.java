@@ -186,17 +186,23 @@ public final class ConnectedHomeIpReflectionDeviceMetadataReader implements Conn
     }
 
     private Object attribute(Object cluster, String methodName, String callbackClassName, String label) {
-        Class<?> callbackClass = classOrNull(callbackClassName, label + " callback");
-        if (callbackClass == null) {
-            return null;
+        Method readMethod = null;
+        Class<?> callbackClass = classForName(callbackClassName);
+        if (callbackClass != null) {
+            try {
+                readMethod = cluster.getClass().getMethod(methodName, callbackClass);
+            } catch (NoSuchMethodException ignored) {
+                // Some generated attributes use cluster-specific callback interfaces.
+            }
         }
-        Method readMethod;
-        try {
-            readMethod = cluster.getClass().getMethod(methodName, callbackClass);
-        } catch (NoSuchMethodException exception) {
+        if (readMethod == null) {
+            readMethod = singleCallbackMethod(cluster.getClass(), methodName);
+        }
+        if (readMethod == null) {
             ConnectedHomeIpDiagnostics.emit("Matter attribute read method unavailable for " + label + ": " + methodName);
             return null;
         }
+        callbackClass = readMethod.getParameterTypes()[0];
         AttributeCallback callback = new AttributeCallback(label);
         try {
             readMethod.invoke(cluster, callback.proxy(callbackClass));
@@ -211,6 +217,15 @@ public final class ConnectedHomeIpReflectionDeviceMetadataReader implements Conn
             ConnectedHomeIpDiagnostics.emit("Interrupted reading Matter " + label);
             return null;
         }
+    }
+
+    private static Method singleCallbackMethod(Class<?> targetClass, String methodName) {
+        for (Method method : targetClass.getMethods()) {
+            if (method.getName().equals(methodName) && method.getParameterTypes().length == 1) {
+                return method;
+            }
+        }
+        return null;
     }
 
     private Object newCluster(String clusterClassName, long devicePointer, int endpoint) {
@@ -234,6 +249,14 @@ public final class ConnectedHomeIpReflectionDeviceMetadataReader implements Conn
             return Class.forName(className, false, classLoader);
         } catch (ClassNotFoundException | LinkageError exception) {
             ConnectedHomeIpDiagnostics.emit("Matter " + label + " unavailable: " + safeMessage(exception));
+            return null;
+        }
+    }
+
+    private Class<?> classForName(String className) {
+        try {
+            return Class.forName(className, false, classLoader);
+        } catch (ClassNotFoundException | LinkageError exception) {
             return null;
         }
     }

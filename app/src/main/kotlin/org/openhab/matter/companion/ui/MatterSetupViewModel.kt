@@ -3,6 +3,7 @@ package org.openhab.matter.companion.ui
 import android.app.Application
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -56,6 +57,8 @@ import org.openhab.matter.companion.setup.toLogSafeUrl
 internal fun resolveEffectiveSetupToken(editableToken: String, persistedToken: String): String {
     return editableToken.trim().ifBlank { persistedToken }
 }
+
+private const val TAG = "MatterSetupViewModel"
 
 internal fun threadSettingsConfigForSave(
     existingConfig: AppConfig,
@@ -841,42 +844,65 @@ class MatterSetupViewModel @JvmOverloads constructor(
     }
 
     private fun fetchPhoneDeviceDetails() {
+        Log.i(
+            TAG,
+            "Phone device details fetch requested stage=${uiState.stage}, selectedNode=${selectedPhoneDevice?.displayNodeId}"
+        )
         if (uiState.stage != MatterSetupStage.PhoneDeviceDetails) {
+            Log.i(TAG, "Phone device details fetch ignored outside details stage")
             return
         }
         val requestNodeId = selectedPhoneDevice?.nodeId ?: run {
+            Log.w(TAG, "Phone device details fetch failed before native call: no selected node")
             uiState = phoneDeviceDetailsFetchFailed(uiState)
             return
         }
         val bootstrapState = bootstrapStateRepository.load()
         val device = PhoneMatterDevice.fromBootstrapState(bootstrapState) ?: run {
+            Log.w(TAG, "Phone device details fetch failed before native call: no stored bootstrap device")
             uiState = phoneDeviceDetailsFetchFailed(uiState)
             return
         }
         val controllerState = bootstrapState.controllerState()
         if (!device.stateReadable ||
-            !device.controllerStateStored ||
-            device.nodeId != requestNodeId ||
-            controllerState.isBlank()
+            device.nodeId != requestNodeId
         ) {
+            Log.w(
+                TAG,
+                "Phone device details fetch failed before native call: " +
+                    "stateReadable=${device.stateReadable}, " +
+                    "controllerStateStored=${device.controllerStateStored}, " +
+                    "storedNode=${device.displayNodeId}, requestedNode=${MatterDeviceDetailFormatter.nodeId(requestNodeId)}"
+            )
             uiState = phoneDeviceDetailsFetchFailed(uiState)
             return
         }
         if (!executionGate.tryStart()) {
+            Log.i(TAG, "Phone device details fetch ignored because another workflow is running")
             return
         }
         uiState = phoneDeviceDetailsFetchStarted(uiState)
         workerThread = Thread({
             try {
                 val selection = controllerSession.selectNativeIfReady()
+                Log.i(
+                    TAG,
+                    "Phone device details native selection: native=${selection.nativeSelected()}, message=${selection.message()}"
+                )
                 if (!selection.nativeSelected()) {
                     throw IllegalStateException("connectedhomeip is not ready for device metadata.")
                 }
                 val details = selection.controller().readDeviceDetails(
                     requestNodeId,
                     controllerState,
-                    { _ -> }
+                    { step ->
+                        Log.i(
+                            TAG,
+                            "Phone device details native progress: complete=${step.complete()}, message=${step.message()}"
+                        )
+                    }
                 )
+                Log.i(TAG, "Phone device details native read returned empty=${details.isEmpty}")
                 if (details.isEmpty) {
                     throw IllegalStateException("No Matter device details were returned.")
                 }
@@ -887,6 +913,7 @@ class MatterSetupViewModel @JvmOverloads constructor(
                     }
                 }
             } catch (error: Exception) {
+                Log.e(TAG, "Phone device details fetch failed", error)
                 postState {
                     if (isCurrentPhoneDeviceDetailsRequest(uiState, selectedPhoneDevice, requestNodeId)) {
                         uiState = phoneDeviceDetailsFetchFailed(uiState)
