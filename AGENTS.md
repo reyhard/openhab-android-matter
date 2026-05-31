@@ -44,6 +44,16 @@ Device serial `62311e26` was used during development, but always verify current 
 - Do not replace the connectedhomeip commissioning path with Play Services-only behavior without explicit design approval.
 - Preserve the native readiness gate: real commissioning should stop when connectedhomeip is not ready.
 
+## Commit and Release Notes
+
+- Use concise, changelog-friendly commit subjects: `type(scope): summary`.
+- Prefer these types: `feat`, `fix`, `matter`, `chip`, `ci`, `build`, `release`, `docs`, `test`, `chore`.
+- Use scopes when they clarify the release note, for example `matter`, `chip`, `commissioning`, `ocw`, `thread`, `ble`, `ui`, `release`.
+- Mark incompatible behavior with `!` after the type or scope, and include `BREAKING CHANGE:` in the commit body when more detail is needed.
+- Add `[skip changelog]` or `changelog: skip` for commits that should not appear in release notes.
+- Keep the first line user-facing where possible; generated releases group commits from `scripts/generate_changelog.mjs`.
+- Release tags should normally be `v<versionName>` from `app/build.gradle`, for example `v0.1.0`.
+
 ## Matter Rules
 
 - Use the manual setup code returned by OpenCommissioningWindow directly.
@@ -62,4 +72,3 @@ Repo-owned skill source files live under `.codex/skills/`.
 | Thread commissioning, BLE, attestation, bootstrap state, OCW internals | `.codex/skills/openhab-android-matter-commissioning-flow/SKILL.md` |
 | IPv6, OTBR, OpenWRT, Avahi, stale `_matterc._udp` records | `.codex/skills/openhab-android-matter-mdns-ipv6-troubleshooting/SKILL.md` |
 | Updating status/workflow docs after real-device findings | `.codex/skills/openhab-android-matter-status-docs/SKILL.md` |
-

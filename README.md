@@ -147,6 +147,10 @@ The artifact source path is managed automatically:
   `openhab-chip-artifacts-arm64.zip`.
 - `Android CI` downloads that release asset by tag on every run. No manual
   URL/secret path updates are required after the release asset is published.
+- Workflow `Release APK` is manually dispatched. It downloads the same CHIP
+  controller artifact, runs tests/lint/artifact checks, builds the APK, generates
+  release notes from commit history, and creates or updates a GitHub release.
+  See `CONTRIBUTING.md` for commit message rules used by the generated changelog.
 
 For production attestation verification, also package local trust-store
 certificates with `-PopenhabMatterChipPaaTrustStoreDir=<dir>` and optionally

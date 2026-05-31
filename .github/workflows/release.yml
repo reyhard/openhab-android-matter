@@ -1,0 +1,242 @@
+name: Release APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag. Defaults to v<versionName> from app/build.gradle."
+        required: false
+        default: ""
+      previous_tag:
+        description: "Optional tag/sha to start changelog from. Defaults to previous v* tag."
+        required: false
+        default: ""
+      prerelease:
+        description: "Mark the GitHub release as a prerelease."
+        required: true
+        default: true
+        type: boolean
+      draft:
+        description: "Create the GitHub release as a draft."
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release-apk:
+    name: Build and publish release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      APK_PATH: app/build/outputs/apk/debug/openhab-matter-helper.apk
+      CHIP_CONTROLLER_ARTIFACTS_DIR: /tmp/connectedhomeip-controller-artifacts
+      CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG: chip-controller-artifacts-latest
+      CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME: openhab-chip-artifacts-arm64.zip
+      CHIP_GRADLE_ARGS: -PopenhabMatterChipControllerArtifactsDir=/tmp/connectedhomeip-controller-artifacts -PopenhabMatterChipControllerAbis=arm64-v8a
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release metadata
+        shell: bash
+        env:
+          INPUT_TAG_NAME: ${{ github.event.inputs.tag_name }}
+          INPUT_PREVIOUS_TAG: ${{ github.event.inputs.previous_tag }}
+          INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
+          INPUT_DRAFT: ${{ github.event.inputs.draft }}
+        run: |
+          set -euo pipefail
+          VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([^"]+)".*$/\1/p' app/build.gradle | head -n1)"
+          VERSION_CODE="$(awk '/^[[:space:]]*versionCode[[:space:]]+[0-9]+/{print $2; exit}' app/build.gradle)"
+          if [[ -z "$VERSION_NAME" || -z "$VERSION_CODE" ]]; then
+            echo "::error::Could not parse versionName/versionCode from app/build.gradle."
+            exit 1
+          fi
+
+          TAG_NAME="$INPUT_TAG_NAME"
+          if [[ -z "$TAG_NAME" ]]; then
+            TAG_NAME="v$VERSION_NAME"
+          fi
+
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "PREVIOUS_TAG=$INPUT_PREVIOUS_TAG" >> "$GITHUB_ENV"
+          echo "RELEASE_PRERELEASE=$INPUT_PRERELEASE" >> "$GITHUB_ENV"
+          echo "RELEASE_DRAFT=$INPUT_DRAFT" >> "$GITHUB_ENV"
+          echo "APK_ASSET_NAME=openhab-matter-helper-$TAG_NAME.apk" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4.3.1
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
+          "$SDKMANAGER" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "cmake;3.22.1" \
+            "ndk;28.2.13676358"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Download connectedhomeip controller artifacts
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RELEASE_API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG}"
+          ARCHIVE_PATH="$RUNNER_TEMP/${CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME}"
+          rm -rf "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+          mkdir -p "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+
+          RELEASE_JSON="$(curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "$RELEASE_API_URL")"
+
+          ASSET_ID="$(echo "$RELEASE_JSON" | jq -r \
+            --arg NAME "$CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME" \
+            '.assets[] | select(.name == $NAME) | .id' | head -n1)"
+
+          if [[ -z "${ASSET_ID:-}" || "${ASSET_ID}" == "null" ]]; then
+            echo "::error::Release '${CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG}' does not contain '${CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME}'."
+            echo "::error::Run workflow 'Build CHIP Controller Artifacts' first."
+            exit 1
+          fi
+
+          curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${ASSET_ID}" \
+            -o "$ARCHIVE_PATH"
+
+          unzip -q -o "$ARCHIVE_PATH" -d "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+
+          if [[ ! -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPController.jar" ]]; then
+            NESTED_ROOT="$(find "$CHIP_CONTROLLER_ARTIFACTS_DIR" -mindepth 2 -maxdepth 3 -type f -name CHIPController.jar -print -quit || true)"
+            if [[ -n "$NESTED_ROOT" ]]; then
+              NESTED_ROOT="$(dirname "$NESTED_ROOT")"
+              TMP_DIR="${CHIP_CONTROLLER_ARTIFACTS_DIR}.tmp"
+              rm -rf "$TMP_DIR"
+              mkdir -p "$TMP_DIR"
+              cp -a "$NESTED_ROOT"/. "$TMP_DIR"/
+              rm -rf "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+              mv "$TMP_DIR" "$CHIP_CONTROLLER_ARTIFACTS_DIR"
+            fi
+          fi
+
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPController.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPInteractionModel.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPClusterID.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/CHIPClusters.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/AndroidPlatform.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/OnboardingPayload.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/libMatterTlv.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/libMatterJson.jar"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/jniLibs/arm64-v8a/libCHIPController.so"
+          test -f "$CHIP_CONTROLLER_ARTIFACTS_DIR/jniLibs/arm64-v8a/libc++_shared.so"
+
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace $CHIP_GRADLE_ARGS
+
+      - name: Run Android lint
+        run: ./gradlew :app:lintDebug --stacktrace $CHIP_GRADLE_ARGS
+
+      - name: Validate connectedhomeip artifact checks
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_connectedhomeip_artifacts.ps1 -GradlePath ./gradlew
+
+      - name: Validate downloaded connectedhomeip artifacts
+        run: ./gradlew :app:verifyConnectedHomeIpControllerArtifacts --stacktrace $CHIP_GRADLE_ARGS
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace $CHIP_GRADLE_ARGS
+
+      - name: Validate release build
+        run: ./gradlew :app:assembleRelease --stacktrace $CHIP_GRADLE_ARGS
+
+      - name: Verify APK artifact
+        run: |
+          test -s "$APK_PATH"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_apk_badging.ps1 -ApkPath "$APK_PATH"
+
+      - name: Generate changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--tag "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --output "$RUNNER_TEMP/RELEASE_NOTES.md")
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            args+=(--from "$PREVIOUS_TAG")
+          fi
+          node scripts/generate_changelog.mjs "${args[@]}"
+          cat "$RUNNER_TEMP/RELEASE_NOTES.md"
+
+      - name: Create or update GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_args=(
+            --repo "$GITHUB_REPOSITORY"
+            --title "openHAB Matter Helper $VERSION_NAME"
+            --notes-file "$RUNNER_TEMP/RELEASE_NOTES.md"
+          )
+          if [[ "$RELEASE_PRERELEASE" == "true" ]]; then
+            release_args+=(--prerelease)
+          fi
+          if [[ "$RELEASE_DRAFT" == "true" ]]; then
+            release_args+=(--draft)
+          fi
+
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG_NAME" "${release_args[@]}"
+          else
+            gh release create "$TAG_NAME" \
+              --target "$GITHUB_SHA" \
+              "${release_args[@]}"
+          fi
+
+          gh release upload "$TAG_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            "$APK_PATH#$APK_ASSET_NAME" \
+            --clobber
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/RELEASE_NOTES.md
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: openhab-matter-helper-release-apk
+          path: ${{ env.APK_PATH }}
+          if-no-files-found: error
+          retention-days: 14
