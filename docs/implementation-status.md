@@ -63,7 +63,8 @@
 - Failure recovery keeps sanitized diagnostics and links to advanced troubleshooting guidance for openHAB readiness, network/VPN hints, OTBR reachability, mDNS/Avahi visibility including stale `_matterc._udp` records, IPv6 reachability, expired pairing windows, and pairing-mode checks.
 - The Compose advanced troubleshooting screen exposes phone-side Matter mDNS browsing for `_matterc._udp` and `_matter._tcp`, plus a best-effort IPv6 reachability check for a user-entered device IPv6 address. The UI states that these checks run from the phone and may differ from openHAB-side Avahi/router results.
 - The Compose advanced troubleshooting screen exposes one-tap OpenCommissioningWindow retry for the currently staged bootstrap device and a forget-from-phone cleanup action that clears this app's stored bootstrap state without claiming to factory reset the device.
-- The Compose settings flow has a dedicated **Devices on this phone** submenu for the app-stored bootstrap device, with visible back navigation, OpenCommissioningWindow retry, and forget-from-phone cleanup. This is currently a view of this app's persisted staging state, not a full connectedhomeip fabric inventory.
+- The Compose settings flow has a dedicated **Devices on this phone** submenu for the app-stored bootstrap device, with visible back navigation, expandable staging diagnostics, OpenCommissioningWindow retry, details navigation, and forget-from-phone cleanup. This is currently a view of this app's persisted staging state, not a full connectedhomeip fabric inventory.
+- The Compose staged-device details screen shows local vendor/product data by default and can explicitly fetch additional Matter cluster metadata from the staged device, merging retrieved fields into copyable detail rows while leaving existing values visible on fetch failure.
 
 ## Not Implemented Yet
 
