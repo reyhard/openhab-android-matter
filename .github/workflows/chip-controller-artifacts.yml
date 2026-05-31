@@ -37,12 +37,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git -C connectedhomeip submodule update --init --depth 1 \
-            third_party/pigweed/repo \
-            third_party/openthread/repo \
-            third_party/editline/repo \
-            third_party/nlio/repo \
-            third_party/perfetto/repo
+          (
+            cd connectedhomeip
+            python3 scripts/checkout_submodules.py \
+              --shallow \
+              --platform android \
+              --jobs 8
+          )
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
