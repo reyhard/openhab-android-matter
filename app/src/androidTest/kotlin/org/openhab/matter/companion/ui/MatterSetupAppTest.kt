@@ -631,6 +631,27 @@ class MatterSetupAppTest {
     }
 
     @Test
+    fun phoneDeviceDetailsShowsFetchFailureAsSnackbarAndKeepsDetailsVisible() {
+        render(
+            state = MatterSetupStateReducer.phoneDeviceDetails(
+                PhoneMatterDevice(
+                    nodeId = 1234L,
+                    controllerStateStored = true,
+                    stateReadable = true,
+                    vendorName = "IKEA of Sweden",
+                    productName = "BILRESA scroll wheel"
+                ),
+                message = "Could not fetch data from device"
+            )
+        )
+
+        composeRule.onNodeWithContentDescription("Device details fetch error").assertIsDisplayed()
+        composeRule.onNodeWithText("Could not fetch data from device").assertIsDisplayed()
+        composeRule.onNodeWithText("IKEA of Sweden").assertIsDisplayed()
+        composeRule.onNodeWithText("0x4D2").assertIsDisplayed()
+    }
+
+    @Test
     fun phoneDeviceListShowsEmptyState() {
         render(MatterSetupStateReducer.phoneDeviceList(hasDevices = false))
 

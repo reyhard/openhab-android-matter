@@ -3,9 +3,11 @@ package org.openhab.matter.companion.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,8 +22,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +50,10 @@ import org.openhab.matter.companion.setup.MatterSetupUiState
 import org.openhab.matter.companion.setup.PhoneMatterDeviceDetails
 import org.openhab.matter.companion.ui.components.MatterSetupScaffold
 
+private const val DEVICE_DATA_FETCH_ERROR_MESSAGE = "Could not fetch data from device"
+private const val DEVICE_DATA_REFRESHED_MESSAGE = "Device data refreshed"
+private const val DEVICE_DETAILS_FETCH_ERROR_DESCRIPTION = "Device details fetch error"
+
 @Composable
 fun PhoneDeviceDetailsScreen(
     state: MatterSetupUiState,
@@ -51,101 +61,123 @@ fun PhoneDeviceDetailsScreen(
 ) {
     val details = state.phoneDeviceDetails
     var copyFeedback by remember { mutableStateOf("") }
-    MatterSetupScaffold(
-        title = "Device details",
-        message = state.message.ifBlank { "Helpful information for advanced setup and troubleshooting." },
-        showBack = true,
-        onBack = { onAction(MatterSetupAction.ShowPhoneDevices) }
-    ) {
-        Text(
-            text = "Advanced",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.clickable { onAction(MatterSetupAction.ShowPhoneDevices) }
-        )
-        Spacer(Modifier.height(16.dp))
-        DeviceHeaderCard(details)
-        Spacer(Modifier.height(16.dp))
-        DeviceDetailsCard(
-            details = details,
-            onCopied = { label ->
-                copyFeedback = "Copied $label"
-            }
-        )
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.FetchPhoneDeviceDetails) },
-            enabled = !state.phoneDeviceDetailsFetching,
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(state.phoneDeviceDetailsMessage) {
+        if (state.phoneDeviceDetailsMessage == DEVICE_DATA_FETCH_ERROR_MESSAGE) {
+            snackbarHostState.showSnackbar(state.phoneDeviceDetailsMessage)
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        MatterSetupScaffold(
+            title = "Device details",
+            message = state.message.ifBlank { "Helpful information for advanced setup and troubleshooting." },
+            showBack = true,
+            onBack = { onAction(MatterSetupAction.ShowPhoneDevices) }
         ) {
-            if (state.phoneDeviceDetailsFetching) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(ButtonDefaults.IconSize),
-                    strokeWidth = 2.dp
+            Text(
+                text = "Advanced",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable { onAction(MatterSetupAction.ShowPhoneDevices) }
+            )
+            Spacer(Modifier.height(16.dp))
+            DeviceHeaderCard(details)
+            Spacer(Modifier.height(16.dp))
+            DeviceDetailsCard(
+                details = details,
+                onCopied = { label ->
+                    copyFeedback = "Copied $label"
+                }
+            )
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.FetchPhoneDeviceDetails) },
+                enabled = !state.phoneDeviceDetailsFetching,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            ) {
+                if (state.phoneDeviceDetailsFetching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(ButtonDefaults.IconSize),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_material_cloud_download),
+                        contentDescription = null,
+                        modifier = Modifier.size(ButtonDefaults.IconSize)
+                    )
+                }
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(if (state.phoneDeviceDetailsFetching) "Fetching..." else "Fetch additional data from device")
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Reads more information directly from Matter clusters.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (state.phoneDeviceDetailsMessage == DEVICE_DATA_REFRESHED_MESSAGE) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = state.phoneDeviceDetailsMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
                 )
-            } else {
+            }
+            if (copyFeedback.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = copyFeedback,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { onAction(MatterSetupAction.OpenCommissioningWindowAgain) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_material_cloud_download),
+                    painter = painterResource(R.drawable.ic_material_open_in_new),
                     contentDescription = null,
                     modifier = Modifier.size(ButtonDefaults.IconSize)
                 )
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("Open commissioning window")
             }
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(if (state.phoneDeviceDetailsFetching) "Fetching..." else "Fetch additional data from device")
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onAction(MatterSetupAction.ForgetFromPhone) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_material_delete),
+                    contentDescription = null,
+                    modifier = Modifier.size(ButtonDefaults.IconSize)
+                )
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text("Forget from this phone")
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Reads more information directly from Matter clusters.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (state.phoneDeviceDetailsMessage in setOf("Could not fetch data from device", "Device data refreshed")) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = state.phoneDeviceDetailsMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (state.phoneDeviceDetailsMessage == "Could not fetch data from device") {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.primary
-                }
-            )
-        }
-        if (copyFeedback.isNotBlank()) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = copyFeedback,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = { onAction(MatterSetupAction.OpenCommissioningWindowAgain) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_material_open_in_new),
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.IconSize)
-            )
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text("Open commissioning window")
-        }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = { onAction(MatterSetupAction.ForgetFromPhone) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_material_delete),
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.IconSize)
-            )
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text("Forget from this phone")
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        ) { snackbarData ->
+            Snackbar {
+                Text(
+                    text = snackbarData.visuals.message,
+                    modifier = Modifier.semantics {
+                        contentDescription = DEVICE_DETAILS_FETCH_ERROR_DESCRIPTION
+                    }
+                )
+            }
         }
     }
 }
