@@ -17,6 +17,9 @@ public final class ConnectedHomeIpReflectionCommandFactory {
     private static final String COMPLETION_LISTENER_CLASS =
             "chip.devicecontroller.ChipDeviceController$CompletionListener";
     private static final String DEVICE_ATTESTATION_DELEGATE_CLASS = "chip.devicecontroller.DeviceAttestationDelegate";
+    private static final String ATTESTATION_TRUST_STORE_DELEGATE_CLASS =
+            "chip.devicecontroller.AttestationTrustStoreDelegate";
+    private static final String DEVICE_ATTESTATION_CLASS = "chip.devicecontroller.DeviceAttestation";
     private static final String GET_CONNECTED_DEVICE_CALLBACK_CLASS =
             "chip.devicecontroller.GetConnectedDeviceCallbackJni$GetConnectedDeviceCallback";
     private static final String ICD_REGISTRATION_INFO_CLASS = "chip.devicecontroller.ICDRegistrationInfo";
@@ -36,6 +39,8 @@ public final class ConnectedHomeIpReflectionCommandFactory {
     private final Class<?> openCommissioningCallbackClass;
     private final Class<?> completionListenerClass;
     private final Class<?> deviceAttestationDelegateClass;
+    private final Class<?> attestationTrustStoreDelegateClass;
+    private final Class<?> deviceAttestationClass;
     private final Class<?> getConnectedDeviceCallbackClass;
     private final Class<?> icdRegistrationInfoClass;
 
@@ -52,6 +57,8 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 chipDeviceControllerClass,
                 openCommissioningCallbackClass,
                 nestedClass(chipDeviceControllerClass, "CompletionListener"),
+                null,
+                null,
                 null,
                 null,
                 null);
@@ -75,6 +82,8 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 completionListenerClass,
                 deviceAttestationDelegateClass,
                 getConnectedDeviceCallbackClass,
+                null,
+                null,
                 null);
     }
 
@@ -88,6 +97,32 @@ public final class ConnectedHomeIpReflectionCommandFactory {
             Class<?> deviceAttestationDelegateClass,
             Class<?> getConnectedDeviceCallbackClass,
             Class<?> icdRegistrationInfoClass) {
+        this(
+                networkCredentialsClass,
+                threadCredentialsClass,
+                commissionParametersBuilderClass,
+                chipDeviceControllerClass,
+                openCommissioningCallbackClass,
+                completionListenerClass,
+                deviceAttestationDelegateClass,
+                getConnectedDeviceCallbackClass,
+                icdRegistrationInfoClass,
+                null,
+                null);
+    }
+
+    public ConnectedHomeIpReflectionCommandFactory(
+            Class<?> networkCredentialsClass,
+            Class<?> threadCredentialsClass,
+            Class<?> commissionParametersBuilderClass,
+            Class<?> chipDeviceControllerClass,
+            Class<?> openCommissioningCallbackClass,
+            Class<?> completionListenerClass,
+            Class<?> deviceAttestationDelegateClass,
+            Class<?> getConnectedDeviceCallbackClass,
+            Class<?> icdRegistrationInfoClass,
+            Class<?> attestationTrustStoreDelegateClass,
+            Class<?> deviceAttestationClass) {
         this.networkCredentialsClass = requireClass(networkCredentialsClass, "networkCredentialsClass");
         this.threadCredentialsClass = requireClass(threadCredentialsClass, "threadCredentialsClass");
         this.commissionParametersBuilderClass = requireClass(
@@ -99,6 +134,8 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 "openCommissioningCallbackClass");
         this.completionListenerClass = completionListenerClass;
         this.deviceAttestationDelegateClass = deviceAttestationDelegateClass;
+        this.attestationTrustStoreDelegateClass = attestationTrustStoreDelegateClass;
+        this.deviceAttestationClass = deviceAttestationClass;
         this.getConnectedDeviceCallbackClass = getConnectedDeviceCallbackClass;
         this.icdRegistrationInfoClass = icdRegistrationInfoClass;
     }
@@ -114,7 +151,9 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 Class.forName(COMPLETION_LISTENER_CLASS, false, classLoader),
                 Class.forName(DEVICE_ATTESTATION_DELEGATE_CLASS, false, classLoader),
                 Class.forName(GET_CONNECTED_DEVICE_CALLBACK_CLASS, false, classLoader),
-                Class.forName(ICD_REGISTRATION_INFO_CLASS, false, classLoader));
+                Class.forName(ICD_REGISTRATION_INFO_CLASS, false, classLoader),
+                Class.forName(ATTESTATION_TRUST_STORE_DELEGATE_CLASS, false, classLoader),
+                Class.forName(DEVICE_ATTESTATION_CLASS, false, classLoader));
     }
 
     public Object newThreadCommissionParameters(ThreadDataset dataset) throws ReflectiveOperationException {
@@ -258,6 +297,14 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 .proxy();
     }
 
+    public Object newAttestationTrustStoreDelegate(ConnectedHomeIpAttestationTrustStore store) {
+        return new ConnectedHomeIpAttestationTrustStoreDelegate(
+                requireAvailable(attestationTrustStoreDelegateClass, "attestationTrustStoreDelegateClass"),
+                requireAvailable(deviceAttestationClass, "deviceAttestationClass"),
+                store)
+                .proxy();
+    }
+
     public Object newGetConnectedDeviceCallback(ConnectedHomeIpConnectedDeviceCallback callback) {
         Object concreteCallback = newConcreteConnectedDeviceCallback(callback);
         if (concreteCallback != null) {
@@ -283,6 +330,26 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                         int.class,
                         requireAvailable(deviceAttestationDelegateClass, "deviceAttestationDelegateClass"))
                 .invoke(controller, failSafeExpiryTimeoutSeconds, delegateProxy);
+    }
+
+    public void invokeSetAttestationTrustStoreDelegate(
+            Object controller,
+            Object delegateProxy,
+            java.util.List<byte[]> cdTrustKeys) throws ReflectiveOperationException {
+        try {
+            chipDeviceControllerClass
+                    .getMethod(
+                            "setAttestationTrustStoreDelegate",
+                            requireAvailable(attestationTrustStoreDelegateClass, "attestationTrustStoreDelegateClass"),
+                            java.util.List.class)
+                    .invoke(controller, delegateProxy, cdTrustKeys);
+        } catch (NoSuchMethodException noTwoArgMethod) {
+            chipDeviceControllerClass
+                    .getMethod(
+                            "setAttestationTrustStoreDelegate",
+                            requireAvailable(attestationTrustStoreDelegateClass, "attestationTrustStoreDelegateClass"))
+                    .invoke(controller, delegateProxy);
+        }
     }
 
     public void invokeContinueCommissioning(

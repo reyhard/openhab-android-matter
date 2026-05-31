@@ -82,6 +82,10 @@ public final class ConnectedHomeIpMatterControllerFactory {
         }
         ConnectedHomeIpPlatformControllerProvider platformProvider = new ConnectedHomeIpPlatformControllerProvider(context);
         ConnectedHomeIpReflectionCommandFactory commandFactory = ConnectedHomeIpReflectionCommandFactory.fromDefaultClassLoader();
+        ConnectedHomeIpAttestationTrustStore trustStore = new ConnectedHomeIpAttestationTrustStoreLoader(
+                path -> context.getAssets().list(path),
+                path -> context.getAssets().open(path))
+                .load("matter/truststore/paa", "matter/truststore/cd");
         ConnectedHomeIpDevicePointerProvider devicePointerProvider =
                 new ConnectedHomeIpReflectionDevicePointerProvider(commandFactory, DEVICE_POINTER_TIMEOUT_MILLIS);
         return new ConnectedHomeIpReflectionGateway(
@@ -89,7 +93,10 @@ public final class ConnectedHomeIpMatterControllerFactory {
                 new ConnectedHomeIpAndroidBleConnectionProvider(context, platformProvider),
                 new ConnectedHomeIpRandomNodeIdAllocator(),
                 new ConnectedHomeIpReflectionCommissioningMonitor(commandFactory),
-                new ConnectedHomeIpReflectionAttestationHandler(commandFactory, ATTESTATION_FAIL_SAFE_EXPIRY_SECONDS),
+                new ConnectedHomeIpReflectionAttestationHandler(
+                        commandFactory,
+                        ATTESTATION_FAIL_SAFE_EXPIRY_SECONDS,
+                        trustStore),
                 devicePointerProvider,
                 commandFactory,
                 new ConnectedHomeIpReflectionDeviceMetadataReader(devicePointerProvider));

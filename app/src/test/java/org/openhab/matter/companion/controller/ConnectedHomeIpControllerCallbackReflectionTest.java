@@ -3,6 +3,7 @@ package org.openhab.matter.companion.controller;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -168,9 +169,12 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
     @Test
     public void reflectionAttestationHandlerRegistersDelegateAndContinuesWithBypassFlag() throws Exception {
         FakeChipDeviceController controller = new FakeChipDeviceController();
+        ConnectedHomeIpAttestationTrustStore trustStore =
+                new ConnectedHomeIpAttestationTrustStore(Collections.emptyList(), Collections.emptyList());
         ConnectedHomeIpReflectionAttestationHandler handler = new ConnectedHomeIpReflectionAttestationHandler(
                 fakeFactory(),
-                120);
+                120,
+                trustStore);
 
         handler.prepareForCommissioning(controller, 987654321L, true);
         controller.attestationDelegate.onDeviceAttestationCompleted(1234L, new Object(), 42L);
@@ -185,9 +189,12 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
     public void attestationDelegateReturnsBeforeContinuingCommissioning() throws Exception {
         FakeChipDeviceController controller = new FakeChipDeviceController();
         controller.blockContinueCommissioning = true;
+        ConnectedHomeIpAttestationTrustStore trustStore =
+                new ConnectedHomeIpAttestationTrustStore(Collections.emptyList(), Collections.emptyList());
         ConnectedHomeIpReflectionAttestationHandler handler = new ConnectedHomeIpReflectionAttestationHandler(
                 fakeFactory(),
-                120);
+                120,
+                trustStore);
 
         handler.prepareForCommissioning(controller, 987654321L, true);
         controller.attestationDelegate.onDeviceAttestationCompleted(1234L, new Object(), 42L);
@@ -255,7 +262,9 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
                 FakeCompletionListener.class,
                 FakeDeviceAttestationDelegate.class,
                 FakeGetConnectedDeviceCallback.class,
-                ConnectedHomeIpReflectionCommandFactoryTest.FakeICDRegistrationInfo.class);
+                ConnectedHomeIpReflectionCommandFactoryTest.FakeICDRegistrationInfo.class,
+                FakeAttestationTrustStoreDelegate.class,
+                FakeDeviceAttestation.class);
     }
 
     public static final class FakeChipDeviceController {
@@ -272,9 +281,16 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
         private long releasedDevicePtr;
         private ConnectedHomeIpReflectionCommandFactoryTest.FakeICDRegistrationInfo icdRegistrationInfo;
         private boolean failIcdRegistrationUpdate;
+        private FakeAttestationTrustStoreDelegate trustStoreDelegate;
 
         public void setCompletionListener(FakeCompletionListener listener) {
             completionListener = listener;
+        }
+
+        public void setAttestationTrustStoreDelegate(
+                FakeAttestationTrustStoreDelegate delegate,
+                List<byte[]> cdTrustKeys) {
+            trustStoreDelegate = delegate;
         }
 
         public void setDeviceAttestationDelegate(
@@ -349,6 +365,16 @@ public final class ConnectedHomeIpControllerCallbackReflectionTest {
 
     public interface FakeDeviceAttestationDelegate {
         void onDeviceAttestationCompleted(long devicePtr, Object attestationInfo, long errorCode);
+    }
+
+    public interface FakeAttestationTrustStoreDelegate {
+        byte[] getProductAttestationAuthorityCert(byte[] skid);
+    }
+
+    public static final class FakeDeviceAttestation {
+        public static byte[] extractSkidFromPaaCert(byte[] cert) {
+            return cert;
+        }
     }
 
     public interface FakeGetConnectedDeviceCallback {

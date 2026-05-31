@@ -30,6 +30,7 @@
 - OpenCommissioningWindow results can display a temporary Matter setup QR code in the app when connectedhomeip returns one, and expose a copy button for the returned manual setup code for openHAB Scan Input.
 - Reflection-backed `ConnectedHomeIpControllerGateway` orchestration invokes the connectedhomeip BLE Thread and OCW commands through injectable controller, BLE connection, node-id, attestation-handler, commissioning-monitor, and connected-device-pointer seams.
 - Reflection bridges cover connectedhomeip `CompletionListener`, `DeviceAttestationDelegate`, `continueCommissioning(...)`, `getConnectedDevicePointer(...)`, and `releaseConnectedDevicePointer(...)`.
+- Reflection-backed attestation trust-store setup loads packaged PAA/CD assets and applies `setAttestationTrustStoreDelegate(...)` before commissioning while preserving developer attestation-bypass behavior.
 - OpenCommissioningWindow uses a concrete connectedhomeip callback class when packaged, avoiding the JNI return-type mismatch observed with a dynamic proxy callback on real Android hardware.
 - Reflection commissioning monitor installs a fresh connectedhomeip completion listener before each BLE pairing command, preventing stale one-shot callback state across commissioning attempts.
 - Reflection-backed controller provider can initialize the connectedhomeip Android platform dependency graph, build `ControllerParams`, and construct/cache `ChipDeviceController` without compile-time CHIP dependencies.

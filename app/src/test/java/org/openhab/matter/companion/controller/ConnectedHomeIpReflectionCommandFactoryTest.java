@@ -6,6 +6,8 @@ import org.junit.Test;
 import org.openhab.matter.companion.domain.ThreadDataset;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -160,6 +162,21 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
         assertTrue(exception.getMessage().contains("blank"));
     }
 
+    @Test
+    public void invokesSetAttestationTrustStoreDelegateWithCdTrustKeys() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+
+        factory.invokeSetAttestationTrustStoreDelegate(
+                controller,
+                new FakeAttestationTrustStoreDelegate() {
+                },
+                Arrays.asList(new byte[] {1, 2, 3}));
+
+        assertTrue(controller.attestationTrustStoreDelegateSet);
+        assertEquals(1, controller.cdTrustKeys.size());
+    }
+
     private static ConnectedHomeIpReflectionCommandFactory fakeFactory() {
         return fakeFactory(FakeICDRegistrationInfo.class);
     }
@@ -174,7 +191,9 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
                 null,
                 null,
                 null,
-                icdRegistrationInfoClass);
+                icdRegistrationInfoClass,
+                FakeAttestationTrustStoreDelegate.class,
+                FakeDeviceAttestation.class);
     }
 
     public static final class FakeNetworkCredentials {
@@ -288,6 +307,8 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
         private boolean openCommissioningWindowError;
         private boolean blankOpenCommissioningWindowSuccess;
         private FakeICDRegistrationInfo icdRegistrationInfo;
+        private boolean attestationTrustStoreDelegateSet;
+        private List<byte[]> cdTrustKeys;
 
         public void pairDeviceThroughBLE(
                 BluetoothGatt bleServer,
@@ -325,11 +346,27 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
         public void updateCommissioningICDRegistrationInfo(FakeICDRegistrationInfo icdRegistrationInfo) {
             this.icdRegistrationInfo = icdRegistrationInfo;
         }
+
+        public void setAttestationTrustStoreDelegate(
+                FakeAttestationTrustStoreDelegate delegate,
+                List<byte[]> cdTrustKeys) {
+            this.attestationTrustStoreDelegateSet = delegate != null;
+            this.cdTrustKeys = cdTrustKeys;
+        }
     }
 
     public interface FakeOpenCommissioningCallback {
         void onError(int status, long deviceId);
 
         void onSuccess(long deviceId, String manualPairingCode, String qrCode);
+    }
+
+    public interface FakeAttestationTrustStoreDelegate {
+    }
+
+    public static final class FakeDeviceAttestation {
+        public static byte[] extractSkidFromPaaCert(byte[] cert) {
+            return cert;
+        }
     }
 }

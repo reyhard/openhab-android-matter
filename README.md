@@ -187,6 +187,12 @@ $env:ANDROID_HOME='D:\Tools\Android\SDK'
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug -PopenhabMatterChipControllerArtifactsDir=<artifact-dir> -PopenhabMatterChipControllerAbis=arm64-v8a
 ```
 
+For production attestation verification, also package local trust-store
+certificates with `-PopenhabMatterChipPaaTrustStoreDir=<dir>` and optionally
+`-PopenhabMatterChipCdTrustStoreDir=<dir>`, where `<dir>` paths point to local
+connectedhomeip DCL mirror outputs such as
+`credentials\production\paa-root-certs` and `credentials\production\cd-certs`.
+
 The Gradle verifier rejects missing native libraries, empty files, corrupt
 controller jars, and controller jar sets that do not contain the class entries
 required by runtime readiness. Placeholder files cannot pass the packaging gate.
