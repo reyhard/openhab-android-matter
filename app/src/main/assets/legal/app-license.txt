@@ -1,0 +1,12 @@
+openHAB Matter helper
+
+This application is distributed under the GNU General Public License as
+published by the Free Software Foundation; either version 2 of the License, or
+at your option any later version.
+
+When an APK bundles Apache-2.0 connectedhomeip controller artifacts, distribute
+that APK only under GPL-3.0-or-later-compatible terms. Apache-2.0 is compatible
+with GPLv3 but is not generally treated as compatible with GPLv2-only terms.
+
+The complete project license text is available in the source repository
+LICENSE file.

@@ -10,12 +10,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
+import org.openhab.matter.companion.BuildConfig
 import org.openhab.matter.companion.qr.InAppQrScannerActivity
 import org.openhab.matter.companion.qr.QrScanIntentFactory
 import org.openhab.matter.companion.setup.MatterSetupAction
 
 class MatterSetupActivity : ComponentActivity() {
     private lateinit var viewModel: MatterSetupViewModel
+    private lateinit var legalContent: AboutLegalContent
     private var pendingSetupAction: MatterSetupAction? = null
 
     private val qrScannerLauncher = registerForActivityResult(
@@ -50,6 +52,10 @@ class MatterSetupActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         viewModel = ViewModelProvider(this)[MatterSetupViewModel::class.java]
+        legalContent = AboutLegalContentLoader.load(
+            BuildConfig.VERSION_NAME,
+            AndroidLegalAssetReader(applicationContext)
+        )
 
         setContent {
             MatterSetupApp(
@@ -67,6 +73,7 @@ class MatterSetupActivity : ComponentActivity() {
                 threadBorderRouterDiscoveryInProgress = viewModel.threadBorderRouterDiscoveryInProgress,
                 phoneDevices = viewModel.phoneDevices,
                 scanReadiness = viewModel.scanReadiness,
+                legalContent = legalContent,
                 ipv6DiagnosticAddress = viewModel.ipv6DiagnosticAddress,
                 manualSetupCode = viewModel.manualSetupCode,
                 onOpenHabUrlChange = viewModel::onOpenHabUrlChange,

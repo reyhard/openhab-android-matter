@@ -26,6 +26,7 @@ fun MatterSetupApp(
     threadBorderRouterDiscoveryInProgress: Boolean,
     phoneDevices: List<PhoneMatterDevice>,
     scanReadiness: ScanReadinessUiState,
+    legalContent: AboutLegalContent,
     ipv6DiagnosticAddress: String,
     manualSetupCode: String,
     onOpenHabUrlChange: (String) -> Unit,
@@ -161,6 +162,12 @@ fun MatterSetupApp(
                 state = state,
                 ipv6DiagnosticAddress = ipv6DiagnosticAddress,
                 onIpv6DiagnosticAddressChange = onIpv6DiagnosticAddressChange,
+                onAction = onAction
+            )
+
+            MatterSetupStage.About -> AboutScreen(
+                state = state,
+                legalContent = legalContent,
                 onAction = onAction
             )
         }

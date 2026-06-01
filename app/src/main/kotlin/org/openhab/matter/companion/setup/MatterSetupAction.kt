@@ -34,6 +34,7 @@ sealed interface MatterSetupAction {
     data object BrowseMatterServices : MatterSetupAction
     data object CheckIpv6Reachability : MatterSetupAction
     data object ShowTroubleshooting : MatterSetupAction
+    data object ShowAbout : MatterSetupAction
     data object ForgetFromPhone : MatterSetupAction
     data object OpenOpenHabInbox : MatterSetupAction
     data object AddAnotherDevice : MatterSetupAction

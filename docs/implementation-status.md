@@ -65,6 +65,7 @@
 - The Compose advanced troubleshooting screen exposes one-tap OpenCommissioningWindow retry for the currently staged bootstrap device and a forget-from-phone cleanup action that clears this app's stored bootstrap state without claiming to factory reset the device.
 - The Compose settings flow has a dedicated **Devices on this phone** submenu for the app-stored bootstrap device, with visible back navigation, expandable staging diagnostics, OpenCommissioningWindow retry, details navigation, and forget-from-phone cleanup. This is currently a view of this app's persisted staging state, not a full connectedhomeip fabric inventory.
 - The Compose staged-device details screen shows local vendor/product data by default and can explicitly fetch additional Matter cluster metadata from the staged device, merging retrieved fields into copyable detail rows while leaving existing values visible on fetch failure.
+- The Compose settings flow has an About screen showing the app version, app license summary, connectedhomeip/Matter SDK third-party notices, and the bundled Apache-2.0 license text from APK assets.
 
 ## Not Implemented Yet
 

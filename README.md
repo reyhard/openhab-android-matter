@@ -162,6 +162,30 @@ The Gradle verifier rejects missing native libraries, empty files, corrupt
 controller jars, and controller jar sets that do not contain the class entries
 required by runtime readiness. Placeholder files cannot pass the packaging gate.
 
+### Licensing and Notices
+
+connectedhomeip is licensed under the Apache License, Version 2.0. Release APKs
+that bundle connectedhomeip controller artifacts must keep the app's About
+screen available so users can view the bundled third-party notices and license
+text. The same text is stored in:
+
+```text
+app\src\main\assets\legal\third-party-notices.txt
+app\src\main\assets\legal\connectedhomeip-apache-2.0.txt
+THIRD_PARTY_NOTICES.md
+NOTICE
+```
+
+Apache-2.0 is compatible with GPLv3-compatible distribution, but it is not
+generally treated as compatible with GPLv2-only distribution. Do not ship an APK
+that bundles connectedhomeip artifacts unless the app distribution is covered by
+GPL-3.0-or-later-compatible terms.
+
+Using the Matter SDK does not grant Matter certification, compliance, logo,
+trademark, or Connectivity Standards Alliance endorsement rights. Do not
+describe this app, an APK, or a device as Matter certified or Matter compliant
+unless the applicable CSA requirements have been satisfied.
+
 Run the synthetic artifact validation smoke test with:
 
 ```powershell

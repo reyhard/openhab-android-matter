@@ -700,6 +700,12 @@ class MatterSetupAppTest {
                 threadBorderRouterDiscoveryInProgress = false,
                 phoneDevices = phoneDevices,
                 scanReadiness = scanReadiness,
+                legalContent = AboutLegalContent(
+                    versionName = "test",
+                    appLicense = "Test app license",
+                    thirdPartyNotices = "Test third-party notices",
+                    thirdPartyLicenses = "Test third-party licenses"
+                ),
                 ipv6DiagnosticAddress = "",
                 manualSetupCode = manualSetupCode,
                 onOpenHabUrlChange = {},

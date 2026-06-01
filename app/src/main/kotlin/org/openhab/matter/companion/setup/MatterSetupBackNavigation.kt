@@ -16,6 +16,7 @@ object MatterSetupBackNavigation {
             MatterSetupStage.PhoneDeviceDetails -> MatterSetupAction.ShowPhoneDevices
 
             MatterSetupStage.AdvancedTroubleshooting -> state.primaryAction
+            MatterSetupStage.About -> MatterSetupAction.BackToSettings
 
             MatterSetupStage.NeedsOpenHabSetup,
             MatterSetupStage.OpenHabSetupChecking,

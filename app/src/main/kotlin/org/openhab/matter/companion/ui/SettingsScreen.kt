@@ -123,6 +123,11 @@ fun SettingsScreen(
                 value = "Setup checks and network tools",
                 onClick = { onAction(MatterSetupAction.ShowTroubleshooting) }
             )
+            SettingsRow(
+                title = "About",
+                value = "Version, license, and notices",
+                onClick = { onAction(MatterSetupAction.ShowAbout) }
+            )
         }
     }
 }

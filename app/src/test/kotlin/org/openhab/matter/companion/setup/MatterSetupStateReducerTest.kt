@@ -71,6 +71,16 @@ class MatterSetupStateReducerTest {
     }
 
     @Test
+    fun aboutStateUsesDedicatedAboutStage() {
+        val state = MatterSetupStateReducer.about()
+
+        assertEquals(MatterSetupStage.About, state.stage)
+        assertEquals("About", state.title)
+        assertEquals(MatterSetupAction.BackToSettings, state.primaryAction)
+        assertEquals("Back to settings", state.primaryActionLabel)
+    }
+
+    @Test
     fun openHabConnectionEditorUsesOneScreenForAddressTokenAndTesting() {
         val state = MatterSetupStateReducer.openHabAddressEditor()
 

@@ -470,6 +470,10 @@ class MatterSetupViewModel @JvmOverloads constructor(
                 uiState = MatterSetupStateReducer.advancedTroubleshooting(uiState)
             }
 
+            MatterSetupAction.ShowAbout -> {
+                uiState = MatterSetupStateReducer.about()
+            }
+
             MatterSetupAction.BrowseMatterServices -> {
                 browseMatterServices()
             }

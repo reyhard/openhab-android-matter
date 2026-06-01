@@ -30,6 +30,16 @@ object MatterSetupStateReducer {
         )
     }
 
+    fun about(): MatterSetupUiState {
+        return MatterSetupUiState(
+            stage = MatterSetupStage.About,
+            title = "About",
+            message = "Version, license, and third-party notices.",
+            primaryAction = MatterSetupAction.BackToSettings,
+            primaryActionLabel = "Back to settings"
+        )
+    }
+
     fun changeToken(): MatterSetupUiState {
         return openHabAddressEditor()
     }

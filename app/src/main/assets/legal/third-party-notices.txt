@@ -1,0 +1,33 @@
+Third-party notices
+
+connectedhomeip / Matter SDK
+
+The connectedhomeip Android controller artifacts are built from the Matter SDK
+project at https://github.com/project-chip/connectedhomeip and are licensed
+under the Apache License, Version 2.0.
+
+The connectedhomeip artifacts are included only in APKs built with
+openhabMatterChipControllerArtifactsDir. Source builds without those artifacts
+package only the local non-production JNI stub.
+
+Upstream Matter SDK NOTICE
+
+Copyright (c) 2020 Project CHIP Authors
+Copyright (c) 2021-2024 Connectivity Standards Alliance
+
+The Matter software is provided under the Apache License, Version 2.0.
+
+Use of the Matter SDK does not grant certification, compliance, logo, trademark,
+or other rights from the Connectivity Standards Alliance. Products must not be
+described as Matter certified, Matter compliant, or otherwise endorsed by the
+Connectivity Standards Alliance unless the relevant CSA certification and
+trademark requirements have been satisfied.
+
+This NOTICE must be included with copies of the Matter SDK and with derivative
+works that include the Matter SDK.
+
+Release packaging note
+
+Release APKs that bundle connectedhomeip must include this notice, the Apache
+2.0 license text, and the licenses/notices for the exact third-party components
+present in the built connectedhomeip artifacts.
