@@ -90,7 +90,7 @@ data class MatterSetupUiState(
             MatterSetupStage.CommissioningWindowOpen -> "The device is ready for openHAB."
             MatterSetupStage.SendingCodeToOpenHab -> "Sending the setup code to openHAB."
             MatterSetupStage.WatchingOpenHabInbox -> "Waiting for openHAB to find the device."
-            else -> "This usually takes less than a minute."
+            else -> "This usually takes around 2 minutes."
         }
 
         private fun progressSteps(activeStage: MatterSetupStage, activeDetail: String): List<MatterSetupStep> {
