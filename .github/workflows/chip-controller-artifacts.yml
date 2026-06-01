@@ -108,6 +108,8 @@ jobs:
         run: |
           set -euo pipefail
           BUILD_LIB_DIR="$GITHUB_WORKSPACE/connectedhomeip/out/android-arm64-chip-tool/lib"
+          PAA_ROOT="$GITHUB_WORKSPACE/connectedhomeip/credentials/production/paa-root-certs"
+          CD_ROOT="$GITHUB_WORKSPACE/connectedhomeip/credentials/production/cd-certs"
           OUT_ROOT="$RUNNER_TEMP/$CHIP_ARTIFACT_DIR_NAME"
           OUT_ARCHIVE="$RUNNER_TEMP/$CHIP_ARTIFACT_NAME"
 
@@ -124,6 +126,23 @@ jobs:
           cp "$BUILD_LIB_DIR/src/controller/java/libMatterJson.jar" "$OUT_ROOT/"
           cp "$BUILD_LIB_DIR/jni/arm64-v8a/libCHIPController.so" "$OUT_ROOT/jniLibs/arm64-v8a/"
           cp "$BUILD_LIB_DIR/jni/arm64-v8a/libc++_shared.so" "$OUT_ROOT/jniLibs/arm64-v8a/"
+
+          test -d "$PAA_ROOT"
+          PAA_CERT_COUNT="$(find "$PAA_ROOT" -type f \( -name '*.pem' -o -name '*.der' \) | wc -l | tr -d '[:space:]')"
+          if [[ "$PAA_CERT_COUNT" -lt 1 ]]; then
+            echo "::error::No PAA trust-store certificates found in $PAA_ROOT."
+            exit 1
+          fi
+          mkdir -p "$OUT_ROOT/paa-root-certs"
+          cp -a "$PAA_ROOT"/. "$OUT_ROOT/paa-root-certs/"
+
+          if [[ -d "$CD_ROOT" ]]; then
+            CD_CERT_COUNT="$(find "$CD_ROOT" -type f \( -name '*.pem' -o -name '*.der' \) | wc -l | tr -d '[:space:]')"
+            if [[ "$CD_CERT_COUNT" -gt 0 ]]; then
+              mkdir -p "$OUT_ROOT/cd-certs"
+              cp -a "$CD_ROOT"/. "$OUT_ROOT/cd-certs/"
+            fi
+          fi
 
           (
             cd "$OUT_ROOT"
