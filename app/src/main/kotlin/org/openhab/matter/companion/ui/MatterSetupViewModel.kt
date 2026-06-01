@@ -324,6 +324,10 @@ class MatterSetupViewModel @JvmOverloads constructor(
                 refreshScanReadiness()
             }
 
+            MatterSetupAction.OpenOpenHabInbox -> {
+                // Handled by MatterSetupActivity because opening a browser is an Android UI side effect.
+            }
+
             MatterSetupAction.ConfirmPairingMode -> {
                 if (scannedPayload.isBlank()) {
                     uiState = MatterSetupUiState.failed(
