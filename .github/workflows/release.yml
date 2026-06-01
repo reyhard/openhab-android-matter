@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 45
 
     env:
-      APK_PATH: app/build/outputs/apk/debug/openhab-matter-helper.apk
+      APK_PATH: app/build/outputs/apk/release/openhab-matter-helper.apk
       CHIP_CONTROLLER_ARTIFACTS_DIR: /tmp/connectedhomeip-controller-artifacts
       CHIP_PAA_TRUST_STORE_DIR: /tmp/connectedhomeip-controller-artifacts/paa-root-certs
       CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG: chip-controller-artifacts-latest
@@ -116,8 +116,50 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Prepare release signing keystore
+        shell: bash
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          for secret_name in \
+            ANDROID_RELEASE_KEYSTORE_BASE64 \
+            ANDROID_RELEASE_KEYSTORE_PASSWORD \
+            ANDROID_RELEASE_KEY_ALIAS \
+            ANDROID_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!secret_name:-}" ]]; then
+              missing+=("$secret_name")
+            fi
+          done
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            printf '::error::Missing required GitHub release signing secret: %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+          keystore_path="$RUNNER_TEMP/openhab-matter-release.keystore"
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+
+          mkdir -p "$HOME/.gradle"
+          {
+            printf 'openhabMatterReleaseStoreFile=%s\n' "$keystore_path"
+            printf 'openhabMatterReleaseStorePassword=%s\n' "$ANDROID_RELEASE_KEYSTORE_PASSWORD"
+            printf 'openhabMatterReleaseKeyAlias=%s\n' "$ANDROID_RELEASE_KEY_ALIAS"
+            printf 'openhabMatterReleaseKeyPassword=%s\n' "$ANDROID_RELEASE_KEY_PASSWORD"
+          } >> "$HOME/.gradle/gradle.properties"
+          chmod 600 "$HOME/.gradle/gradle.properties"
+
       - name: Validate changelog generator
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_generate_changelog.ps1
+
+      - name: Validate release signing pipeline
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_release_signing_pipeline.ps1
 
       - name: Download connectedhomeip controller artifacts
         shell: bash
@@ -198,12 +240,13 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace $CHIP_GRADLE_ARGS
 
-      - name: Validate release build
+      - name: Build signed release APK
         run: ./gradlew :app:assembleRelease --stacktrace $CHIP_GRADLE_ARGS
 
       - name: Verify APK artifact
         run: |
           test -s "$APK_PATH"
+          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --print-certs "$APK_PATH"
           pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_apk_badging.ps1 -ApkPath "$APK_PATH"
           pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_apk_truststore_assets.ps1 -ApkPath "$APK_PATH"
 

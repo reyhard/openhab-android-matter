@@ -12,6 +12,14 @@ def chipSupportedAbis = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
 def chipControllerArtifactsDir = (findProperty("openhabMatterChipControllerArtifactsDir") ?: "").toString().trim()
 def chipPaaTrustStoreDir = (findProperty("openhabMatterChipPaaTrustStoreDir") ?: "").toString().trim()
 def chipCdTrustStoreDir = (findProperty("openhabMatterChipCdTrustStoreDir") ?: "").toString().trim()
+def releaseStoreFilePath = (findProperty("openhabMatterReleaseStoreFile") ?: "").toString().trim()
+def releaseStorePassword = (findProperty("openhabMatterReleaseStorePassword") ?: "").toString()
+def releaseKeyAlias = (findProperty("openhabMatterReleaseKeyAlias") ?: "").toString().trim()
+def releaseKeyPassword = (findProperty("openhabMatterReleaseKeyPassword") ?: "").toString()
+def hasReleaseSigning = !releaseStoreFilePath.isEmpty()
+        && !releaseStorePassword.isEmpty()
+        && !releaseKeyAlias.isEmpty()
+        && !releaseKeyPassword.isEmpty()
 def chipControllerSupportedAbis = (findProperty("openhabMatterChipControllerAbis")
         ?: "arm64-v8a;armeabi-v7a;x86;x86_64")
         .toString()
@@ -99,6 +107,25 @@ android {
 
     lint {
         baseline = file("lint-baseline.xml")
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 
     if (chipNativeMode == "stub") {

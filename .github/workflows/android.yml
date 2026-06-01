@@ -60,6 +60,9 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Validate release signing pipeline
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_release_signing_pipeline.ps1
+
       - name: Download connectedhomeip controller artifacts
         shell: bash
         env:
