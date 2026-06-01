@@ -78,6 +78,14 @@ jobs:
           unzip -q "$RUNNER_TEMP/kotlin-compiler.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
 
+      - name: Refresh production PAA trust store from DCL
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 connectedhomeip/credentials/fetch_paa_certs_from_dcl.py \
+            --use-main-net-http \
+            --paa-trust-store-path connectedhomeip/credentials/production/paa-root-certs
+
       - name: Build connectedhomeip Android controller artifacts
         shell: bash
         run: |
@@ -131,6 +139,10 @@ jobs:
           PAA_CERT_COUNT="$(find "$PAA_ROOT" -type f \( -name '*.pem' -o -name '*.der' \) | wc -l | tr -d '[:space:]')"
           if [[ "$PAA_CERT_COUNT" -lt 1 ]]; then
             echo "::error::No PAA trust-store certificates found in $PAA_ROOT."
+            exit 1
+          fi
+          if ! find "$PAA_ROOT" -type f \( -name '*.pem' -o -name '*.der' \) | grep -Eiq 'IKEA|117C'; then
+            echo "::error::DCL-refreshed PAA trust store does not include IKEA VID 0x117C root required by validated device logs."
             exit 1
           fi
           mkdir -p "$OUT_ROOT/paa-root-certs"
