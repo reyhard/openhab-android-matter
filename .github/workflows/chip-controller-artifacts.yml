@@ -82,6 +82,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 -m pip install \
+            -c connectedhomeip/scripts/setup/constraints.txt \
+            click-option-group
           python3 connectedhomeip/credentials/fetch_paa_certs_from_dcl.py \
             --use-main-net-http \
             --paa-trust-store-path connectedhomeip/credentials/production/paa-root-certs
