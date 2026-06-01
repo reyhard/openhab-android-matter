@@ -5,7 +5,7 @@ import fs from "node:fs";
 
 const args = parseArgs(process.argv.slice(2));
 const tag = args.tag ?? args.version ?? "";
-const toRef = args.to ?? "HEAD";
+const toRef = args.to ?? (tag && refExists(tag) ? tag : "HEAD");
 const repo = args.repo ?? process.env.GITHUB_REPOSITORY ?? "";
 const output = args.output ?? "";
 const fromRef = args.from ?? findPreviousTag(toRef);
@@ -185,4 +185,13 @@ function stripTrailingPeriod(value) {
 
 function execGit(args) {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function refExists(ref) {
+  try {
+    execGit(["rev-parse", "--verify", `${ref}^{commit}`]);
+    return true;
+  } catch {
+    return false;
+  }
 }

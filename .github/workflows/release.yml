@@ -66,9 +66,22 @@ jobs:
             TAG_NAME="v$VERSION_NAME"
           fi
 
+          RELEASE_TARGET_REF="$GITHUB_SHA"
+          if git rev-parse --verify --quiet "${TAG_NAME}^{commit}" >/dev/null; then
+            RELEASE_TARGET_REF="$(git rev-list -n 1 "$TAG_NAME")"
+            git checkout --detach "$RELEASE_TARGET_REF"
+            VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([^"]+)".*$/\1/p' app/build.gradle | head -n1)"
+            VERSION_CODE="$(awk '/^[[:space:]]*versionCode[[:space:]]+[0-9]+/{print $2; exit}' app/build.gradle)"
+            if [[ -z "$VERSION_NAME" || -z "$VERSION_CODE" ]]; then
+              echo "::error::Could not parse versionName/versionCode from app/build.gradle after checking out ${TAG_NAME}."
+              exit 1
+            fi
+          fi
+
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "RELEASE_TARGET_REF=$RELEASE_TARGET_REF" >> "$GITHUB_ENV"
           echo "PREVIOUS_TAG=$INPUT_PREVIOUS_TAG" >> "$GITHUB_ENV"
           echo "RELEASE_PRERELEASE=$INPUT_PRERELEASE" >> "$GITHUB_ENV"
           echo "RELEASE_DRAFT=$INPUT_DRAFT" >> "$GITHUB_ENV"
@@ -102,6 +115,9 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
+
+      - name: Validate changelog generator
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test_generate_changelog.ps1
 
       - name: Download connectedhomeip controller artifacts
         shell: bash
@@ -195,7 +211,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(--tag "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --output "$RUNNER_TEMP/RELEASE_NOTES.md")
+          args=(--tag "$TAG_NAME" --to "$RELEASE_TARGET_REF" --repo "$GITHUB_REPOSITORY" --output "$RUNNER_TEMP/RELEASE_NOTES.md")
           if [[ -n "$PREVIOUS_TAG" ]]; then
             args+=(--from "$PREVIOUS_TAG")
           fi
@@ -224,7 +240,7 @@ jobs:
             gh release edit "$TAG_NAME" "${release_args[@]}"
           else
             gh release create "$TAG_NAME" \
-              --target "$GITHUB_SHA" \
+              --target "$RELEASE_TARGET_REF" \
               "${release_args[@]}"
           fi
 
