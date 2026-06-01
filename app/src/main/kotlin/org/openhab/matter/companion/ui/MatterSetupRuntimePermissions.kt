@@ -9,7 +9,11 @@ import android.os.Build
 
 object MatterSetupRuntimePermissions {
     fun requiredForSetup(sdkInt: Int = Build.VERSION.SDK_INT): List<String> {
+        if (sdkInt < Build.VERSION_CODES.M) {
+            return emptyList()
+        }
         return buildList {
+            add(Manifest.permission.CAMERA)
             add(Manifest.permission.ACCESS_FINE_LOCATION)
             if (sdkInt >= Build.VERSION_CODES.S) {
                 add(Manifest.permission.BLUETOOTH_SCAN)

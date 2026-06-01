@@ -5,11 +5,15 @@ import java.util.Collections;
 import java.util.List;
 
 public final class CommissioningPermissionPlanner {
+    private static final String CAMERA_PERMISSION = "android.permission.CAMERA";
     private static final List<String> BLUETOOTH_PERMISSIONS = Collections.unmodifiableList(Arrays.asList(
             "android.permission.BLUETOOTH_SCAN",
             "android.permission.BLUETOOTH_CONNECT"));
-    private static final List<String> LOCATION_PERMISSIONS = Collections.singletonList("android.permission.ACCESS_FINE_LOCATION");
-    private static final List<String> BLUETOOTH_AND_LOCATION_PERMISSIONS = Collections.unmodifiableList(Arrays.asList(
+    private static final List<String> CAMERA_AND_LOCATION_PERMISSIONS = Collections.unmodifiableList(Arrays.asList(
+            CAMERA_PERMISSION,
+            "android.permission.ACCESS_FINE_LOCATION"));
+    private static final List<String> CAMERA_BLUETOOTH_AND_LOCATION_PERMISSIONS = Collections.unmodifiableList(Arrays.asList(
+            CAMERA_PERMISSION,
             "android.permission.BLUETOOTH_SCAN",
             "android.permission.BLUETOOTH_CONNECT",
             "android.permission.ACCESS_FINE_LOCATION"));
@@ -19,10 +23,10 @@ public final class CommissioningPermissionPlanner {
 
     public static List<String> requiredPermissions(int sdkVersion) {
         if (sdkVersion >= 31) {
-            return BLUETOOTH_AND_LOCATION_PERMISSIONS;
+            return CAMERA_BLUETOOTH_AND_LOCATION_PERMISSIONS;
         }
         if (sdkVersion >= 23) {
-            return LOCATION_PERMISSIONS;
+            return CAMERA_AND_LOCATION_PERMISSIONS;
         }
         return Collections.emptyList();
     }
