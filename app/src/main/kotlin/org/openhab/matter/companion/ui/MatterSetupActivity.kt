@@ -2,6 +2,7 @@ package org.openhab.matter.companion.ui
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.WindowManager
@@ -111,6 +112,11 @@ class MatterSetupActivity : ComponentActivity() {
 
             MatterSetupAction.OpenBluetoothSettings -> {
                 bluetoothSettingsLauncher.launch(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            }
+
+            MatterSetupAction.OpenOpenHabInbox -> {
+                val inboxUri = Uri.parse(OpenHabInboxBrowserTarget.url(viewModel.openHabUrl))
+                startActivity(Intent(Intent.ACTION_VIEW, inboxUri))
             }
 
             else -> {
