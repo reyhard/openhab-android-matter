@@ -29,11 +29,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -55,6 +52,7 @@ import org.openhab.matter.companion.ui.components.MatterSetupScaffold
 private const val DEVICE_DATA_FETCH_ERROR_MESSAGE = "Could not fetch data from device"
 private const val DEVICE_DATA_REFRESHED_MESSAGE = "Device data refreshed"
 private const val DEVICE_DETAILS_FETCH_ERROR_DESCRIPTION = "Device details fetch error"
+private const val DEVICE_DETAILS_COPY_CONFIRMATION_DESCRIPTION = "Device details copy confirmation"
 
 @Composable
 fun PhoneDeviceDetailsScreen(
@@ -62,7 +60,6 @@ fun PhoneDeviceDetailsScreen(
     onAction: (MatterSetupAction) -> Unit
 ) {
     val details = state.phoneDeviceDetails
-    var copyFeedback by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
 
@@ -98,7 +95,9 @@ fun PhoneDeviceDetailsScreen(
             DeviceDetailsCard(
                 details = details,
                 onCopied = { label ->
-                    copyFeedback = "Copied $label"
+                    snackbarScope.launch {
+                        snackbarHostState.showSnackbar("Copied $label")
+                    }
                 }
             )
             Spacer(Modifier.height(16.dp))
@@ -137,14 +136,6 @@ fun PhoneDeviceDetailsScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            if (copyFeedback.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = copyFeedback,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
             Spacer(Modifier.height(24.dp))
             Button(
                 onClick = { onAction(MatterSetupAction.OpenCommissioningWindowAgain) },
@@ -179,11 +170,16 @@ fun PhoneDeviceDetailsScreen(
                 .align(Alignment.BottomCenter)
                 .padding(16.dp)
         ) { snackbarData ->
+            val isCopyConfirmation = snackbarData.visuals.message.startsWith("Copied ")
             Snackbar {
                 Text(
                     text = snackbarData.visuals.message,
                     modifier = Modifier.semantics {
-                        contentDescription = DEVICE_DETAILS_FETCH_ERROR_DESCRIPTION
+                        contentDescription = if (isCopyConfirmation) {
+                            DEVICE_DETAILS_COPY_CONFIRMATION_DESCRIPTION
+                        } else {
+                            DEVICE_DETAILS_FETCH_ERROR_DESCRIPTION
+                        }
                     }
                 )
             }

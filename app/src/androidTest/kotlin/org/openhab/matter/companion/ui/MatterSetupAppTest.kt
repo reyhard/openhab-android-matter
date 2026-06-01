@@ -619,6 +619,7 @@ class MatterSetupAppTest {
 
         composeRule.onNodeWithText("Fetch additional data from device").performClick()
         composeRule.onNodeWithContentDescription("Copy Vendor").performClick()
+        composeRule.onNodeWithContentDescription("Device details copy confirmation").assertIsDisplayed()
         composeRule.onNodeWithText("Copied Vendor").assertIsDisplayed()
         assertEquals("IKEA of Sweden", clipboardText())
         composeRule.onNodeWithText("Advanced").performClick()
