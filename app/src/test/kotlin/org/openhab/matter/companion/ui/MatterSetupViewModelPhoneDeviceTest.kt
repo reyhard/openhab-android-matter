@@ -299,6 +299,89 @@ class MatterSetupViewModelPhoneDeviceTest {
         assertEquals("", viewModel.uiState.phoneDeviceDetailsMessage)
     }
 
+    @Test
+    fun forgetFromPhoneUnpairsNativeDeviceBeforeClearingBootstrapState() {
+        val nativeController = RecordingNativeController()
+        val bootstrapStateRepository = FakeBootstrapStateRepository(
+            MatterBootstrapState(
+                0x4D2,
+                "controller-state",
+                false,
+                "Staged vendor",
+                "Staged product"
+            )
+        )
+        val viewModel = viewModelWith(
+            bootstrapStateRepository = bootstrapStateRepository,
+            nativeController = nativeController
+        )
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ForgetFromPhone)
+
+        assertEquals(1, nativeController.unpairCalls)
+        assertEquals(0x4D2L, nativeController.lastUnpairNodeId)
+        assertEquals("controller-state", nativeController.lastUnpairControllerState)
+        assertTrue(bootstrapStateRepository.load().isEmptyForTesting())
+        assertEquals(MatterSetupStage.PhoneDeviceList, viewModel.uiState.stage)
+        assertTrue(viewModel.phoneDevices.isEmpty())
+        assertFalse(viewModel.uiState.secondaryActions.contains(MatterSetupAction.ForceRemoveFromPhone))
+    }
+
+    @Test
+    fun forgetFromPhoneKeepsBootstrapStateAndExposesForceRemoveWhenNativeUnpairFails() {
+        val originalState = MatterBootstrapState(
+            0x4D2,
+            "controller-state",
+            false,
+            "Staged vendor",
+            "Staged product"
+        )
+        val nativeController = RecordingNativeController(unpairError = IllegalStateException("fabric entry missing"))
+        val bootstrapStateRepository = FakeBootstrapStateRepository(originalState)
+        val viewModel = viewModelWith(
+            bootstrapStateRepository = bootstrapStateRepository,
+            nativeController = nativeController
+        )
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ForgetFromPhone)
+
+        assertEquals(1, nativeController.unpairCalls)
+        assertEquals(originalState, bootstrapStateRepository.load())
+        assertEquals(MatterSetupStage.PhoneDeviceList, viewModel.uiState.stage)
+        assertEquals(1, viewModel.phoneDevices.size)
+        assertTrue(viewModel.uiState.message.contains("Could not unpair"))
+        assertTrue(viewModel.uiState.message.contains("fabric entry missing"))
+        assertTrue(viewModel.uiState.secondaryActions.contains(MatterSetupAction.ForceRemoveFromPhone))
+    }
+
+    @Test
+    fun forceRemoveFromPhoneClearsBootstrapStateWithoutCallingNativeUnpair() {
+        val nativeController = RecordingNativeController()
+        val bootstrapStateRepository = FakeBootstrapStateRepository(
+            MatterBootstrapState(
+                0x4D2,
+                "controller-state",
+                false,
+                "Staged vendor",
+                "Staged product"
+            )
+        )
+        val viewModel = viewModelWith(
+            bootstrapStateRepository = bootstrapStateRepository,
+            nativeController = nativeController
+        )
+
+        viewModel.handleAction(MatterSetupAction.ShowPhoneDevices)
+        viewModel.handleAction(MatterSetupAction.ForceRemoveFromPhone)
+
+        assertEquals(0, nativeController.unpairCalls)
+        assertTrue(bootstrapStateRepository.load().isEmptyForTesting())
+        assertEquals(MatterSetupStage.PhoneDeviceList, viewModel.uiState.stage)
+        assertTrue(viewModel.phoneDevices.isEmpty())
+    }
+
     private fun viewModelWith(
         bootstrapState: MatterBootstrapState,
         nativeController: RecordingNativeController = RecordingNativeController()
@@ -357,13 +440,20 @@ class MatterSetupViewModelPhoneDeviceTest {
     private class RecordingNativeController(
         private val details: MatterDeviceDetails = MatterDeviceDetails.empty(),
         private val ready: Boolean = true,
-        private val beforeReadReturns: () -> Unit = {}
+        private val beforeReadReturns: () -> Unit = {},
+        private val unpairError: Exception? = null
     ) : MatterControllerCandidate {
         var readDeviceDetailsCalls = 0
             private set
         var lastNodeId: Long? = null
             private set
         var lastControllerState: String? = null
+            private set
+        var unpairCalls = 0
+            private set
+        var lastUnpairNodeId: Long? = null
+            private set
+        var lastUnpairControllerState: String? = null
             private set
 
         override fun readiness(): ChipMatterControllerStatus {
@@ -401,6 +491,20 @@ class MatterSetupViewModelPhoneDeviceTest {
             beforeReadReturns()
             return details
         }
+
+        override fun unpair(
+            nodeId: Long,
+            controllerState: String,
+            listener: MatterController.ProgressListener
+        ) {
+            unpairCalls += 1
+            lastUnpairNodeId = nodeId
+            lastUnpairControllerState = controllerState
+            listener.onProgress(CommissioningStep("Unpairing device", false))
+            if (unpairError != null) {
+                throw unpairError
+            }
+        }
     }
 
     private object ThrowingMatterController : MatterController {
@@ -422,5 +526,22 @@ class MatterSetupViewModelPhoneDeviceTest {
         ): MatterOpenCommissioningWindowResult {
             throw AssertionError("Fallback controller should not be called")
         }
+
+        override fun unpair(
+            nodeId: Long,
+            controllerState: String,
+            listener: MatterController.ProgressListener
+        ) {
+            throw AssertionError("Fallback controller should not be called")
+        }
+    }
+
+    private fun MatterBootstrapState.isEmptyForTesting(): Boolean {
+        return bootstrapNodeId() < 0L &&
+            controllerState().isBlank() &&
+            !stateUnreadable() &&
+            vendorName().isBlank() &&
+            productName().isBlank() &&
+            deviceDetails().isEmpty
     }
 }

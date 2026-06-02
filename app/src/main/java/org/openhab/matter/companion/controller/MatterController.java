@@ -28,4 +28,11 @@ public interface MatterController {
             ProgressListener listener) throws Exception {
         throw new UnsupportedOperationException("Matter device details are not supported by this controller.");
     }
+
+    default void unpair(
+            long nodeId,
+            String controllerState,
+            ProgressListener listener) throws Exception {
+        throw new UnsupportedOperationException("Matter unpair is not supported by this controller.");
+    }
 }

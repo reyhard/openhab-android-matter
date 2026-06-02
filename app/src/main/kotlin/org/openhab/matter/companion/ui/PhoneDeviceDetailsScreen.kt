@@ -162,6 +162,24 @@ fun PhoneDeviceDetailsScreen(
                 Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                 Text("Forget from this phone")
             }
+            if (MatterSetupAction.ForceRemoveFromPhone in state.secondaryActions) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { onAction(MatterSetupAction.ForceRemoveFromPhone) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_material_delete),
+                        contentDescription = null,
+                        modifier = Modifier.size(ButtonDefaults.IconSize)
+                    )
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text("Force remove from this app")
+                }
+            }
         }
 
         SnackbarHost(

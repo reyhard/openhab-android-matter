@@ -85,7 +85,8 @@ object MatterSetupStateReducer {
     fun phoneDeviceList(
         hasDevices: Boolean,
         message: String = "",
-        returnAction: MatterSetupAction = MatterSetupAction.BackToSettings
+        returnAction: MatterSetupAction = MatterSetupAction.BackToSettings,
+        secondaryActions: List<MatterSetupAction> = emptyList()
     ): MatterSetupUiState {
         return MatterSetupUiState(
             stage = MatterSetupStage.PhoneDeviceList,
@@ -98,7 +99,8 @@ object MatterSetupStateReducer {
                 }
             },
             primaryAction = returnAction,
-            primaryActionLabel = returnAction.phoneDeviceReturnLabel()
+            primaryActionLabel = returnAction.phoneDeviceReturnLabel(),
+            secondaryActions = secondaryActions
         )
     }
 

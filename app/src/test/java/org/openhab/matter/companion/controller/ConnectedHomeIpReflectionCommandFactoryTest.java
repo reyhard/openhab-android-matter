@@ -96,6 +96,16 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
     }
 
     @Test
+    public void invokesUnpair() throws Exception {
+        ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
+        FakeChipDeviceController controller = new FakeChipDeviceController();
+
+        factory.invokeUnpair(controller, 0x165BC267A7E344D0L);
+
+        assertEquals(0x165BC267A7E344D0L, controller.unpairNodeId);
+    }
+
+    @Test
     public void invokesOpenPairingWindowAndReturnsManualCodeFromCallback() throws Exception {
         ConnectedHomeIpReflectionCommandFactory factory = fakeFactory();
         FakeChipDeviceController controller = new FakeChipDeviceController();
@@ -309,6 +319,7 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
         private FakeICDRegistrationInfo icdRegistrationInfo;
         private boolean attestationTrustStoreDelegateSet;
         private List<byte[]> cdTrustKeys;
+        private long unpairNodeId = -1L;
 
         public void pairDeviceThroughBLE(
                 BluetoothGatt bleServer,
@@ -345,6 +356,10 @@ public final class ConnectedHomeIpReflectionCommandFactoryTest {
 
         public void updateCommissioningICDRegistrationInfo(FakeICDRegistrationInfo icdRegistrationInfo) {
             this.icdRegistrationInfo = icdRegistrationInfo;
+        }
+
+        public void unpairDevice(long nodeId) {
+            this.unpairNodeId = nodeId;
         }
 
         public void setAttestationTrustStoreDelegate(

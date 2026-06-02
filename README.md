@@ -54,7 +54,7 @@ The app includes advanced troubleshooting screens for:
 - Phone-side Matter mDNS browsing for `_matterc._udp` and `_matter._tcp`.
 - Best-effort phone-side IPv6 reachability to a user-entered device address.
 - Retrying OpenCommissioningWindow for the currently staged phone-side device.
-- Forgetting this app's stored bootstrap device state on the phone.
+- Forgetting a staged device by unpairing it from the phone fabric first, with a force-remove local cleanup option if unpair fails.
 
 Phone-side mDNS and IPv6 checks are useful diagnostics, but they do not prove
 what openHAB, Avahi, the router, or the Thread Border Router can see. If openHAB

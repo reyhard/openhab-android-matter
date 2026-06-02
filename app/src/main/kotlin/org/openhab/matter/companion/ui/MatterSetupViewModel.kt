@@ -489,6 +489,10 @@ class MatterSetupViewModel @JvmOverloads constructor(
             MatterSetupAction.ForgetFromPhone -> {
                 forgetStagedDeviceFromPhone()
             }
+
+            MatterSetupAction.ForceRemoveFromPhone -> {
+                forceRemoveStagedDeviceFromPhone()
+            }
         }
     }
 
@@ -1436,13 +1440,63 @@ class MatterSetupViewModel @JvmOverloads constructor(
 
     private fun forgetStagedDeviceFromPhone() {
         val returnAction = uiState.primaryAction ?: MatterSetupAction.BackToSettings
+        val bootstrapState = bootstrapStateRepository.load()
+        val device = PhoneMatterDevice.fromBootstrapState(bootstrapState)
+        if (device == null || bootstrapState.stateUnreadable()) {
+            uiState = MatterSetupStateReducer.phoneDeviceList(
+                hasDevices = phoneDevices.isNotEmpty(),
+                message = "Could not unpair this Matter device from the phone because the stored staging data is incomplete. You can force remove the local app entry.",
+                returnAction = returnAction,
+                secondaryActions = listOf(MatterSetupAction.ForceRemoveFromPhone)
+            )
+            return
+        }
+        runCatching {
+            val selection = controllerSession.selectNativeIfReady()
+            if (!selection.nativeSelected()) {
+                throw IllegalStateException("connectedhomeip is not ready for unpair.")
+            }
+            selection.controller().unpair(
+                device.nodeId ?: throw IllegalStateException("Stored Matter node id is missing."),
+                bootstrapState.controllerState(),
+                { step ->
+                    Log.i(
+                        TAG,
+                        "Phone device unpair progress: complete=${step.complete()}, message=${step.message()}"
+                    )
+                }
+            )
+            bootstrapStateRepository.clear()
+        }
+            .onSuccess {
+                refreshPhoneDevices()
+                selectedPhoneDevice = null
+                uiState = MatterSetupStateReducer.phoneDeviceList(
+                    hasDevices = false,
+                    message = "The Matter device was unpaired from this phone and the stored staging data was removed from this app. This does not factory reset the device or remove it from openHAB or other ecosystems.",
+                    returnAction = returnAction
+                )
+            }
+            .onFailure { error ->
+                refreshPhoneDevices()
+                uiState = MatterSetupStateReducer.phoneDeviceList(
+                    hasDevices = phoneDevices.isNotEmpty(),
+                    message = "Could not unpair this Matter device from the phone: ${error.message.orEmpty().ifBlank { error.javaClass.simpleName }}. You can force remove only this app's stored entry.",
+                    returnAction = returnAction,
+                    secondaryActions = listOf(MatterSetupAction.ForceRemoveFromPhone)
+                )
+            }
+    }
+
+    private fun forceRemoveStagedDeviceFromPhone() {
+        val returnAction = uiState.primaryAction ?: MatterSetupAction.BackToSettings
         runCatching { bootstrapStateRepository.clear() }
             .onSuccess {
                 refreshPhoneDevices()
                 selectedPhoneDevice = null
                 uiState = MatterSetupStateReducer.phoneDeviceList(
                     hasDevices = false,
-                    message = "Stored Matter staging data was removed from this app. This does not factory reset the device or remove it from other ecosystems.",
+                    message = "Stored Matter staging data was removed from this app. This does not unpair or factory reset the device, and does not remove it from openHAB or other ecosystems.",
                     returnAction = returnAction
                 )
             }
@@ -1450,7 +1504,7 @@ class MatterSetupViewModel @JvmOverloads constructor(
                 uiState = MatterSetupUiState.failed(
                     MatterSetupFailure(
                         step = MatterSetupStage.AdvancedTroubleshooting,
-                        message = "Staged device could not be removed from this phone.",
+                        message = "Staged device could not be force removed from this app.",
                         details = error.message.orEmpty()
                     ),
                     MatterSetupDiagnosticsSummary.empty()

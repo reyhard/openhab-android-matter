@@ -93,6 +93,22 @@ public final class ConnectedHomeIpMatterController implements MatterControllerCa
     }
 
     @Override
+    public void unpair(
+            long nodeId,
+            String controllerState,
+            ProgressListener listener) throws Exception {
+        requireArtifactsReady();
+        emit(listener, "Unpairing connectedhomeip Java device", false);
+        ConnectedHomeIpDiagnostics.withListener(
+                message -> emit(listener, message, false),
+                () -> {
+                    gateway.unpair(nodeId);
+                    return null;
+                });
+        emit(listener, "connectedhomeip Java device unpaired", true);
+    }
+
+    @Override
     public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) throws Exception {
         requireArtifactsReady();
         return gateway.checkFabricRestore(bootstrapNodeId);

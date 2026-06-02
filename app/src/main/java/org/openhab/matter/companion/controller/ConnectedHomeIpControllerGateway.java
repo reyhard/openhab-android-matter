@@ -9,4 +9,8 @@ public interface ConnectedHomeIpControllerGateway extends ConnectedHomeIpFabricR
     default MatterDeviceDetails readDeviceDetails(long nodeId) throws Exception {
         throw new UnsupportedOperationException("Matter device details are not supported by this gateway.");
     }
+
+    default void unpair(long nodeId) throws Exception {
+        throw new UnsupportedOperationException("Matter unpair is not supported by this gateway.");
+    }
 }

@@ -112,6 +112,25 @@ public final class ConnectedHomeIpMatterControllerTest {
     }
 
     @Test
+    public void unpairRequiresReadyArtifactsAndDelegatesToGateway() throws Exception {
+        CapturingGateway gateway = new CapturingGateway();
+        ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
+                readyArtifacts(),
+                gateway,
+                false);
+        List<String> steps = new ArrayList<>();
+
+        controller.unpair(
+                0x165BC267A7E344D0L,
+                "controller-state",
+                step -> steps.add(step.message()));
+
+        assertEquals(0x165BC267A7E344D0L, gateway.unpairNodeId);
+        assertEquals("Unpairing connectedhomeip Java device", steps.get(0));
+        assertEquals("connectedhomeip Java device unpaired", steps.get(1));
+    }
+
+    @Test
     public void readDeviceDetailsRejectsMissingArtifactsBeforeCallingGateway() {
         CapturingGateway gateway = new CapturingGateway();
         ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
@@ -121,6 +140,22 @@ public final class ConnectedHomeIpMatterControllerTest {
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> controller.readDeviceDetails(1234L, "state", ignored -> { }));
+
+        assertEquals("Missing connectedhomeip controller class: chip.devicecontroller.ChipDeviceController",
+                error.getMessage());
+        assertEquals(0, gateway.callCount);
+    }
+
+    @Test
+    public void unpairRejectsMissingArtifactsBeforeCallingGateway() {
+        CapturingGateway gateway = new CapturingGateway();
+        ConnectedHomeIpMatterController controller = new ConnectedHomeIpMatterController(
+                missingArtifacts(),
+                gateway,
+                false);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> controller.unpair(1234L, "state", ignored -> { }));
 
         assertEquals("Missing connectedhomeip controller class: chip.devicecontroller.ChipDeviceController",
                 error.getMessage());
@@ -221,6 +256,7 @@ public final class ConnectedHomeIpMatterControllerTest {
         private String commissioningDiagnostic;
         private MatterDeviceDetails details = MatterDeviceDetails.empty();
         private long detailsNodeId = -1L;
+        private long unpairNodeId = -1L;
 
         @Override
         public MatterCommissioningResult commissionBleThread(ConnectedHomeIpCommissioningRequest request) {
@@ -245,6 +281,12 @@ public final class ConnectedHomeIpMatterControllerTest {
             callCount++;
             detailsNodeId = nodeId;
             return details;
+        }
+
+        @Override
+        public void unpair(long nodeId) {
+            callCount++;
+            unpairNodeId = nodeId;
         }
 
         public ConnectedHomeIpFabricRestoreStatus checkFabricRestore(long bootstrapNodeId) {

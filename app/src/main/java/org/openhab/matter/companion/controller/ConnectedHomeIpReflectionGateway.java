@@ -143,6 +143,12 @@ public final class ConnectedHomeIpReflectionGateway implements ConnectedHomeIpCo
     }
 
     @Override
+    public void unpair(long nodeId) throws Exception {
+        Object controller = controllerProvider.controller();
+        commandFactory.invokeUnpair(controller, nodeId);
+    }
+
+    @Override
     public MatterOpenCommissioningWindowResult openCommissioningWindow(
             ConnectedHomeIpOpenCommissioningWindowRequest request) throws Exception {
         if (request == null) {

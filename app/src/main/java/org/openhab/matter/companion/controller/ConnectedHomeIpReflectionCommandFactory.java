@@ -384,6 +384,12 @@ public final class ConnectedHomeIpReflectionCommandFactory {
                 .invoke(controller, devicePtr);
     }
 
+    public void invokeUnpair(Object controller, long nodeId) throws ReflectiveOperationException {
+        chipDeviceControllerClass
+                .getMethod("unpairDevice", long.class)
+                .invoke(controller, nodeId);
+    }
+
     public void invokeClose(Object controller) throws ReflectiveOperationException {
         chipDeviceControllerClass
                 .getMethod("close")

@@ -67,7 +67,11 @@ fun PhoneDeviceListScreen(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 devices.forEach { device ->
-                    PhoneMatterDeviceCard(device = device, onAction = onAction)
+                    PhoneMatterDeviceCard(
+                        device = device,
+                        forceRemoveAvailable = MatterSetupAction.ForceRemoveFromPhone in state.secondaryActions,
+                        onAction = onAction
+                    )
                 }
             }
         }
@@ -77,6 +81,7 @@ fun PhoneDeviceListScreen(
 @Composable
 private fun PhoneMatterDeviceCard(
     device: PhoneMatterDevice,
+    forceRemoveAvailable: Boolean,
     onAction: (MatterSetupAction) -> Unit
 ) {
     var expanded by rememberSaveable(device.nodeId, device.displayNodeId) { mutableStateOf(false) }
@@ -173,6 +178,25 @@ private fun PhoneMatterDeviceCard(
                     )
                     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text("Forget from this phone")
+                }
+                if (forceRemoveAvailable) {
+                    OutlinedButton(
+                        onClick = { onAction(MatterSetupAction.ForceRemoveFromPhone) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics { contentDescription = "Force remove from this app" },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_material_delete),
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                        )
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Force remove from this app")
+                    }
                 }
             }
         }

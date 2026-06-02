@@ -36,6 +36,7 @@ sealed interface MatterSetupAction {
     data object ShowTroubleshooting : MatterSetupAction
     data object ShowAbout : MatterSetupAction
     data object ForgetFromPhone : MatterSetupAction
+    data object ForceRemoveFromPhone : MatterSetupAction
     data object OpenOpenHabInbox : MatterSetupAction
     data object AddAnotherDevice : MatterSetupAction
 }
