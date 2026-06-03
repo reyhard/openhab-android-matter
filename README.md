@@ -15,16 +15,14 @@ Inbox.
   QR scan through openHAB Inbox success.
 - The current validated handoff uses the manual setup code returned by
   OpenCommissioningWindow and submits it to openHAB Matter Scan Input.
-- The app fails closed when connectedhomeip artifacts or runtime readiness are
-  missing. Real Thread commissioning and OpenCommissioningWindow are not
-  silently routed through the fake controller.
 - Broader hardware validation, long-run fabric persistence hardening, and full
   phone-side Matter fabric inventory are still future work.
 
 For detailed implementation status, see
-[docs/implementation-status.md](docs/implementation-status.md). For the
-OpenCommissioningWindow internals, see
-[docs/open-commissioning-window-workflow.md](docs/open-commissioning-window-workflow.md).
+[Implementation status](docs/implementation-status.md).
+
+For the OpenCommissioningWindow internals, see
+[OpenCommissioningWindow workflow](docs/open-commissioning-window-workflow.md).
 
 ## What You Need
 
@@ -44,6 +42,64 @@ Keep the phone, Thread Border Router, and openHAB host on networks where IPv6
 Matter traffic can work. IPv4 reachability to the Thread Border Router is not
 enough for openHAB Matter pairing.
 
+See also [DIY OTBR setup](docs/setting_otbr.md).
+
+## Usage
+
+On first launch, you will see the following screen.
+
+![getting_started](docs/img/getting_started.jpg)
+
+Next, configure the openHAB address, REST API token if required, OTBR IP
+address, and the OTBR's **Thread Active Operational Dataset**. The OTBR IP
+address is currently used only for connectivity checks.
+
+![first_setup](docs/img/first_setup.jpg)
+
+Once setup is complete, you can scan the device QR code with the app or enter
+the pairing code manually.
+
+![scanning_device](docs/img/scanning_device.jpg)
+
+When everything is ready, the app automatically performs the following steps:
+
+![adding_device](docs/img/adding_device.jpg)
+
+### Checking setup
+
+The app checks that required settings and phone capabilities are ready,
+including BLE, permissions, and the Thread dataset.
+
+### Adding device to this phone
+
+The app searches for the device over BLE, connects to it, sends the Thread
+configuration, and disconnects. It then waits for the device to appear on the
+Thread network over IPv6. If the device is not detected, the process is
+canceled and the device returns to pairing mode.
+
+### Opening pairing window
+
+The app opens an OpenCommissioningWindow on the device over the Thread network
+so the openHAB Matter binding can pair with it.
+
+### Sending setup code to openHAB
+
+The app sends the temporary pairing code to openHAB through the REST API. Each
+pairing sequence generates a new code, different from the one printed on the
+device.
+
+### Waiting for openHAB
+
+If openHAB detects the device correctly, pairing usually takes about 2-3
+minutes. When it completes, the device should appear in the Inbox.
+
+![device_added](docs/img/device_added.jpg)
+
+_Tip: Enable TRACE logging for the Matter binding. If the device is not found
+on the network, for example because of stale mDNS records, the logs should show
+an error about 15 seconds after the pairing code is sent to openHAB._
+
+
 ## Troubleshooting in the App
 
 The app includes advanced troubleshooting screens for:
@@ -54,7 +110,7 @@ The app includes advanced troubleshooting screens for:
 - Phone-side Matter mDNS browsing for `_matterc._udp` and `_matter._tcp`.
 - Best-effort phone-side IPv6 reachability to a user-entered device address.
 - Retrying OpenCommissioningWindow for the currently staged phone-side device.
-- Forgetting a staged device by unpairing it from the phone fabric first, with a force-remove local cleanup option if unpair fails.
+- Forgetting this app's stored bootstrap device state on the phone.
 
 Phone-side mDNS and IPv6 checks are useful diagnostics, but they do not prove
 what openHAB, Avahi, the router, or the Thread Border Router can see. If openHAB
