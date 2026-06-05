@@ -48,22 +48,30 @@ See also [DIY OTBR setup](docs/setting_otbr.md).
 
 On first launch, you will see the following screen.
 
-![getting_started](docs/img/getting_started.jpg)
+<p align="center">
+  <img src="docs/img/getting_started.jpg" alt="Getting started screen" width="280">
+</p>
 
 Next, configure the openHAB address, REST API token if required, OTBR IP
 address, and the OTBR's **Thread Active Operational Dataset**. The OTBR IP
 address is currently used only for connectivity checks.
 
-![first_setup](docs/img/first_setup.jpg)
+<p align="center">
+  <img src="docs/img/first_setup.jpg" alt="First setup screen" width="280">
+</p>
 
 Once setup is complete, you can scan the device QR code with the app or enter
 the pairing code manually.
 
-![scanning_device](docs/img/scanning_device.jpg)
+<p align="center">
+  <img src="docs/img/scanning_device.jpg" alt="Scanning device screen" width="280">
+</p>
 
 When everything is ready, the app automatically performs the following steps:
 
-![adding_device](docs/img/adding_device.jpg)
+<p align="center">
+  <img src="docs/img/adding_device.jpg" alt="Adding device progress screen" width="280">
+</p>
 
 ### Checking setup
 
@@ -93,7 +101,9 @@ device.
 If openHAB detects the device correctly, pairing usually takes about 2-3
 minutes. When it completes, the device should appear in the Inbox.
 
-![device_added](docs/img/device_added.jpg)
+<p align="center">
+  <img src="docs/img/device_added.jpg" alt="Device added screen" width="280">
+</p>
 
 _Tip: Enable TRACE logging for the Matter binding. If the device is not found
 on the network, for example because of stale mDNS records, the logs should show
