@@ -2,7 +2,10 @@ param(
     [string] $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
     [string] $ApkPath = "",
     [int] $MinimumPaaCertificates = 1,
-    [switch] $RequireCdTrustKeys
+    [switch] $RequireCdTrustKeys,
+    [switch] $RequireChipControllerNativeLibraries,
+    [string] $ExpectedChipSourceTag = "",
+    [string] $ExpectedChipSourceCommit = ""
 )
 
 Set-StrictMode -Version Latest
@@ -55,6 +58,35 @@ try {
     if ($RequireCdTrustKeys) {
         $cdEntries = @(Get-TrustStoreEntries -Zip $zip -Prefix "assets/matter/truststore/cd/")
         Assert-True ($cdEntries.Count -gt 0) "APK is missing packaged CD trust keys under assets/matter/truststore/cd/."
+    }
+
+    if ($RequireChipControllerNativeLibraries) {
+        foreach ($library in @("libCHIPController.so", "libc++_shared.so")) {
+            $entry = $zip.GetEntry("lib/arm64-v8a/$library")
+            Assert-True ($null -ne $entry -and $entry.Length -gt 0) (
+                "APK is missing packaged connectedhomeip native library lib/arm64-v8a/$library.")
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedChipSourceTag) -or
+        -not [string]::IsNullOrWhiteSpace($ExpectedChipSourceCommit)) {
+        $manifestEntry = $zip.GetEntry("assets/matter/connectedhomeip/chip-artifact-manifest.json")
+        Assert-True ($null -ne $manifestEntry) (
+            "APK is missing connectedhomeip provenance manifest assets/matter/connectedhomeip/chip-artifact-manifest.json.")
+        $reader = [System.IO.StreamReader]::new($manifestEntry.Open())
+        try {
+            $manifest = $reader.ReadToEnd() | ConvertFrom-Json
+        } finally {
+            $reader.Dispose()
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedChipSourceTag)) {
+            Assert-True ($manifest.connectedhomeip_tag -eq $ExpectedChipSourceTag) (
+                "APK connectedhomeip tag mismatch: expected $ExpectedChipSourceTag but found $($manifest.connectedhomeip_tag).")
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedChipSourceCommit)) {
+            Assert-True ($manifest.connectedhomeip_commit -eq $ExpectedChipSourceCommit) (
+                "APK connectedhomeip commit mismatch: expected $ExpectedChipSourceCommit but found $($manifest.connectedhomeip_commit).")
+        }
     }
 } finally {
     $zip.Dispose()

@@ -5,6 +5,8 @@ plugins {
 }
 
 import java.util.zip.ZipFile
+import java.security.MessageDigest
+import groovy.json.JsonSlurper
 
 def chipNativeMode = (findProperty("openhabMatterChipNativeMode") ?: "stub").toString().trim()
 def chipPrebuiltDir = (findProperty("openhabMatterChipPrebuiltDir") ?: "").toString().trim()
@@ -12,6 +14,8 @@ def chipSupportedAbis = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
 def chipControllerArtifactsDir = (findProperty("openhabMatterChipControllerArtifactsDir") ?: "").toString().trim()
 def chipPaaTrustStoreDir = (findProperty("openhabMatterChipPaaTrustStoreDir") ?: "").toString().trim()
 def chipCdTrustStoreDir = (findProperty("openhabMatterChipCdTrustStoreDir") ?: "").toString().trim()
+def chipArtifactExpectedSourceTag = (findProperty("openhabMatterChipArtifactExpectedSourceTag") ?: "").toString().trim()
+def chipArtifactExpectedSourceCommit = (findProperty("openhabMatterChipArtifactExpectedSourceCommit") ?: "").toString().trim()
 def releaseStoreFilePath = (findProperty("openhabMatterReleaseStoreFile") ?: "").toString().trim()
 def releaseStorePassword = (findProperty("openhabMatterReleaseStorePassword") ?: "").toString()
 def releaseKeyAlias = (findProperty("openhabMatterReleaseKeyAlias") ?: "").toString().trim()
@@ -47,6 +51,9 @@ def chipControllerRequiredClassEntries = [
         'chip/devicecontroller/NetworkCredentials$ThreadCredentials.class',
         "chip/devicecontroller/CommissionParameters.class",
         'chip/devicecontroller/CommissionParameters$Builder.class',
+        "chip/devicecontroller/ICDRegistrationInfo.class",
+        'chip/devicecontroller/ICDRegistrationInfo$Builder.class',
+        "chip/devicecontroller/ICDDeviceInfo.class",
         'chip/devicecontroller/ChipDeviceController$CompletionListener.class',
         "chip/devicecontroller/DeviceAttestationDelegate.class",
         "chip/devicecontroller/AttestationTrustStoreDelegate.class",
@@ -197,6 +204,69 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
         if (!root.isDirectory()) {
             throw new GradleException("connectedhomeip controller artifact directory does not exist: " + root)
         }
+        File manifestFile = new File(root, "chip-artifact-manifest.json")
+        if (!manifestFile.isFile()) {
+            if (!chipArtifactExpectedSourceTag.isEmpty() || !chipArtifactExpectedSourceCommit.isEmpty()) {
+                throw new GradleException(
+                        "Missing connectedhomeip artifact provenance manifest: " + manifestFile)
+            }
+        } else {
+            def manifest
+            try {
+                manifest = new JsonSlurper().parse(manifestFile)
+            } catch (Exception exception) {
+                throw new GradleException(
+                        "Invalid connectedhomeip artifact provenance manifest: " + manifestFile,
+                        exception)
+            }
+            if (!(manifest instanceof Map)) {
+                throw new GradleException("connectedhomeip artifact manifest must be a JSON object: " + manifestFile)
+            }
+            if (!chipArtifactExpectedSourceTag.isEmpty()
+                    && manifest.connectedhomeip_tag != chipArtifactExpectedSourceTag) {
+                throw new GradleException(
+                        "connectedhomeip artifact tag mismatch: expected "
+                                + chipArtifactExpectedSourceTag
+                                + " but manifest has "
+                                + manifest.connectedhomeip_tag)
+            }
+            if (!chipArtifactExpectedSourceCommit.isEmpty()
+                    && manifest.connectedhomeip_commit != chipArtifactExpectedSourceCommit) {
+                throw new GradleException(
+                        "connectedhomeip artifact commit mismatch: expected "
+                                + chipArtifactExpectedSourceCommit
+                                + " but manifest has "
+                                + manifest.connectedhomeip_commit)
+            }
+            if (manifest.abi == null || !chipControllerSupportedAbis.contains(manifest.abi.toString())) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest ABI is not compatible with requested ABIs: "
+                                + manifest.abi)
+            }
+            if (manifest.files == null || !(manifest.files instanceof Map)) {
+                throw new GradleException("connectedhomeip artifact manifest does not list file checksums")
+            }
+            def sha256 = { File file ->
+                MessageDigest.getInstance("SHA-256").digest(file.bytes).encodeHex().toString()
+            }
+            manifest.files.each { path, expectedDigest ->
+                File artifactFile = new File(root, path.toString())
+                if (!artifactFile.isFile()) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest lists a missing file: " + artifactFile)
+                }
+                String actualDigest = sha256(artifactFile)
+                if (actualDigest != expectedDigest.toString()) {
+                    throw new GradleException(
+                            "connectedhomeip artifact checksum mismatch for "
+                                    + artifactFile
+                                    + ": expected "
+                                    + expectedDigest
+                                    + " but found "
+                                    + actualDigest)
+                }
+            }
+        }
         Set<String> discoveredClassEntries = new LinkedHashSet<>()
         chipControllerRequiredJars.each { jarName ->
             File jar = new File(root, jarName)
@@ -245,14 +315,30 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
                 .withPropertyName("cdTrustStoreDir")
                 .withPathSensitivity(PathSensitivity.RELATIVE)
     }
+    if (!chipControllerArtifactsDir.isEmpty()) {
+        inputs.file(new File(file(chipControllerArtifactsDir), "chip-artifact-manifest.json"))
+                .withPropertyName("artifactManifest")
+                .optional()
+    }
     outputs.dir(generatedTrustStoreAssetsDir)
     doLast {
         File outRoot = generatedTrustStoreAssetsDir.get().asFile
         delete(outRoot)
-        if (chipPaaTrustStoreDir.isEmpty() && chipCdTrustStoreDir.isEmpty()) {
+        File artifactManifest = chipControllerArtifactsDir.isEmpty()
+                ? null
+                : new File(file(chipControllerArtifactsDir), "chip-artifact-manifest.json")
+        boolean hasArtifactManifest = artifactManifest != null && artifactManifest.isFile()
+        if (chipPaaTrustStoreDir.isEmpty() && chipCdTrustStoreDir.isEmpty() && !hasArtifactManifest) {
             return
         }
         outRoot.mkdirs()
+
+        if (hasArtifactManifest) {
+            copy {
+                from artifactManifest
+                into new File(outRoot, "matter/connectedhomeip")
+            }
+        }
 
         if (!chipPaaTrustStoreDir.isEmpty()) {
             File paaRoot = file(chipPaaTrustStoreDir)

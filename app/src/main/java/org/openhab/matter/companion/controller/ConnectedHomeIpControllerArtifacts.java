@@ -9,6 +9,8 @@ public final class ConnectedHomeIpControllerArtifacts {
             "chip.devicecontroller.NetworkCredentials$ThreadCredentials",
             "chip.devicecontroller.CommissionParameters",
             "chip.devicecontroller.CommissionParameters$Builder",
+            "chip.devicecontroller.ICDRegistrationInfo",
+            "chip.devicecontroller.ICDDeviceInfo",
             "chip.devicecontroller.ChipDeviceController$CompletionListener",
             "chip.devicecontroller.DeviceAttestationDelegate",
             "chip.devicecontroller.AttestationTrustStoreDelegate",

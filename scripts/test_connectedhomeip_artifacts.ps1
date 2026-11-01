@@ -96,6 +96,9 @@ $RequiredClassEntries = @(
     'chip/devicecontroller/NetworkCredentials$ThreadCredentials.class',
     'chip/devicecontroller/CommissionParameters.class',
     'chip/devicecontroller/CommissionParameters$Builder.class',
+    'chip/devicecontroller/ICDRegistrationInfo.class',
+    'chip/devicecontroller/ICDRegistrationInfo$Builder.class',
+    'chip/devicecontroller/ICDDeviceInfo.class',
     'chip/devicecontroller/ChipDeviceController$CompletionListener.class',
     'chip/devicecontroller/DeviceAttestationDelegate.class',
     'chip/devicecontroller/AttestationTrustStoreDelegate.class',
@@ -115,15 +118,52 @@ $RequiredClassEntries = @(
 )
 
 function Invoke-GradleArtifactVerification {
-    param([Parameter(Mandatory = $true)] [string] $ArtifactRoot)
+    param(
+        [Parameter(Mandatory = $true)] [string] $ArtifactRoot,
+        [string[]] $ExtraGradleArgs = @()
+    )
 
     Push-Location $ProjectRoot
     try {
-        $output = & $GradlePath ":app:verifyConnectedHomeIpControllerArtifacts" "--offline" "-PopenhabMatterChipControllerArtifactsDir=$ArtifactRoot" 2>&1
+        $output = & $GradlePath ":app:verifyConnectedHomeIpControllerArtifacts" "--offline" "-PopenhabMatterChipControllerArtifactsDir=$ArtifactRoot" @ExtraGradleArgs 2>&1
         return @{ ExitCode = $LASTEXITCODE; Output = ($output -join "`n") }
     } finally {
         Pop-Location
     }
+}
+
+function New-ArtifactManifest {
+    param(
+        [Parameter(Mandatory = $true)] [string] $Root,
+        [string] $SourceTag = "v1.6.1.0",
+        [string] $SourceCommit = "3bcdd56ba54fb88b2afb4bfef575014671df7aa7",
+        [string] $TamperPath = ""
+    )
+
+    $files = [ordered]@{}
+    Get-ChildItem -LiteralPath $Root -Recurse -File | ForEach-Object {
+        if ($_.Name -eq "chip-artifact-manifest.json") {
+            return
+        }
+        $relative = [System.IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
+        $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($relative -eq $TamperPath) {
+            $hash = "0" * 64
+        }
+        $files[$relative] = $hash
+    }
+
+    $manifest = [ordered]@{
+        schema = 1
+        connectedhomeip_tag = $SourceTag
+        connectedhomeip_commit = $SourceCommit
+        abi = "arm64-v8a"
+        build_target = "android-arm64-chip-tool"
+        build_profile = "release"
+        files = $files
+    }
+    $path = Join-Path $Root "chip-artifact-manifest.json"
+    Set-Content -LiteralPath $path -Value ($manifest | ConvertTo-Json -Depth 6) -Encoding UTF8
 }
 
 if (-not (Test-Path -LiteralPath $ProjectRoot -PathType Container)) {
@@ -151,6 +191,39 @@ $missingClassRoot = Join-Path $tmpRoot "chip-controller-artifacts-missing-class"
 New-ArtifactLayout -Root $positiveRoot -JarMode "Valid"
 $positive = Invoke-GradleArtifactVerification -ArtifactRoot $positiveRoot
 Assert-True ($positive.ExitCode -eq 0) ("Expected positive synthetic artifacts to pass, got exit " + $positive.ExitCode + ". Output:`n" + $positive.Output)
+
+$manifestRoot = Join-Path $tmpRoot "chip-controller-artifacts-manifest"
+New-ArtifactLayout -Root $manifestRoot -JarMode "Valid"
+New-ArtifactManifest -Root $manifestRoot
+$manifestPositive = Invoke-GradleArtifactVerification -ArtifactRoot $manifestRoot -ExtraGradleArgs @(
+    "-PopenhabMatterChipArtifactExpectedSourceTag=v1.6.1.0",
+    "-PopenhabMatterChipArtifactExpectedSourceCommit=3bcdd56ba54fb88b2afb4bfef575014671df7aa7"
+)
+Assert-True ($manifestPositive.ExitCode -eq 0) ("Expected matching provenance manifest to pass, got exit " + $manifestPositive.ExitCode + ". Output:`n" + $manifestPositive.Output)
+
+$wrongTagRoot = Join-Path $tmpRoot "chip-controller-artifacts-wrong-tag"
+New-ArtifactLayout -Root $wrongTagRoot -JarMode "Valid"
+New-ArtifactManifest -Root $wrongTagRoot
+$wrongTag = Invoke-GradleArtifactVerification -ArtifactRoot $wrongTagRoot -ExtraGradleArgs @(
+    "-PopenhabMatterChipArtifactExpectedSourceTag=v1.6.0.0"
+)
+Assert-True ($wrongTag.ExitCode -ne 0) "Expected mismatched provenance tag to fail validation."
+Assert-True ($wrongTag.Output.Contains("connectedhomeip artifact tag mismatch")) ("Expected tag mismatch failure message. Output:`n" + $wrongTag.Output)
+
+$tamperedRoot = Join-Path $tmpRoot "chip-controller-artifacts-tampered-manifest"
+New-ArtifactLayout -Root $tamperedRoot -JarMode "Valid"
+New-ArtifactManifest -Root $tamperedRoot -TamperPath "CHIPController.jar"
+$tampered = Invoke-GradleArtifactVerification -ArtifactRoot $tamperedRoot
+Assert-True ($tampered.ExitCode -ne 0) "Expected tampered provenance checksum to fail validation."
+Assert-True ($tampered.Output.Contains("connectedhomeip artifact checksum mismatch")) ("Expected checksum mismatch failure message. Output:`n" + $tampered.Output)
+
+$missingManifestRoot = Join-Path $tmpRoot "chip-controller-artifacts-missing-manifest"
+New-ArtifactLayout -Root $missingManifestRoot -JarMode "Valid"
+$missingManifest = Invoke-GradleArtifactVerification -ArtifactRoot $missingManifestRoot -ExtraGradleArgs @(
+    "-PopenhabMatterChipArtifactExpectedSourceTag=v1.6.1.0"
+)
+Assert-True ($missingManifest.ExitCode -ne 0) "Expected missing provenance manifest to fail when a source tag is required."
+Assert-True ($missingManifest.Output.Contains("Missing connectedhomeip artifact provenance manifest")) ("Expected missing-manifest failure message. Output:`n" + $missingManifest.Output)
 
 New-ArtifactLayout -Root $emptyRoot -JarMode "EmptyControllerJar"
 $negative = Invoke-GradleArtifactVerification -ArtifactRoot $emptyRoot
