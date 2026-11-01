@@ -23,7 +23,21 @@ class MatterMdnsRecordTest {
             txt = mapOf("D" to "3840")
         )
 
-        assertEquals("Phone can see the device", record.interpretationTitle)
+        assertEquals("Matter service resolved to IPv6 (reachability not verified)", record.interpretationTitle)
+    }
+
+    @Test
+    fun failedResolutionIsNotMistakenForReachableDevice() {
+        val record = MatterMdnsRecord(
+            serviceType = "_matterc._udp",
+            instanceName = "Stale Device",
+            host = "",
+            ipv6Addresses = emptyList(),
+            port = 0,
+            txt = emptyMap(),
+            resolutionFailure = "Android NSD error 3"
+        )
+        assertEquals("Matter service advertised but resolution failed", record.interpretationTitle)
     }
 
     @Test
@@ -37,6 +51,6 @@ class MatterMdnsRecordTest {
             txt = mapOf("D" to "3840")
         )
 
-        assertEquals("Phone found a Matter service", record.interpretationTitle)
+        assertEquals("Matter service resolved without an IPv6 address", record.interpretationTitle)
     }
 }

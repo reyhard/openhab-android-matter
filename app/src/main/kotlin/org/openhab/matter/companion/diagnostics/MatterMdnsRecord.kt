@@ -6,14 +6,14 @@ data class MatterMdnsRecord(
     val host: String,
     val ipv6Addresses: List<String>,
     val port: Int,
-    val txt: Map<String, String>
+    val txt: Map<String, String>,
+    val resolutionFailure: String? = null
 ) {
-    val interpretationTitle: String =
-        if (ipv6Addresses.isEmpty()) {
-            "Phone found a Matter service"
-        } else {
-            "Phone can see the device"
-        }
+    val interpretationTitle: String = when {
+        resolutionFailure != null -> "Matter service advertised but resolution failed"
+        ipv6Addresses.isEmpty() -> "Matter service resolved without an IPv6 address"
+        else -> "Matter service resolved to IPv6 (reachability not verified)"
+    }
 
     companion object {
         const val phoneDiscoveryLimitation: String =

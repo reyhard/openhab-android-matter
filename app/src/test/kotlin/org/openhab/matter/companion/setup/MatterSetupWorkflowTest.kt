@@ -114,6 +114,26 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
+    fun commissioningStageErrorIsVisibleAndPreservedOnFailure() {
+        val ports = FakeMatterSetupPorts().apply {
+            commissionProgressMessages = listOf(
+                "connectedhomeip commissioning stage started: FindOperational",
+                "connectedhomeip commissioning stage update: FindOperational error 50"
+            )
+            commissionError = IllegalStateException("Commissioning failed with error 50")
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        MatterSetupWorkflow(ports) { states.add(it) }.startAutomatedSetup("MT:TEST")
+
+        val details = states.filter { it.stage == MatterSetupStage.CommissioningToPhone }
+            .mapNotNull { it.activeDetail }
+        assertTrue(details.contains("Matter stage FindOperational error 50 (awaiting final result)"))
+        assertEquals(MatterSetupStage.CommissioningToPhone, states.last().failure?.step)
+        assertTrue(states.last().failure!!.details.contains("FindOperational error 50"))
+        assertFalse(ports.openWindowCalled)
+    }
+
+    @Test
     fun readinessFailureIncludesWarningsThenDetailsAndOmitsBlanks() {
         val ports = FakeMatterSetupPorts().apply {
             readinessReady = false
@@ -679,6 +699,7 @@ class MatterSetupWorkflowTest {
         var baselineMatterEntryIds = emptySet<String>()
         var inboxMatterEntryIds = setOf("matter:node:controller:device")
         var commissionProgressMessages = emptyList<String>()
+        var commissionError: RuntimeException? = null
 
         override fun loadConfig(): MatterSetupConfig {
             loadConfigCalled = true
@@ -709,6 +730,7 @@ class MatterSetupWorkflowTest {
             commissionCalled = true
             commissionSetupPayload = setupPayload
             commissionProgressMessages.forEach(progress)
+            commissionError?.let { throw it }
             return MatterSetupPorts.CommissionResult(
                 nodeId = 1234L,
                 controllerState = commissionControllerState,

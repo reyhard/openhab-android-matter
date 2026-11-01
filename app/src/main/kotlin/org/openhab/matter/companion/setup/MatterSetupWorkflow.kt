@@ -8,6 +8,7 @@ class MatterSetupWorkflow(
         var activeStage = MatterSetupStage.ReadyToScan
         var diagnosticsContext = emptyDiagnosticsContext()
         val redactor = SensitiveValueRedactor(setupPayload)
+        var lastCommissioningStageError: String? = null
 
         runCatching {
             val config = ports.loadConfig()
@@ -40,9 +41,13 @@ class MatterSetupWorkflow(
             val commission = ports.commissionToPhone(setupPayload, config) { progressMessage ->
                 val detail = commissioningProgressDetail(redactor.sanitize(progressMessage))
                 if (detail != null) {
+                    if (detail.startsWith("Matter stage ")) {
+                        lastCommissioningStageError = detail
+                    }
                     emit(MatterSetupUiState.progress(activeStage, activeDetail = detail))
                 }
             }
+            lastCommissioningStageError = null
             val commissionedIdentity = MatterSetupDeviceIdentity(commission.vendorName, commission.productName)
             redactor.add(commission.controllerState)
 
@@ -107,7 +112,11 @@ class MatterSetupWorkflow(
                 )
             )
         }.onFailure { error ->
-            fail(activeStage, "Setup could not finish", error.message.orEmpty(), diagnosticsContext, redactor)
+            val details = listOfNotNull(
+                error.message?.takeIf { it.isNotBlank() },
+                lastCommissioningStageError?.takeIf { activeStage == MatterSetupStage.CommissioningToPhone }
+            ).joinToString("; ")
+            fail(activeStage, "Setup could not finish", details, diagnosticsContext, redactor)
         }
     }
 
@@ -147,6 +156,14 @@ class MatterSetupWorkflow(
         val value = message.trim()
         if (value.isBlank()) {
             return null
+        }
+        val stageError = Regex(
+            """commissioning stage update:\s*([A-Za-z0-9_]+)\s+error\s+(\d+)""",
+            RegexOption.IGNORE_CASE
+        ).find(value)
+        if (stageError != null) {
+            val (stage, errorCode) = stageError.destructured
+            return "Matter stage $stage error $errorCode (awaiting final result)"
         }
         return when {
             value.contains("BLE scan", ignoreCase = true) ||

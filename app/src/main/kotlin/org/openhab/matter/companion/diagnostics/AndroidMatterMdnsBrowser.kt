@@ -24,21 +24,20 @@ class AndroidMatterMdnsBrowser(
     private fun browse(serviceType: String, timeoutMillis: Long): List<MatterMdnsRecord> {
         val manager = nsdManager ?: return emptyList()
         val stateLock = Object()
-        val records = mutableListOf<MatterMdnsRecord>()
-        val seenServices = mutableSetOf<String>()
-        val pendingServices = ArrayDeque<NsdServiceInfo>()
+        val tracker = MatterMdnsServiceTracker()
+        val pendingServices = ArrayDeque<PendingResolution>()
         var resolveInProgress = false
         var acceptingResolveResults = true
         val discoveryFinished = CountDownLatch(1)
         val timeout = timeoutMillis.coerceAtLeast(0L)
         val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout)
 
-        lateinit var startResolve: (NsdServiceInfo) -> Unit
+        lateinit var startResolve: (PendingResolution) -> Unit
 
-        fun completeResolve(record: MatterMdnsRecord?) {
+        fun completeResolve(request: PendingResolution, record: MatterMdnsRecord?) {
             val nextService = synchronized(stateLock) {
-                if (record != null && acceptingResolveResults) {
-                    records.add(record)
+                if (acceptingResolveResults) {
+                    tracker.resolved(request.ticket, record)
                 }
 
                 val next = pendingServices.removeFirstOrNull()
@@ -54,28 +53,27 @@ class AndroidMatterMdnsBrowser(
             }
         }
 
-        startResolve = { serviceInfo ->
+        startResolve = { request ->
             resolve(
                 manager = manager,
                 requestedServiceType = serviceType,
-                serviceInfo = serviceInfo,
-                onComplete = ::completeResolve
+                serviceInfo = request.serviceInfo,
+                onComplete = { record -> completeResolve(request, record) }
             )
         }
 
         fun enqueueResolve(serviceInfo: NsdServiceInfo) {
             val serviceToResolve = synchronized(stateLock) {
-                val key = "${serviceInfo.serviceType}/${serviceInfo.serviceName}"
-                if (!acceptingResolveResults || !seenServices.add(key)) {
-                    return
-                }
+                if (!acceptingResolveResults) return
+                val ticket = tracker.found(serviceKey(serviceInfo)) ?: return
+                val request = PendingResolution(serviceInfo, ticket)
 
                 if (resolveInProgress) {
-                    pendingServices.addLast(serviceInfo)
+                    pendingServices.addLast(request)
                     null
                 } else {
                     resolveInProgress = true
-                    serviceInfo
+                    request
                 }
             }
 
@@ -106,7 +104,13 @@ class AndroidMatterMdnsBrowser(
                 enqueueResolve(serviceInfo)
             }
 
-            override fun onServiceLost(serviceInfo: NsdServiceInfo) = Unit
+            override fun onServiceLost(serviceInfo: NsdServiceInfo) {
+                synchronized(stateLock) {
+                    val key = serviceKey(serviceInfo)
+                    tracker.lost(key)
+                    pendingServices.removeAll { it.ticket.key == key }
+                }
+            }
 
             override fun onDiscoveryStopped(serviceType: String) {
                 discoveryFinished.countDown()
@@ -129,7 +133,7 @@ class AndroidMatterMdnsBrowser(
             synchronized(stateLock) {
                 acceptingResolveResults = false
                 pendingServices.clear()
-                records.toList()
+                tracker.snapshot()
             }
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
@@ -151,7 +155,7 @@ class AndroidMatterMdnsBrowser(
     ) {
         val listener = object : NsdManager.ResolveListener {
             override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-                onComplete(null)
+                onComplete(unresolvedRecord(serviceInfo, requestedServiceType, "Android NSD error $errorCode"))
             }
 
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
@@ -162,13 +166,35 @@ class AndroidMatterMdnsBrowser(
         try {
             manager.resolveService(serviceInfo, listener)
         } catch (e: SecurityException) {
-            onComplete(null)
+            onComplete(unresolvedRecord(serviceInfo, requestedServiceType, "Android NSD security exception"))
         } catch (e: IllegalArgumentException) {
-            onComplete(null)
+            onComplete(unresolvedRecord(serviceInfo, requestedServiceType, "Android NSD invalid service"))
         } catch (e: RuntimeException) {
-            onComplete(null)
+            onComplete(unresolvedRecord(serviceInfo, requestedServiceType, "Android NSD resolution exception"))
         }
     }
+
+    private fun unresolvedRecord(
+        serviceInfo: NsdServiceInfo,
+        requestedServiceType: String,
+        error: String
+    ): MatterMdnsRecord = MatterMdnsRecord(
+        serviceType = requestedServiceType,
+        instanceName = serviceInfo.serviceName,
+        host = "",
+        ipv6Addresses = emptyList(),
+        port = 0,
+        txt = emptyMap(),
+        resolutionFailure = error
+    )
+
+    private fun serviceKey(serviceInfo: NsdServiceInfo): String =
+        "${serviceInfo.serviceType}/${serviceInfo.serviceName}"
+
+    private data class PendingResolution(
+        val serviceInfo: NsdServiceInfo,
+        val ticket: MatterMdnsServiceTracker.Ticket
+    )
 
     private fun stopDiscovery(manager: NsdManager, listener: NsdManager.DiscoveryListener) {
         try {

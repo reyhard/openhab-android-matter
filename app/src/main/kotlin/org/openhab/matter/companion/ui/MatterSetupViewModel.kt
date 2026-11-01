@@ -1091,14 +1091,24 @@ class MatterSetupViewModel @JvmOverloads constructor(
 
         return records.flatMap { record ->
             buildList {
-                add("${record.serviceType} ${record.instanceName} at ${record.host.ifBlank { "unknown host" }}:${record.port}")
-                add("IPv6 addresses: ${record.ipv6Addresses.ifEmpty { listOf("none resolved") }.joinToString()}")
-                if (record.txt.isNotEmpty()) {
-                    add("TXT keys: ${record.txt.keys.sorted().joinToString()}")
+                val endpoint = if (record.host.isBlank() || record.port <= 0) {
+                    "unresolved"
+                } else {
+                    "${record.host}:${record.port}"
                 }
+                add("${record.serviceType} ${record.instanceName} at $endpoint")
+                add("IPv6 addresses: ${record.ipv6Addresses.ifEmpty { listOf("none resolved") }.joinToString()}")
+                if (record.serviceType.startsWith("_matterc")) {
+                    add("Commissioning: D=${record.txt["D"] ?: "unknown"}, CM=${record.txt["CM"] ?: "unknown"}")
+                    record.txt["RI"]?.let { add("Rotating ID: $it") }
+                }
+                record.resolutionFailure?.let { add("Resolution error: $it") }
                 add(record.interpretationTitle)
             }
-        } + MatterMdnsRecord.phoneDiscoveryLimitation
+        } + listOf(
+            "DNS-SD TTL is not available through this Android NSD result; resolved addresses do not prove device reachability.",
+            MatterMdnsRecord.phoneDiscoveryLimitation
+        )
     }
 
     private fun appendAdvancedDiagnostics(
