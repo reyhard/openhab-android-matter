@@ -4,9 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       connectedhomeip_ref:
-        description: "connectedhomeip git ref (tag/branch/sha)"
+        description: "Allowlisted connectedhomeip release tag to build (v1.6.1.0 or v1.5.1.0 for rollback)"
         required: true
-        default: "v1.5.1.0"
+        default: "v1.6.1.0"
+      publish:
+        description: "Publish a new immutable versioned artifact release. Refuses to overwrite an existing tag or asset."
+        required: true
+        default: false
+        type: boolean
   schedule:
     - cron: "0 4 * * 1"
 
@@ -19,13 +24,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      CONNECTEDHOMEIP_REF: ${{ github.event.inputs.connectedhomeip_ref || 'v1.5.1.0' }}
-      CHIP_ARTIFACT_TAG: chip-controller-artifacts-latest
-      CHIP_ARTIFACT_NAME: openhab-chip-artifacts-arm64.zip
-      CHIP_ARTIFACT_DIR_NAME: openhab-chip-artifacts-arm64
+      CONNECTEDHOMEIP_REF: ${{ github.event.inputs.connectedhomeip_ref || 'v1.6.1.0' }}
       KOTLIN_VERSION: 2.1.21
 
     steps:
+      - name: Check out openhab-android-matter
+        uses: actions/checkout@v6
+
       - name: Check out connectedhomeip
         uses: actions/checkout@v6
         with:
@@ -33,6 +38,36 @@ jobs:
           ref: ${{ env.CONNECTEDHOMEIP_REF }}
           path: connectedhomeip
           fetch-depth: 1
+
+      - name: Validate connectedhomeip ref and resolve immutable source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "$CONNECTEDHOMEIP_REF" in
+            v1.6.1.0) EXPECTED_SHA="3bcdd56ba54fb88b2afb4bfef575014671df7aa7" ;;
+            v1.5.1.0) EXPECTED_SHA="abcc720b48c5e59c0edcfe65c516f76ca9448aa3" ;;
+            *)
+              echo "::error::Unsupported connectedhomeip ref '$CONNECTEDHOMEIP_REF'. Allowed refs: v1.6.1.0, v1.5.1.0."
+              exit 1
+              ;;
+          esac
+
+          RESOLVED_SHA="$(git -C connectedhomeip rev-parse HEAD)"
+          if [[ "$RESOLVED_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::connectedhomeip ref '$CONNECTEDHOMEIP_REF' resolved to $RESOLVED_SHA, expected $EXPECTED_SHA."
+            exit 1
+          fi
+
+          ARTIFACT_TAG="chip-controller-artifacts-${CONNECTEDHOMEIP_REF}"
+          ARTIFACT_NAME="openhab-chip-artifacts-arm64-${CONNECTEDHOMEIP_REF}.zip"
+          echo "CHIP_SOURCE_TAG=$CONNECTEDHOMEIP_REF" >> "$GITHUB_ENV"
+          echo "CHIP_SOURCE_COMMIT=$RESOLVED_SHA" >> "$GITHUB_ENV"
+          echo "CHIP_ARTIFACT_TAG=$ARTIFACT_TAG" >> "$GITHUB_ENV"
+          echo "CHIP_ARTIFACT_NAME=$ARTIFACT_NAME" >> "$GITHUB_ENV"
+          echo "CHIP_ARTIFACT_DIR_NAME=openhab-chip-artifacts-arm64-${CONNECTEDHOMEIP_REF}" >> "$GITHUB_ENV"
+          echo "CHIP_ARTIFACT_SHA256_NAME=${ARTIFACT_NAME}.sha256" >> "$GITHUB_ENV"
+          echo "Validated $CONNECTEDHOMEIP_REF at $RESOLVED_SHA; candidate artifact $ARTIFACT_NAME."
 
       - name: Initialize connectedhomeip submodules
         shell: bash
@@ -123,68 +158,95 @@ jobs:
           CD_ROOT="$GITHUB_WORKSPACE/connectedhomeip/credentials/production/cd-certs"
           OUT_ROOT="$RUNNER_TEMP/$CHIP_ARTIFACT_DIR_NAME"
           OUT_ARCHIVE="$RUNNER_TEMP/$CHIP_ARTIFACT_NAME"
+          BUILD_JOB_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
-          rm -rf "$OUT_ROOT" "$OUT_ARCHIVE"
-          mkdir -p "$OUT_ROOT/jniLibs/arm64-v8a"
+          bash scripts/package_chip_controller_artifact.sh \
+            --build-lib-dir "$BUILD_LIB_DIR" \
+            --paa-root "$PAA_ROOT" \
+            --cd-root "$CD_ROOT" \
+            --output-dir "$OUT_ROOT" \
+            --archive "$OUT_ARCHIVE" \
+            --source-tag "$CHIP_SOURCE_TAG" \
+            --source-commit "$CHIP_SOURCE_COMMIT" \
+            --abi "arm64-v8a" \
+            --build-target "android-arm64-chip-tool" \
+            --build-profile "release" \
+            --jdk "17" \
+            --ndk "28.2.13676358" \
+            --kotlin "$KOTLIN_VERSION" \
+            --build-job-url "$BUILD_JOB_URL"
 
-          cp "$BUILD_LIB_DIR/src/controller/java/CHIPController.jar" "$OUT_ROOT/"
-          cp "$BUILD_LIB_DIR/src/controller/java/CHIPInteractionModel.jar" "$OUT_ROOT/"
-          cp "$BUILD_LIB_DIR/src/controller/java/CHIPClusterID.jar" "$OUT_ROOT/"
-          cp "$BUILD_LIB_DIR/src/controller/java/CHIPClusters.jar" "$OUT_ROOT/"
-          cp "$BUILD_LIB_DIR/src/platform/android/AndroidPlatform.jar" "$OUT_ROOT/"
-          cp "$BUILD_LIB_DIR/src/controller/java/OnboardingPayload.jar" "$OUT_ROOT/"
-          cp "$BUILD_LIB_DIR/src/controller/java/libMatterTlv.jar" "$OUT_ROOT/"
-          cp "$BUILD_LIB_DIR/src/controller/java/libMatterJson.jar" "$OUT_ROOT/"
-          cp "$BUILD_LIB_DIR/jni/arm64-v8a/libCHIPController.so" "$OUT_ROOT/jniLibs/arm64-v8a/"
-          cp "$BUILD_LIB_DIR/jni/arm64-v8a/libc++_shared.so" "$OUT_ROOT/jniLibs/arm64-v8a/"
+          echo "CHIP_ARTIFACT_MANIFEST_PATH=$OUT_ROOT/chip-artifact-manifest.json" >> "$GITHUB_ENV"
+          echo "CHIP_ARTIFACT_SHA256_PATH=$OUT_ARCHIVE.sha256" >> "$GITHUB_ENV"
 
-          test -d "$PAA_ROOT"
-          PAA_CERT_COUNT="$(find "$PAA_ROOT" -type f \( -name '*.pem' -o -name '*.der' \) | wc -l | tr -d '[:space:]')"
-          if [[ "$PAA_CERT_COUNT" -lt 1 ]]; then
-            echo "::error::No PAA trust-store certificates found in $PAA_ROOT."
-            exit 1
-          fi
-          if ! find "$PAA_ROOT" -type f \( -name '*.pem' -o -name '*.der' \) | grep -Eiq 'IKEA|117C'; then
-            echo "::error::DCL-refreshed PAA trust store does not include IKEA VID 0x117C root required by validated device logs."
-            exit 1
-          fi
-          mkdir -p "$OUT_ROOT/paa-root-certs"
-          cp -a "$PAA_ROOT"/. "$OUT_ROOT/paa-root-certs/"
+      - name: Verify candidate artifact package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sha256sum -c "$CHIP_ARTIFACT_SHA256_NAME"
 
-          if [[ -d "$CD_ROOT" ]]; then
-            CD_CERT_COUNT="$(find "$CD_ROOT" -type f \( -name '*.pem' -o -name '*.der' \) | wc -l | tr -d '[:space:]')"
-            if [[ "$CD_CERT_COUNT" -gt 0 ]]; then
-              mkdir -p "$OUT_ROOT/cd-certs"
-              cp -a "$CD_ROOT"/. "$OUT_ROOT/cd-certs/"
-            fi
-          fi
+          VERIFY_ROOT="$RUNNER_TEMP/chip-artifact-verify"
+          rm -rf "$VERIFY_ROOT"
+          mkdir -p "$VERIFY_ROOT"
+          unzip -q "$CHIP_ARTIFACT_NAME" -d "$VERIFY_ROOT"
 
-          (
-            cd "$OUT_ROOT"
-            zip -r "$OUT_ARCHIVE" .
-          )
+          test -f "$VERIFY_ROOT/chip-artifact-manifest.json"
+          jq -e \
+            --arg tag "$CHIP_SOURCE_TAG" \
+            --arg commit "$CHIP_SOURCE_COMMIT" \
+            --arg abi "arm64-v8a" \
+            --arg target "android-arm64-chip-tool" \
+            '.connectedhomeip_tag == $tag and .connectedhomeip_commit == $commit and .abi == $abi and .build_target == $target' \
+            "$VERIFY_ROOT/chip-artifact-manifest.json" >/dev/null
+
+          for entry in \
+            CHIPController.jar \
+            CHIPInteractionModel.jar \
+            CHIPClusterID.jar \
+            CHIPClusters.jar \
+            AndroidPlatform.jar \
+            OnboardingPayload.jar \
+            libMatterTlv.jar \
+            libMatterJson.jar \
+            jniLibs/arm64-v8a/libCHIPController.so \
+            jniLibs/arm64-v8a/libc++_shared.so; do
+            test -s "$VERIFY_ROOT/$entry"
+          done
+          test -d "$VERIFY_ROOT/paa-root-certs"
+          PAA_CERT="$(find "$VERIFY_ROOT/paa-root-certs" -type f \( -name '*.pem' -o -name '*.der' \) -print -quit)"
+          test -n "$PAA_CERT"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
           name: chip-controller-artifacts-arm64
-          path: ${{ runner.temp }}/${{ env.CHIP_ARTIFACT_NAME }}
+          path: |
+            ${{ runner.temp }}/openhab-chip-artifacts-arm64-*.zip
+            ${{ runner.temp }}/openhab-chip-artifacts-arm64-*.zip.sha256
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish latest release asset
+      - name: Publish immutable versioned release assets
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release view "$CHIP_ARTIFACT_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create "$CHIP_ARTIFACT_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "CHIP Controller Artifacts (latest)" \
-              --notes "Auto-published connectedhomeip artifacts for openhab-android-matter CI."
+
+          if gh release view "$CHIP_ARTIFACT_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release '$CHIP_ARTIFACT_TAG' already exists. Immutable artifacts must not be overwritten."
+            echo "::error::Choose a new reviewed artifact version instead of rebuilding this tag."
+            exit 1
+          fi
+
+          gh release create "$CHIP_ARTIFACT_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "CHIP Controller Artifacts ${CHIP_SOURCE_TAG}" \
+            --notes "Immutable connectedhomeip ${CHIP_SOURCE_TAG} (${CHIP_SOURCE_COMMIT}) Android arm64 controller artifacts for openhab-android-matter. Verify ${CHIP_ARTIFACT_NAME} against the published ${CHIP_ARTIFACT_SHA256_NAME} sidecar and inspect chip-artifact-manifest.json before use."
 
           gh release upload "$CHIP_ARTIFACT_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             "$RUNNER_TEMP/$CHIP_ARTIFACT_NAME#$CHIP_ARTIFACT_NAME" \
-            --clobber
+            "$RUNNER_TEMP/$CHIP_ARTIFACT_SHA256_NAME#$CHIP_ARTIFACT_SHA256_NAME"
