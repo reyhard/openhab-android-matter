@@ -99,6 +99,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Avoid the action's deprecated default 'tools' SDK package.
+          packages: platform-tools
 
       - name: Install Android SDK packages
         shell: bash
