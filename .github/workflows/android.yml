@@ -24,8 +24,14 @@ jobs:
       CHIP_PAA_TRUST_STORE_DIR: /tmp/connectedhomeip-controller-artifacts/paa-root-certs
       CHIP_CONTROLLER_ABIS: arm64-v8a
       CHIP_CONTROLLER_ARTIFACT_RELEASE_TAG: chip-controller-artifacts-latest
-      CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME: openhab-chip-artifacts-arm64.zip
-      CHIP_GRADLE_ARGS: -PopenhabMatterChipControllerArtifactsDir=/tmp/connectedhomeip-controller-artifacts -PopenhabMatterChipControllerAbis=arm64-v8a -PopenhabMatterChipPaaTrustStoreDir=/tmp/connectedhomeip-controller-artifacts/paa-root-certs
+      CHIP_CONTROLLER_ARTIFACT_ARCHIVE_NAME: openhab-chip-artifacts-arm64-v1.6.1.0.zip
+      CHIP_CONTROLLER_ARTIFACT_SHA256: 6a0ad753ba2f905fa9fc9ba8655495d7b1abf974e5882d391e7bbb22b007ec28
+      CHIP_GRADLE_ARGS: >-
+        -PopenhabMatterChipControllerArtifactsDir=/tmp/connectedhomeip-controller-artifacts
+        -PopenhabMatterChipControllerAbis=arm64-v8a
+        -PopenhabMatterChipPaaTrustStoreDir=/tmp/connectedhomeip-controller-artifacts/paa-root-certs
+        -PopenhabMatterChipArtifactExpectedSourceTag=v1.6.1.0
+        -PopenhabMatterChipArtifactExpectedSourceCommit=3bcdd56ba54fb88b2afb4bfef575014671df7aa7
 
     steps:
       - name: Check out repository
@@ -97,6 +103,8 @@ jobs:
             -H "Accept: application/octet-stream" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${ASSET_ID}" \
             -o "$ARCHIVE_PATH"
+
+          echo "${CHIP_CONTROLLER_ARTIFACT_SHA256}  ${ARCHIVE_PATH}" | sha256sum -c -
 
           unzip -q -o "$ARCHIVE_PATH" -d "$CHIP_CONTROLLER_ARTIFACTS_DIR"
 
