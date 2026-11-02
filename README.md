@@ -211,8 +211,10 @@ The artifact source path is managed automatically:
   artifacts from an allowlisted connectedhomeip release. It now defaults to
   `v1.6.1.0` and produces a versioned candidate archive
   (`openhab-chip-artifacts-arm64-v1.6.1.0.zip`), a SHA-256 sidecar, and an
-  embedded `chip-artifact-manifest.json`. Publishing requires an explicit
-  `publish=true` dispatch and refuses to overwrite an existing version tag.
+  embedded `chip-artifact-manifest.json`. The sidecar is only a convenience
+  copy; consumers must verify against a separately trusted, maintainer-approved
+  digest. Publishing requires an explicit `publish=true` dispatch and refuses to
+  overwrite an existing version tag.
 - `Android CI` still downloads the legacy mutable
   `chip-controller-artifacts-latest` asset until the immutable `v1.6.1.0`
   artifact release is published and verified. Do not switch consumers before

@@ -16,13 +16,21 @@ on:
     - cron: "0 4 * * 1"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-artifacts:
-    name: Build and publish connectedhomeip artifacts
+    name: Build connectedhomeip artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
+    outputs:
+      artifact_tag: ${{ steps.source.outputs.artifact_tag }}
+      artifact_name: ${{ steps.source.outputs.artifact_name }}
+      sha256_name: ${{ steps.source.outputs.sha256_name }}
+      source_tag: ${{ steps.source.outputs.source_tag }}
+      source_commit: ${{ steps.source.outputs.source_commit }}
     env:
       CONNECTEDHOMEIP_REF: ${{ github.event.inputs.connectedhomeip_ref || 'v1.6.1.0' }}
       KOTLIN_VERSION: 2.1.21
@@ -40,6 +48,7 @@ jobs:
           fetch-depth: 1
 
       - name: Validate connectedhomeip ref and resolve immutable source
+        id: source
         shell: bash
         run: |
           set -euo pipefail
@@ -67,6 +76,13 @@ jobs:
           echo "CHIP_ARTIFACT_NAME=$ARTIFACT_NAME" >> "$GITHUB_ENV"
           echo "CHIP_ARTIFACT_DIR_NAME=openhab-chip-artifacts-arm64-${CONNECTEDHOMEIP_REF}" >> "$GITHUB_ENV"
           echo "CHIP_ARTIFACT_SHA256_NAME=${ARTIFACT_NAME}.sha256" >> "$GITHUB_ENV"
+          {
+            echo "artifact_tag=$ARTIFACT_TAG"
+            echo "artifact_name=$ARTIFACT_NAME"
+            echo "sha256_name=${ARTIFACT_NAME}.sha256"
+            echo "source_tag=$CONNECTEDHOMEIP_REF"
+            echo "source_commit=$RESOLVED_SHA"
+          } >> "$GITHUB_OUTPUT"
           echo "Validated $CONNECTEDHOMEIP_REF at $RESOLVED_SHA; candidate artifact $ARTIFACT_NAME."
 
       - name: Initialize connectedhomeip submodules
@@ -227,13 +243,55 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  publish-artifact:
+    name: Publish immutable versioned release assets
+    needs: build-artifacts
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      CHIP_ARTIFACT_TAG: ${{ needs.build-artifacts.outputs.artifact_tag }}
+      CHIP_ARTIFACT_NAME: ${{ needs.build-artifacts.outputs.artifact_name }}
+      CHIP_ARTIFACT_SHA256_NAME: ${{ needs.build-artifacts.outputs.sha256_name }}
+      CHIP_SOURCE_TAG: ${{ needs.build-artifacts.outputs.source_tag }}
+      CHIP_SOURCE_COMMIT: ${{ needs.build-artifacts.outputs.source_commit }}
+
+    steps:
+      - name: Download candidate artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: chip-controller-artifacts-arm64
+          path: ${{ runner.temp }}/chip-controller-artifacts
+
+      - name: Verify downloaded candidate artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/chip-controller-artifacts"
+          sha256sum -c "$CHIP_ARTIFACT_SHA256_NAME"
+          test -s "$CHIP_ARTIFACT_NAME"
+
+          VERIFY_ROOT="$RUNNER_TEMP/chip-artifact-publish-verify"
+          rm -rf "$VERIFY_ROOT"
+          mkdir -p "$VERIFY_ROOT"
+          unzip -q "$CHIP_ARTIFACT_NAME" -d "$VERIFY_ROOT"
+          test -f "$VERIFY_ROOT/chip-artifact-manifest.json"
+          jq -e \
+            --arg tag "$CHIP_SOURCE_TAG" \
+            --arg commit "$CHIP_SOURCE_COMMIT" \
+            --arg abi "arm64-v8a" \
+            '.connectedhomeip_tag == $tag and .connectedhomeip_commit == $commit and .abi == $abi' \
+            "$VERIFY_ROOT/chip-artifact-manifest.json" >/dev/null
+
       - name: Publish immutable versioned release assets
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          cd "$RUNNER_TEMP/chip-controller-artifacts"
 
           if gh release view "$CHIP_ARTIFACT_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release '$CHIP_ARTIFACT_TAG' already exists. Immutable artifacts must not be overwritten."
@@ -244,9 +302,9 @@ jobs:
           gh release create "$CHIP_ARTIFACT_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "CHIP Controller Artifacts ${CHIP_SOURCE_TAG}" \
-            --notes "Immutable connectedhomeip ${CHIP_SOURCE_TAG} (${CHIP_SOURCE_COMMIT}) Android arm64 controller artifacts for openhab-android-matter. Verify ${CHIP_ARTIFACT_NAME} against the published ${CHIP_ARTIFACT_SHA256_NAME} sidecar and inspect chip-artifact-manifest.json before use."
+            --notes "Immutable connectedhomeip ${CHIP_SOURCE_TAG} (${CHIP_SOURCE_COMMIT}) Android arm64 controller artifacts for openhab-android-matter. Verify the archive against a separately trusted, maintainer-approved SHA-256 value before use; the co-published ${CHIP_ARTIFACT_SHA256_NAME} sidecar is a convenience copy, not an independent trust anchor. Inspect chip-artifact-manifest.json for source tag, commit, ABI, and per-file checksums."
 
           gh release upload "$CHIP_ARTIFACT_TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            "$RUNNER_TEMP/$CHIP_ARTIFACT_NAME#$CHIP_ARTIFACT_NAME" \
-            "$RUNNER_TEMP/$CHIP_ARTIFACT_SHA256_NAME#$CHIP_ARTIFACT_SHA256_NAME"
+            "$CHIP_ARTIFACT_NAME#$CHIP_ARTIFACT_NAME" \
+            "$CHIP_ARTIFACT_SHA256_NAME#$CHIP_ARTIFACT_SHA256_NAME"

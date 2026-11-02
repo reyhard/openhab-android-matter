@@ -117,25 +117,39 @@ The candidate was packaged with `scripts/package_chip_controller_artifact.sh`:
 | `CHIPController.jar` | `16a9bbbc78fb7c8b5b86a9d7041b49f4a3f8ba20cf26bad67b32bf290b2de59b` |
 
 The archive is a local candidate under `.artifacts/` and was **not** published.
-The manifest contains per-file checksums and PAA/CD digests; the `.sha256`
-sidecar is separate from the archive.
+The digest above is an observed candidate checksum, not a trusted or pinned
+release value. The manifest contains per-file checksums and PAA/CD digests; the
+`.sha256` sidecar is a convenience copy and is not an independent trust anchor.
+Before consumer use, a maintainer must verify the archive against a separately
+trusted digest and pin that value.
+
+The producer workflow runs build/bootstrap with `contents: read`. Release write
+permission is granted only to a separate publishing job gated on a manual
+`workflow_dispatch` with `publish=true`; scheduled builds cannot publish.
 
 ## Validation results
 
-All commands below were executed locally on 2026-11-01.
+All commands below were executed locally on 2026-11-01 and 2026-11-02.
 
 - Provenance verifier, positive:
-  `scripts/verify_connectedhomeip_artifact_archive.ps1` passed against the pinned
-  archive digest, source tag, source commit, sidecar, manifest, required files,
-  and per-file checksums.
+  `scripts/verify_connectedhomeip_artifact_archive.ps1` passed against the
+  expected archive digest, source tag, source commit, sidecar, manifest,
+  required files, exact packaged-file coverage, and per-file checksums. The
+  expected digest was supplied locally for verification and is **not yet
+  independently pinned**.
 - Provenance verifier, negative:
-  - Wrong pinned archive SHA-256 failed with
+  - Wrong expected archive SHA-256 failed with
     `artifact archive SHA-256 mismatch ... Refusing to extract.`
   - Wrong expected source tag failed with `Artifact source tag mismatch`.
+  - Empty or incomplete manifest coverage, unlisted/tampered files,
+    traversal/unsafe paths, duplicate entries, missing PAA certificates, and a
+    non-empty caller extraction directory failed as expected.
 - Gradle artifact verification with the real candidate passed, including the
-  manifest tag/commit and embedded file checksums.
-- Gradle negative checks rejected a missing controller jar, a missing
-  `libCHIPController.so`, and a tampered manifest checksum.
+  manifest tag/commit, exact packaged-file coverage, and embedded file
+  checksums.
+- Gradle negative checks rejected empty/incomplete manifest coverage, a missing
+  controller jar, a missing `libCHIPController.so`, an extra unlisted file, a
+  tampered manifest checksum, and unsafe manifest paths.
 - `:app:testDebugUnitTest` with the real 1.6.1 jars: **499 tests, 0 failures,
   0 skipped**. `ConnectedHomeIpV161CompatibilityTest` ran against the packaged
   jars and confirmed the reflected controller signatures, deferred ICD factory,
