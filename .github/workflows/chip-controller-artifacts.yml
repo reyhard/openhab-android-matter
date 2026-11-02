@@ -1,6 +1,12 @@
 name: Build CHIP Controller Artifacts
 
 on:
+  # Automatically validate changes to the native artifact build workflow.
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/chip-controller-artifacts.yml"
   workflow_dispatch:
     inputs:
       connectedhomeip_ref:
@@ -21,7 +27,8 @@ permissions:
 jobs:
   build-artifacts:
     name: Build connectedhomeip artifacts
-    runs-on: ubuntu-latest
+    # Pin the native toolchain host image; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:
       contents: read
@@ -142,6 +149,21 @@ jobs:
           python3 connectedhomeip/credentials/fetch_paa_certs_from_dcl.py \
             --use-main-net-http \
             --paa-trust-store-path connectedhomeip/credentials/production/paa-root-certs
+
+      - name: Install native dependencies for Matter Python bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          # PyGObject pulls pycairo from source; both need native headers.
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc \
+            python3-dev \
+            pkg-config \
+            libcairo2-dev \
+            libgirepository-2.0-dev
+          pkg-config --modversion cairo
+          pkg-config --modversion girepository-2.0
 
       - name: Build connectedhomeip Android controller artifacts
         shell: bash
