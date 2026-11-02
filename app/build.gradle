@@ -541,9 +541,15 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
                 .withPathSensitivity(PathSensitivity.RELATIVE)
     }
     if (!chipControllerArtifactsDir.isEmpty()) {
-        inputs.file(new File(file(chipControllerArtifactsDir), "chip-artifact-manifest.json"))
-                .withPropertyName("artifactManifest")
-                .optional()
+        File manifestInput = new File(file(chipControllerArtifactsDir), "chip-artifact-manifest.json")
+        // Legacy controller artifacts have no manifest. Do not register a missing
+        // file as a Gradle input: Gradle 8.14 rejects it during task validation
+        // even if the input is marked optional.
+        if (manifestInput.isFile()) {
+            inputs.file(manifestInput)
+                    .withPropertyName("artifactManifest")
+                    .withPathSensitivity(PathSensitivity.RELATIVE)
+        }
     }
     outputs.dir(generatedTrustStoreAssetsDir)
     doLast {
