@@ -124,12 +124,13 @@ $RequiredClassEntries = @(
 function Invoke-GradleArtifactVerification {
     param(
         [Parameter(Mandatory = $true)] [string] $ArtifactRoot,
-        [string[]] $ExtraGradleArgs = @()
+        [string[]] $ExtraGradleArgs = @(),
+        [string] $TaskName = ":app:verifyConnectedHomeIpControllerArtifacts"
     )
 
     Push-Location $ProjectRoot
     try {
-        $output = & $GradlePath ":app:verifyConnectedHomeIpControllerArtifacts" "--offline" "-PopenhabMatterChipControllerArtifactsDir=$ArtifactRoot" @ExtraGradleArgs 2>&1
+        $output = & $GradlePath $TaskName "--offline" "-PopenhabMatterChipControllerArtifactsDir=$ArtifactRoot" @ExtraGradleArgs 2>&1
         return @{ ExitCode = $LASTEXITCODE; Output = ($output -join "`n") }
     } finally {
         Pop-Location
@@ -238,6 +239,12 @@ $emptyMapManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Pat
 $emptyMap = Invoke-GradleArtifactVerification -ArtifactRoot $emptyMapRoot
 Assert-True ($emptyMap.ExitCode -ne 0) "Expected empty manifest files map to fail validation."
 Assert-True ($emptyMap.Output.Contains("unlisted files")) ("Expected unlisted-files failure for empty map. Output:`n" + $emptyMap.Output)
+
+$prepareGate = Invoke-GradleArtifactVerification -ArtifactRoot $emptyMapRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets" -ExtraGradleArgs @(
+    "-PopenhabMatterChipPaaTrustStoreDir=$emptyMapRoot\paa-root-certs"
+)
+Assert-True ($prepareGate.ExitCode -ne 0) "Expected APK provenance preparation to reject an incomplete manifest."
+Assert-True ($prepareGate.Output.Contains("unlisted files")) ("Expected preparation to depend on artifact verification. Output:`n" + $prepareGate.Output)
 
 $omittedRoot = Join-Path $tmpRoot "chip-controller-artifacts-omitted-required"
 New-ArtifactLayout -Root $omittedRoot -JarMode "Valid"

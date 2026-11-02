@@ -149,7 +149,9 @@ All commands below were executed locally on 2026-11-01 and 2026-11-02.
   checksums.
 - Gradle negative checks rejected empty/incomplete manifest coverage, a missing
   controller jar, a missing `libCHIPController.so`, an extra unlisted file, a
-  tampered manifest checksum, and unsafe manifest paths.
+  tampered manifest checksum, and unsafe manifest paths. The APK provenance
+  preparation task also failed when artifact verification failed, proving the
+  manifest asset cannot be copied from an incomplete artifact.
 - `:app:testDebugUnitTest` with the real 1.6.1 jars: **499 tests, 0 failures,
   0 skipped**. `ConnectedHomeIpV161CompatibilityTest` ran against the packaged
   jars and confirmed the reflected controller signatures, deferred ICD factory,
