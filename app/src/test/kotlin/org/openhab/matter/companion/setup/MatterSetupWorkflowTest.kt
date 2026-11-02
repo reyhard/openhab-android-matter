@@ -43,24 +43,122 @@ class MatterSetupWorkflowTest {
     }
 
     @Test
-    fun automatedFlowIgnoresMatterInboxEntriesThatExistedBeforeOpenHabScan() {
-        val staleEntryId = "matter:node:controller:old"
+    fun automatedFlowPassesDiscoveryContextToInboxWaiter() {
         val ports = FakeMatterSetupPorts().apply {
-            baselineMatterEntryIds = setOf(staleEntryId)
-            inboxMatterEntryIds = setOf(staleEntryId)
-            inboxMatterEntryDetected = true
-            inboxDetails = "Only stale Matter Inbox entry detected"
+            vendorName = "Aqara"
+            productName = "U200"
         }
         val states = mutableListOf<MatterSetupUiState>()
         val workflow = MatterSetupWorkflow(ports) { states.add(it) }
 
         workflow.startAutomatedSetup("MT:TEST")
 
-        assertTrue(ports.baselineInboxCalled)
-        assertEquals(setOf(staleEntryId), ports.waitForInboxBaselineMatterEntryIds)
+        assertEquals(MatterSetupStage.SuccessInboxDetected, states.last().stage)
+        assertEquals(
+            MatterDiscoveryContext("Aqara", "U200", 1234L),
+            ports.waitForInboxDiscoveryContext
+        )
+    }
+
+    @Test
+    fun automatedFlowSucceedsWhenNewInboxEntryAlreadyExistsBeforeScan() {
+        val ports = FakeMatterSetupPorts().apply {
+            inboxMatterEntryDetected = true
+            inboxLabelConfirmed = true
+            inboxDetectedOnFirstPoll = true
+            inboxDetails = "Matter Inbox entry was already present"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        assertEquals(MatterSetupStage.SuccessInboxDetected, states.last().stage)
+        assertEquals("openHAB already knows this device.", states.last().message)
+    }
+
+    @Test
+    fun automatedFlowReportsUnconfirmedInboxEntryWithoutClaimingIdentity() {
+        val ports = FakeMatterSetupPorts().apply {
+            inboxMatterEntryDetected = true
+            inboxLabelConfirmed = false
+            inboxDetails = "Fresh Matter Inbox entry with an unrelated label"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        assertEquals(MatterSetupStage.SuccessInboxDetected, states.last().stage)
+        assertEquals(
+            "A fresh Matter Inbox entry was found, but its identity could not be confirmed.",
+            states.last().message
+        )
+    }
+
+    @Test
+    fun automatedFlowFailsWhenOnlyIgnoredMatterEntriesRemain() {
+        val ports = FakeMatterSetupPorts().apply {
+            inboxMatterEntryDetected = false
+            inboxDetails = "Matter Inbox entries were present, but all were IGNORED"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
         assertEquals(MatterSetupStage.Failed, states.last().stage)
         assertEquals(MatterSetupStage.WatchingOpenHabInbox, states.last().failure?.step)
         assertEquals("openHAB did not report the device yet", states.last().failure?.message)
+    }
+
+    @Test
+    fun automatedFlowFailsWithDistinctMessageWhenInboxIsUnreachable() {
+        val ports = FakeMatterSetupPorts().apply {
+            inboxMatterEntryDetected = false
+            inboxReachable = false
+            inboxDetails = "openHAB Inbox is not reachable"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        assertEquals(MatterSetupStage.Failed, states.last().stage)
+        assertEquals("openHAB Inbox could not be checked", states.last().failure?.message)
+    }
+
+    @Test
+    fun automatedFlowFailsWithDistinctMessageWhenInboxResponseIsIncomplete() {
+        val ports = FakeMatterSetupPorts().apply {
+            inboxMatterEntryDetected = false
+            inboxResponseIncomplete = true
+            inboxDetails = "openHAB Inbox response exceeded the 8388608-byte limit"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        assertEquals(MatterSetupStage.Failed, states.last().stage)
+        assertEquals("openHAB Inbox response was incomplete", states.last().failure?.message)
+        assertTrue(states.last().failure!!.details.contains("8388608"))
+    }
+
+    @Test
+    fun automatedFlowDoesNotRequireMatchingPhoneAndOpenHabNodeIds() {
+        val ports = FakeMatterSetupPorts().apply {
+            inboxMatterEntryDetected = true
+            inboxLabelConfirmed = true
+            inboxDetails = "Matter Inbox entry uses openHAB fabric node id"
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        val workflow = MatterSetupWorkflow(ports) { states.add(it) }
+
+        workflow.startAutomatedSetup("MT:TEST")
+
+        assertEquals(MatterSetupStage.SuccessInboxDetected, states.last().stage)
+        assertEquals(1234L, ports.waitForInboxDiscoveryContext?.nodeId)
     }
 
     @Test
@@ -664,7 +762,6 @@ class MatterSetupWorkflowTest {
         var openWindowCalled = false
         var scanCalled = false
         var inboxCalled = false
-        var baselineInboxCalled = false
         var scanStarted = true
         var scanDetails = "scan accepted"
         var scanTimeoutSeconds = 120
@@ -674,7 +771,7 @@ class MatterSetupWorkflowTest {
         var openWindowControllerState: String? = null
         var scanManualCode: String? = null
         var waitForInboxTimeoutSeconds: Int? = null
-        var waitForInboxBaselineMatterEntryIds: Set<String> = emptySet()
+        var waitForInboxDiscoveryContext: MatterDiscoveryContext? = null
         var diagnosticsCalled = false
         var diagnosticsFailure: MatterSetupFailure? = null
         var diagnosticsContext: MatterSetupDiagnosticsContext? = null
@@ -696,8 +793,10 @@ class MatterSetupWorkflowTest {
         var readinessWarnings = emptyList<String>()
         var inboxMatterEntryDetected = true
         var inboxDetails = "Matter Inbox entry detected"
-        var baselineMatterEntryIds = emptySet<String>()
-        var inboxMatterEntryIds = setOf("matter:node:controller:device")
+        var inboxLabelConfirmed = false
+        var inboxDetectedOnFirstPoll = false
+        var inboxReachable = true
+        var inboxResponseIncomplete = false
         var commissionProgressMessages = emptyList<String>()
         var commissionError: RuntimeException? = null
 
@@ -770,38 +869,19 @@ class MatterSetupWorkflowTest {
 
         override fun waitForOpenHabInbox(
             config: MatterSetupConfig,
-            timeoutSeconds: Int
-        ): MatterSetupPorts.InboxResult {
-            return waitForOpenHabInbox(config, timeoutSeconds, emptySet())
-        }
-
-        override fun waitForOpenHabInbox(
-            config: MatterSetupConfig,
             timeoutSeconds: Int,
-            baselineMatterEntryIds: Set<String>
+            discoveryContext: MatterDiscoveryContext
         ): MatterSetupPorts.InboxResult {
             inboxCalled = true
             waitForInboxTimeoutSeconds = timeoutSeconds
-            waitForInboxBaselineMatterEntryIds = baselineMatterEntryIds
-            val newEntryIds = inboxMatterEntryIds - baselineMatterEntryIds
-            val detected = if (baselineMatterEntryIds.isEmpty()) {
-                inboxMatterEntryDetected
-            } else {
-                newEntryIds.isNotEmpty()
-            }
+            waitForInboxDiscoveryContext = discoveryContext
             return MatterSetupPorts.InboxResult(
-                matterEntryDetected = detected,
+                matterEntryDetected = inboxMatterEntryDetected,
                 details = inboxDetails,
-                matterEntryIds = inboxMatterEntryIds
-            )
-        }
-
-        override fun readOpenHabInbox(config: MatterSetupConfig): MatterSetupPorts.InboxResult {
-            baselineInboxCalled = true
-            return MatterSetupPorts.InboxResult(
-                matterEntryDetected = baselineMatterEntryIds.isNotEmpty(),
-                details = "Baseline Matter Inbox entries",
-                matterEntryIds = baselineMatterEntryIds
+                labelConfirmed = inboxLabelConfirmed,
+                detectedOnFirstPoll = inboxDetectedOnFirstPoll,
+                reachable = inboxReachable,
+                responseIncomplete = inboxResponseIncomplete
             )
         }
 

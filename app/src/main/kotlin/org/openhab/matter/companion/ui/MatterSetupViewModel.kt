@@ -28,12 +28,12 @@ import org.openhab.matter.companion.domain.ThreadDataset
 import org.openhab.matter.companion.openhab.HttpOpenHabClient
 import org.openhab.matter.companion.openhab.HttpOpenHabInboxClient
 import org.openhab.matter.companion.openhab.HttpOpenHabMatterDiscoveryClient
-import org.openhab.matter.companion.openhab.OpenHabInboxStatus
 import org.openhab.matter.companion.openhab.OpenHabStatus
 import org.openhab.matter.companion.otbr.HttpOtbrClient
 import org.openhab.matter.companion.setup.AndroidMatterSetupPorts
 import org.openhab.matter.companion.setup.FirstRunSettingsValidator
 import org.openhab.matter.companion.setup.MatterDeviceDetailFormatter
+import org.openhab.matter.companion.setup.MatterDiscoveryContext
 import org.openhab.matter.companion.setup.MatterSetupAction
 import org.openhab.matter.companion.setup.MatterSetupConfig
 import org.openhab.matter.companion.setup.MatterSetupConfigCompleteness
@@ -51,8 +51,11 @@ import org.openhab.matter.companion.setup.PhoneMatterDeviceDetails
 import org.openhab.matter.companion.setup.ThreadDatasetSettingsStatus
 import org.openhab.matter.companion.setup.ThreadDatasetSettingsValidator
 import org.openhab.matter.companion.setup.WorkflowExecutionGate
+import org.openhab.matter.companion.setup.failureMessage
 import org.openhab.matter.companion.setup.phoneMatterDeviceDetailsFromControllerDetails
+import org.openhab.matter.companion.setup.pollForMatterInbox
 import org.openhab.matter.companion.setup.sanitizeLogUrls
+import org.openhab.matter.companion.setup.successMessage
 import org.openhab.matter.companion.setup.toLogSafeUrl
 
 internal fun resolveEffectiveSetupToken(editableToken: String, persistedToken: String): String {
@@ -1393,7 +1396,6 @@ class MatterSetupViewModel @JvmOverloads constructor(
 
                 activeStage = MatterSetupStage.SendingCodeToOpenHab
                 emitState(MatterSetupUiState.progress(activeStage, window.timeoutSeconds, deviceIdentity = windowIdentity))
-                val baselineInbox = ports.readOpenHabInbox(workflowConfig)
                 val scan = ports.sendCodeToOpenHab(window.manualCode, workflowConfig)
                 if (!scan.started) {
                     emitWorkflowFailure(
@@ -1408,15 +1410,20 @@ class MatterSetupViewModel @JvmOverloads constructor(
 
                 activeStage = MatterSetupStage.WatchingOpenHabInbox
                 emitState(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds, deviceIdentity = windowIdentity))
+                val discoveryContext = MatterDiscoveryContext(
+                    vendorName = windowIdentity.vendorName,
+                    productName = windowIdentity.productName,
+                    nodeId = bootstrap.bootstrapNodeId()
+                )
                 val inbox = ports.waitForOpenHabInbox(
                     workflowConfig,
                     scan.timeoutSeconds,
-                    baselineInbox.matterEntryIds
+                    discoveryContext
                 )
                 if (!inbox.matterEntryDetected) {
                     emitWorkflowFailure(
                         activeStage,
-                        "openHAB did not report the device yet",
+                        inbox.failureMessage(),
                         inbox.details,
                         diagnosticsContext,
                         sanitizer
@@ -1428,7 +1435,7 @@ class MatterSetupViewModel @JvmOverloads constructor(
                     MatterSetupUiState(
                         stage = MatterSetupStage.SuccessInboxDetected,
                         title = "Device found by openHAB",
-                        message = "openHAB reported a Matter Inbox entry for this device.",
+                        message = inbox.successMessage(),
                         primaryAction = MatterSetupAction.AddAnotherDevice,
                         primaryActionLabel = "Add another device"
                     )
@@ -1635,21 +1642,15 @@ class MatterSetupViewModel @JvmOverloads constructor(
             discoveryScan = { baseUrl, manualCode, apiToken ->
                 openHabMatterDiscoveryClient.startMatterScan(baseUrl, manualCode, apiToken)
             },
-            inboxWaiter = { baseUrl, apiToken, timeoutSeconds ->
-                waitForOpenHabInbox(baseUrl, apiToken, timeoutSeconds)
+            inboxWaiter = { baseUrl, apiToken, timeoutSeconds, discoveryContext ->
+                waitForOpenHabInbox(baseUrl, apiToken, timeoutSeconds, discoveryContext)
             },
             diagnosticsRunner = ::runBasicDiagnostics,
             readinessDiagnostics = {
                 listOf(readinessProbe.bluetoothDiagnostic(), readinessProbe.locationServicesDiagnostic()) +
                     readinessProbe.permissionDiagnostics()
             },
-            networkTransportSummary = readinessProbe::networkTransportSummary,
-            inboxReader = { baseUrl, apiToken ->
-                readOpenHabInbox(baseUrl, apiToken)
-            },
-            baselineAwareInboxWaiter = { baseUrl, apiToken, timeoutSeconds, baselineMatterEntryIds ->
-                waitForOpenHabInbox(baseUrl, apiToken, timeoutSeconds, baselineMatterEntryIds)
-            }
+            networkTransportSummary = readinessProbe::networkTransportSummary
         )
     }
 
@@ -1670,69 +1671,15 @@ class MatterSetupViewModel @JvmOverloads constructor(
         baseUrl: String,
         apiToken: String,
         timeoutSeconds: Int,
-        baselineMatterEntryIds: Set<String> = emptySet()
+        discoveryContext: MatterDiscoveryContext
     ): MatterSetupPorts.InboxResult {
-        val deadlineMillis = System.currentTimeMillis() + (timeoutSeconds.coerceAtLeast(30) * 1000L)
-        var last = OpenHabInboxStatus(false, false, "openHAB Inbox was not checked", "")
-        var detected = false
-        do {
-            last = runCatching {
+        return pollForMatterInbox(
+            timeoutSeconds = timeoutSeconds,
+            discoveryContext = discoveryContext,
+            checkInbox = {
                 openHabInboxClient.checkInbox(baseUrl, apiToken)
-            }.getOrElse { error ->
-                OpenHabInboxStatus(false, false, "openHAB Inbox check failed", error.message.orEmpty())
             }
-            detected = matterEntryDetectedAfterBaseline(last, baselineMatterEntryIds)
-            if (detected) {
-                break
-            }
-            val remainingMillis = deadlineMillis - System.currentTimeMillis()
-            if (remainingMillis <= 0L) {
-                break
-            }
-            try {
-                Thread.sleep(remainingMillis.coerceAtMost(2_000L))
-            } catch (interrupted: InterruptedException) {
-                Thread.currentThread().interrupt()
-                break
-            }
-        } while (true)
-
-        val details = listOf(last.message().orEmpty(), last.details().orEmpty())
-            .filter { it.isNotBlank() }
-            .joinToString(": ")
-        val baselineDetails = if (!detected && baselineMatterEntryIds.isNotEmpty() && last.matterEntryDetected()) {
-            listOf(details, "Only pre-existing Matter Inbox entries were detected.")
-                .filter { it.isNotBlank() }
-                .joinToString(" ")
-        } else {
-            details
-        }
-        return MatterSetupPorts.InboxResult(detected, baselineDetails, last.matterEntryIds())
-    }
-
-    private fun readOpenHabInbox(
-        baseUrl: String,
-        apiToken: String
-    ): MatterSetupPorts.InboxResult {
-        val status = runCatching {
-            openHabInboxClient.checkInbox(baseUrl, apiToken)
-        }.getOrElse { error ->
-            OpenHabInboxStatus(false, false, "openHAB Inbox check failed", error.message.orEmpty())
-        }
-        val details = listOf(status.message().orEmpty(), status.details().orEmpty())
-            .filter { it.isNotBlank() }
-            .joinToString(": ")
-        return MatterSetupPorts.InboxResult(status.matterEntryDetected(), details, status.matterEntryIds())
-    }
-
-    private fun matterEntryDetectedAfterBaseline(
-        status: OpenHabInboxStatus,
-        baselineMatterEntryIds: Set<String>
-    ): Boolean {
-        if (baselineMatterEntryIds.isEmpty()) {
-            return status.matterEntryDetected()
-        }
-        return (status.matterEntryIds() - baselineMatterEntryIds).isNotEmpty()
+        )
     }
 
     private fun runBasicDiagnostics(

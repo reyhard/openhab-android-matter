@@ -7,16 +7,12 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Collections;
+import java.util.List;
 
 public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
     private static final int TIMEOUT_MILLIS = 3000;
-    private static final int MAX_RESPONSE_BYTES = 16 * 1024;
-    private static final Pattern THING_UID_PATTERN = Pattern.compile(
-            "\"thingUID\"\\s*:\\s*\"([^\"]+)\"");
+    private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
     @Override
     public OpenHabInboxStatus checkInbox(String baseUrl) {
@@ -40,12 +36,36 @@ public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
 
             int responseCode = connection.getResponseCode();
             if (responseCode >= 200 && responseCode < 300) {
-                String responseText = readBoundedResponse(connection.getInputStream());
-                Set<String> matterEntryIds = extractMatterEntryIds(responseText);
-                boolean detected = !matterEntryIds.isEmpty() || containsMatterEntry(responseText);
+                ReadResult response = readBoundedResponse(connection.getInputStream());
+                if (response.truncated) {
+                    String message = "openHAB Inbox response exceeded the "
+                            + MAX_RESPONSE_BYTES + "-byte limit";
+                    String details = "HTTP " + responseCode + " from " + url
+                            + "; response exceeded the " + MAX_RESPONSE_BYTES
+                            + "-byte limit and was not checked";
+                    return new OpenHabInboxStatus(
+                            true,
+                            false,
+                            message,
+                            details,
+                            Collections.emptyList(),
+                            true);
+                }
+                OpenHabInboxJsonScanner.ScanResult scan = OpenHabInboxJsonScanner.scan(response.text);
+                List<OpenHabInboxEntry> entries = scan.entries();
+                boolean detected = containsMatterEntry(entries);
                 String message = detected ? "Matter Inbox entry detected" : "No Matter Inbox entry detected";
-                return new OpenHabInboxStatus(true, detected, message, "HTTP " + responseCode + " from " + url,
-                        matterEntryIds);
+                String details = "HTTP " + responseCode + " from " + url;
+                if (scan.truncated()) {
+                    details += "; openHAB Inbox response was truncated or incomplete, so only complete entries were considered";
+                }
+                return new OpenHabInboxStatus(
+                        true,
+                        detected,
+                        message,
+                        details,
+                        entries,
+                        scan.truncated());
             }
             return unreachable("openHAB Inbox is not reachable", "HTTP " + responseCode + " from " + url);
         } catch (MalformedURLException e) {
@@ -73,37 +93,41 @@ public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
         return new URL(normalizedBaseUrl + "/rest/inbox");
     }
 
-    private static boolean containsMatterEntry(String responseText) {
-        return responseText.contains("matter:") || responseText.contains("\"bindingId\":\"matter\"");
-    }
-
-    private static Set<String> extractMatterEntryIds(String responseText) {
-        Set<String> ids = new LinkedHashSet<>();
-        Matcher matcher = THING_UID_PATTERN.matcher(responseText);
-        while (matcher.find()) {
-            String thingUid = matcher.group(1);
-            if (thingUid != null && thingUid.startsWith("matter:")) {
-                ids.add(thingUid);
+    private static boolean containsMatterEntry(List<OpenHabInboxEntry> entries) {
+        for (OpenHabInboxEntry entry : entries) {
+            if (entry.matterEntry()) {
+                return true;
             }
         }
-        if (ids.isEmpty() && containsMatterEntry(responseText)) {
-            ids.add("response:" + Integer.toHexString(responseText.hashCode()));
-        }
-        return ids;
+        return false;
     }
 
-    private static String readBoundedResponse(InputStream stream) throws IOException {
+    private static ReadResult readBoundedResponse(InputStream stream) throws IOException {
         try {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[8192];
             int totalBytes = 0;
-            int readBytes;
-            while (totalBytes < MAX_RESPONSE_BYTES
-                    && (readBytes = stream.read(buffer, 0, Math.min(buffer.length, MAX_RESPONSE_BYTES - totalBytes))) != -1) {
+            boolean truncated = false;
+            while (true) {
+                int remaining = MAX_RESPONSE_BYTES + 1 - totalBytes;
+                if (remaining <= 0) {
+                    truncated = true;
+                    break;
+                }
+                int readBytes = stream.read(buffer, 0, Math.min(buffer.length, remaining));
+                if (readBytes == -1) {
+                    break;
+                }
                 output.write(buffer, 0, readBytes);
                 totalBytes += readBytes;
+                if (totalBytes > MAX_RESPONSE_BYTES) {
+                    truncated = true;
+                    break;
+                }
             }
-            return output.toString(StandardCharsets.UTF_8.name());
+            byte[] bytes = output.toByteArray();
+            int textLength = Math.min(bytes.length, MAX_RESPONSE_BYTES);
+            return new ReadResult(new String(bytes, 0, textLength, StandardCharsets.UTF_8), truncated);
         } finally {
             stream.close();
         }
@@ -118,5 +142,15 @@ public final class HttpOpenHabInboxClient implements OpenHabInboxClient {
             return "No details available";
         }
         return value.replace('\r', ' ').replace('\n', ' ').trim();
+    }
+
+    private static final class ReadResult {
+        private final String text;
+        private final boolean truncated;
+
+        ReadResult(String text, boolean truncated) {
+            this.text = text;
+            this.truncated = truncated;
+        }
     }
 }

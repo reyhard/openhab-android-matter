@@ -75,7 +75,6 @@ class MatterSetupWorkflow(
 
             activeStage = MatterSetupStage.SendingCodeToOpenHab
             emit(MatterSetupUiState.progress(activeStage, window.timeoutSeconds, deviceIdentity = windowIdentity))
-            val baselineInbox = ports.readOpenHabInbox(config)
             val scan = ports.sendCodeToOpenHab(window.manualCode, config)
             if (!scan.started) {
                 fail(
@@ -90,11 +89,16 @@ class MatterSetupWorkflow(
 
             activeStage = MatterSetupStage.WatchingOpenHabInbox
             emit(MatterSetupUiState.progress(activeStage, scan.timeoutSeconds, deviceIdentity = windowIdentity))
-            val inbox = ports.waitForOpenHabInbox(config, scan.timeoutSeconds, baselineInbox.matterEntryIds)
+            val discoveryContext = MatterDiscoveryContext(
+                vendorName = commission.vendorName.ifBlank { window.vendorName },
+                productName = commission.productName.ifBlank { window.productName },
+                nodeId = commission.nodeId
+            )
+            val inbox = ports.waitForOpenHabInbox(config, scan.timeoutSeconds, discoveryContext)
             if (!inbox.matterEntryDetected) {
                 fail(
                     activeStage,
-                    "openHAB did not report the device yet",
+                    inbox.failureMessage(),
                     inbox.details,
                     diagnosticsContext,
                     redactor
@@ -106,7 +110,7 @@ class MatterSetupWorkflow(
                 MatterSetupUiState(
                     stage = MatterSetupStage.SuccessInboxDetected,
                     title = "Device found by openHAB",
-                    message = "openHAB reported a Matter Inbox entry for this device.",
+                    message = inbox.successMessage(),
                     primaryAction = MatterSetupAction.AddAnotherDevice,
                     primaryActionLabel = "Add another device"
                 )

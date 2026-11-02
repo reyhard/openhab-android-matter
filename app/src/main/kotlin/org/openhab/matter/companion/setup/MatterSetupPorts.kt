@@ -15,37 +15,11 @@ interface MatterSetupPorts {
 
     fun sendCodeToOpenHab(manualCode: String, config: MatterSetupConfig): OpenHabScanResult
 
-    fun readOpenHabInbox(config: MatterSetupConfig): InboxResult {
-        return InboxResult(
-            matterEntryDetected = false,
-            details = "openHAB Inbox baseline was not checked",
-            matterEntryIds = emptySet()
-        )
-    }
-
-    fun waitForOpenHabInbox(config: MatterSetupConfig, timeoutSeconds: Int): InboxResult
-
     fun waitForOpenHabInbox(
         config: MatterSetupConfig,
         timeoutSeconds: Int,
-        baselineMatterEntryIds: Set<String>
-    ): InboxResult {
-        val result = waitForOpenHabInbox(config, timeoutSeconds)
-        if (baselineMatterEntryIds.isEmpty()) {
-            return result
-        }
-        val newEntryIds = result.matterEntryIds - baselineMatterEntryIds
-        return result.copy(
-            matterEntryDetected = newEntryIds.isNotEmpty(),
-            details = if (newEntryIds.isNotEmpty()) {
-                result.details
-            } else {
-                listOf(result.details, "Only pre-existing Matter Inbox entries were detected.")
-                    .filter { it.isNotBlank() }
-                    .joinToString(" ")
-            }
-        )
-    }
+        discoveryContext: MatterDiscoveryContext = MatterDiscoveryContext()
+    ): InboxResult
 
     fun runDiagnostics(
         failure: MatterSetupFailure,
@@ -112,14 +86,33 @@ interface MatterSetupPorts {
     data class InboxResult(
         val matterEntryDetected: Boolean,
         val details: String,
-        val matterEntryIds: Set<String> = emptySet()
+        val matterEntryIds: Set<String> = emptySet(),
+        val labelConfirmed: Boolean = false,
+        val detectedOnFirstPoll: Boolean = false,
+        val reachable: Boolean = true,
+        val responseIncomplete: Boolean = false
     ) {
         override fun toString(): String {
             return "InboxResult(" +
                 "matterEntryDetected=$matterEntryDetected, " +
+                "labelConfirmed=$labelConfirmed, " +
                 "details=<redacted>" +
                 ")"
         }
+    }
+}
+
+data class MatterDiscoveryContext(
+    val vendorName: String = "",
+    val productName: String = "",
+    val nodeId: Long? = null
+) {
+    override fun toString(): String {
+        return "MatterDiscoveryContext(" +
+            "vendorName=${vendorName.trim()}, " +
+            "productName=${productName.trim()}, " +
+            "nodeId=$nodeId" +
+            ")"
     }
 }
 

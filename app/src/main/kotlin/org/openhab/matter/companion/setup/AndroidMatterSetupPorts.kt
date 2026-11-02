@@ -10,35 +10,10 @@ class AndroidMatterSetupPorts(
     private val readinessChecker: (String, String) -> OpenHabStatus,
     private val matterRunner: MatterRunner,
     private val discoveryScan: (String, String, String) -> OpenHabMatterDiscoveryScanStatus,
-    private val inboxWaiter: (String, String, Int) -> MatterSetupPorts.InboxResult,
+    private val inboxWaiter: (String, String, Int, MatterDiscoveryContext) -> MatterSetupPorts.InboxResult,
     private val diagnosticsRunner: (MatterSetupFailure, MatterSetupDiagnosticsContext) -> MatterSetupDiagnosticsSummary,
     private val readinessDiagnostics: () -> List<ReadinessDiagnostic> = { emptyList() },
-    private val networkTransportSummary: () -> NetworkTransportSummary? = { null },
-    private val inboxReader: (String, String) -> MatterSetupPorts.InboxResult = { baseUrl, apiToken ->
-        inboxWaiter(baseUrl, apiToken, 1)
-    },
-    private val baselineAwareInboxWaiter: (String, String, Int, Set<String>) -> MatterSetupPorts.InboxResult = {
-            baseUrl,
-            apiToken,
-            timeoutSeconds,
-            baselineMatterEntryIds ->
-        val result = inboxWaiter(baseUrl, apiToken, timeoutSeconds)
-        if (baselineMatterEntryIds.isEmpty()) {
-            result
-        } else {
-            val newEntryIds = result.matterEntryIds - baselineMatterEntryIds
-            result.copy(
-                matterEntryDetected = newEntryIds.isNotEmpty(),
-                details = if (newEntryIds.isNotEmpty()) {
-                    result.details
-                } else {
-                    listOf(result.details, "Only pre-existing Matter Inbox entries were detected.")
-                        .filter { it.isNotBlank() }
-                        .joinToString(" ")
-                }
-            )
-        }
-    }
+    private val networkTransportSummary: () -> NetworkTransportSummary? = { null }
 ) : MatterSetupPorts {
     interface MatterRunner {
         fun commissionToPhone(
@@ -126,25 +101,14 @@ class AndroidMatterSetupPorts(
 
     override fun waitForOpenHabInbox(
         config: MatterSetupConfig,
-        timeoutSeconds: Int
-    ): MatterSetupPorts.InboxResult {
-        return inboxWaiter(config.openHabBaseUrl, config.openHabApiToken, timeoutSeconds)
-    }
-
-    override fun readOpenHabInbox(config: MatterSetupConfig): MatterSetupPorts.InboxResult {
-        return inboxReader(config.openHabBaseUrl, config.openHabApiToken)
-    }
-
-    override fun waitForOpenHabInbox(
-        config: MatterSetupConfig,
         timeoutSeconds: Int,
-        baselineMatterEntryIds: Set<String>
+        discoveryContext: MatterDiscoveryContext
     ): MatterSetupPorts.InboxResult {
-        return baselineAwareInboxWaiter(
+        return inboxWaiter(
             config.openHabBaseUrl,
             config.openHabApiToken,
             timeoutSeconds,
-            baselineMatterEntryIds
+            discoveryContext
         )
     }
 

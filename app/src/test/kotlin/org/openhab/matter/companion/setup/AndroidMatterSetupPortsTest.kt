@@ -34,7 +34,7 @@ class AndroidMatterSetupPortsTest {
                     120
                 )
             },
-            inboxWaiter = { _, _, _ -> MatterSetupPorts.InboxResult(true, "detected") },
+            inboxWaiter = { _, _, _, _ -> MatterSetupPorts.InboxResult(true, "detected") },
             diagnosticsRunner = { _, _ -> MatterSetupDiagnosticsSummary.empty() }
         )
 
@@ -67,7 +67,7 @@ class AndroidMatterSetupPortsTest {
             },
             matterRunner = FakeMatterRunner(),
             discoveryScan = { _, _, _ -> OpenHabMatterDiscoveryScanStatus(true, true, "started", "started", 60) },
-            inboxWaiter = { _, _, _ -> MatterSetupPorts.InboxResult(true, "detected") },
+            inboxWaiter = { _, _, _, _ -> MatterSetupPorts.InboxResult(true, "detected") },
             diagnosticsRunner = { _, _ -> MatterSetupDiagnosticsSummary.empty() }
         )
 
@@ -89,7 +89,7 @@ class AndroidMatterSetupPortsTest {
             readinessChecker = { _, _ -> readyStatus() },
             matterRunner = FakeMatterRunner(),
             discoveryScan = { _, _, _ -> OpenHabMatterDiscoveryScanStatus(true, true, "started", "started", 60) },
-            inboxWaiter = { _, _, _ -> MatterSetupPorts.InboxResult(true, "detected") },
+            inboxWaiter = { _, _, _, _ -> MatterSetupPorts.InboxResult(true, "detected") },
             diagnosticsRunner = { _, _ -> MatterSetupDiagnosticsSummary.empty() },
             readinessDiagnostics = {
                 listOf(
@@ -118,6 +118,7 @@ class AndroidMatterSetupPortsTest {
         val runner = FakeMatterRunner()
         val failure = MatterSetupFailure(MatterSetupStage.SendingCodeToOpenHab, "failed")
         val context = MatterSetupDiagnosticsContext("http://openhab.local:8080", "http://otbr.local", true)
+        val discoveryContext = MatterDiscoveryContext("Aqara", "U200", 1234L)
         val summary = MatterSetupDiagnosticsSummary(
             checks = listOf("check"),
             warnings = listOf("warning"),
@@ -126,6 +127,7 @@ class AndroidMatterSetupPortsTest {
         var inboxBaseUrl: String? = null
         var inboxToken: String? = null
         var inboxTimeout: Int? = null
+        var inboxDiscoveryContext: MatterDiscoveryContext? = null
         var diagnosticsFailure: MatterSetupFailure? = null
         var diagnosticsContext: MatterSetupDiagnosticsContext? = null
         val ports = AndroidMatterSetupPorts(
@@ -133,10 +135,11 @@ class AndroidMatterSetupPortsTest {
             readinessChecker = { _, _ -> readyStatus() },
             matterRunner = runner,
             discoveryScan = { _, _, _ -> OpenHabMatterDiscoveryScanStatus(true, true, "started", "started", 60) },
-            inboxWaiter = { baseUrl, token, timeoutSeconds ->
+            inboxWaiter = { baseUrl, token, timeoutSeconds, discoveryContext ->
                 inboxBaseUrl = baseUrl
                 inboxToken = token
                 inboxTimeout = timeoutSeconds
+                inboxDiscoveryContext = discoveryContext
                 MatterSetupPorts.InboxResult(false, "not yet")
             },
             diagnosticsRunner = { receivedFailure, receivedContext ->
@@ -161,11 +164,12 @@ class AndroidMatterSetupPortsTest {
         assertEquals("commissioned-controller-state", runner.controllerState)
         assertEquals(
             MatterSetupPorts.InboxResult(false, "not yet"),
-            ports.waitForOpenHabInbox(config, 90)
+            ports.waitForOpenHabInbox(config, 90, discoveryContext)
         )
         assertEquals(config.openHabBaseUrl, inboxBaseUrl)
         assertEquals(config.openHabApiToken, inboxToken)
         assertEquals(90, inboxTimeout)
+        assertSame(discoveryContext, inboxDiscoveryContext)
         assertSame(summary, ports.runDiagnostics(failure, context))
         assertSame(failure, diagnosticsFailure)
         assertSame(context, diagnosticsContext)
