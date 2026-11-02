@@ -228,6 +228,23 @@ Assert-True ($traversalZipResult.Output.Contains("unsafe entry path")) ("Expecte
 Assert-True (@(Get-ChildItem -LiteralPath $traversalZipTarget -Force).Count -eq 0) (
     "Verifier extracted files before rejecting a traversal ZIP entry.")
 
+# Win32 aliases (trailing dots/spaces) must be rejected before extraction.
+foreach ($aliasSuffix in @('.', ' ')) {
+    $aliasLabel = if ($aliasSuffix -eq '.') { 'trailing-dot' } else { 'trailing-space' }
+    $aliasZip = Join-Path $tmpRoot "$aliasLabel-alias.zip"
+    Copy-Item -LiteralPath $validArchive -Destination $aliasZip -Force
+    $aliasHash = Add-ZipEntry -ArchivePath $aliasZip -EntryName "alias-check/duplicate.txt" -Content "first"
+    $aliasHash = Add-ZipEntry -ArchivePath $aliasZip -EntryName "alias-check/duplicate.txt$aliasSuffix" -Content "second"
+    $aliasTarget = Join-Path $tmpRoot "$aliasLabel-alias-target"
+    New-EmptyDirectory -Path $aliasTarget
+    $aliasResult = Invoke-VerifierCase -ArchivePath $aliasZip -Hash $aliasHash -ExtraArgs @("-ExtractTo", $aliasTarget)
+    Assert-True ($aliasResult.ExitCode -ne 0) "Expected $aliasLabel ZIP aliases to fail."
+    Assert-True ($aliasResult.Output.Contains("unsafe entry path")) (
+        "Expected unsafe-path error for $aliasLabel aliases. Output:`n" + $aliasResult.Output)
+    Assert-True (@(Get-ChildItem -LiteralPath $aliasTarget -Force).Count -eq 0) (
+        "Verifier extracted files before rejecting $aliasLabel aliases.")
+}
+
 # Empty files map must not pass.
 $emptyRoot = New-SyntheticArtifact -Name "empty-map"
 Write-Manifest -Root $emptyRoot -Files ([ordered]@{})

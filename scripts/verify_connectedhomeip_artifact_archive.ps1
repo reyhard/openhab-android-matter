@@ -48,6 +48,19 @@ function Test-SafeRelativePath {
         if ([string]::IsNullOrEmpty($segment) -or $segment -eq "." -or $segment -eq "..") {
             return $false
         }
+        # Win32 normalizes trailing dots/spaces and treats several device names
+        # as reserved even when an extension is present. Reject these before
+        # Expand-Archive can map distinct ZIP names onto the same filesystem path.
+        if ($segment.EndsWith('.') -or $segment.EndsWith(' ')) {
+            return $false
+        }
+        if ($segment -match '[<>:"|?*\x00-\x1F]') {
+            return $false
+        }
+        $deviceName = ($segment -split '\.', 2)[0]
+        if ($deviceName -match '^(?i:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])$') {
+            return $false
+        }
     }
     return $true
 }
