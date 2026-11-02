@@ -245,6 +245,32 @@ foreach ($aliasSuffix in @('.', ' ')) {
         "Verifier extracted files before rejecting $aliasLabel aliases.")
 }
 
+# Reserved Win32 device names are unsafe in both file and directory segments.
+foreach ($reservedName in @('CON', 'NUL.txt', 'COM1')) {
+    foreach ($asParent in @($false, $true)) {
+        $reservedLabel = ($reservedName -replace '[^A-Za-z0-9]', '-') +
+            $(if ($asParent) { '-parent' } else { '-file' })
+        $reservedZip = Join-Path $tmpRoot "reserved-$reservedLabel.zip"
+        Copy-Item -LiteralPath $validArchive -Destination $reservedZip -Force
+        $entryName = if ($asParent) {
+            "$reservedName/child.txt"
+        } else {
+            "reserved-check/$reservedName"
+        }
+        $reservedHash = Add-ZipEntry -ArchivePath $reservedZip -EntryName $entryName -Content "reserved"
+        $reservedTarget = Join-Path $tmpRoot "reserved-$reservedLabel-target"
+        New-EmptyDirectory -Path $reservedTarget
+        $reservedResult = Invoke-VerifierCase -ArchivePath $reservedZip -Hash $reservedHash `
+            -ExtraArgs @("-ExtractTo", $reservedTarget)
+        Assert-True ($reservedResult.ExitCode -ne 0) (
+            "Expected reserved device name '$reservedName' in $(if ($asParent) { 'parent' } else { 'file' }) segment to fail.")
+        Assert-True ($reservedResult.Output.Contains("unsafe entry path")) (
+            "Expected unsafe-path error for reserved device name '$reservedName'. Output:`n" + $reservedResult.Output)
+        Assert-True (@(Get-ChildItem -LiteralPath $reservedTarget -Force).Count -eq 0) (
+            "Verifier extracted files before rejecting reserved device name '$reservedName'.")
+    }
+}
+
 # Empty files map must not pass.
 $emptyRoot = New-SyntheticArtifact -Name "empty-map"
 Write-Manifest -Root $emptyRoot -Files ([ordered]@{})
