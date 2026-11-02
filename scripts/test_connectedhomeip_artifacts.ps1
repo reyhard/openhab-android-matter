@@ -60,6 +60,7 @@ function New-ArtifactLayout {
     $paaDir = Join-Path $Root "paa-root-certs"
     New-Item -ItemType Directory -Force -Path $paaDir | Out-Null
     Set-Content -LiteralPath (Join-Path $paaDir "synthetic-IKEA-0x117C.pem") -Value "synthetic PAA" -NoNewline
+    Set-Content -LiteralPath (Join-Path $paaDir "synthetic-IKEA-0x117C-secondary.pem") -Value "synthetic PAA secondary" -NoNewline
 }
 
 function New-SyntheticJar {
@@ -211,6 +212,18 @@ $trustStorePositive = Invoke-GradleArtifactVerification -ArtifactRoot $manifestR
 )
 Assert-True ($trustStorePositive.ExitCode -eq 0) ("Expected manifest-covered PAA assets to package, got exit " + $trustStorePositive.ExitCode + ". Output:`n" + $trustStorePositive.Output)
 
+$subsetPaaRoot = Join-Path $tmpRoot "chip-paa-subset"
+Remove-Item -LiteralPath $subsetPaaRoot -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $subsetPaaRoot | Out-Null
+Copy-Item -Path (Join-Path $manifestRoot "paa-root-certs\*") -Destination $subsetPaaRoot -Recurse -Force
+Remove-Item -LiteralPath (Join-Path $subsetPaaRoot "synthetic-IKEA-0x117C-secondary.pem") -Force
+$trustStoreSubsetPaa = Invoke-GradleArtifactVerification -ArtifactRoot $manifestRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets" -ExtraGradleArgs @(
+    "-PopenhabMatterChipPaaTrustStoreDir=$subsetPaaRoot"
+)
+Assert-True ($trustStoreSubsetPaa.ExitCode -ne 0) "Expected subset PAA trust-store assets to fail."
+Assert-True ($trustStoreSubsetPaa.Output.Contains("missing manifest-covered files")) (
+    "Expected subset-PAA failure. Output:`n" + $trustStoreSubsetPaa.Output)
+
 $trustStoreOmittedPaa = Invoke-GradleArtifactVerification -ArtifactRoot $manifestRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets"
 Assert-True ($trustStoreOmittedPaa.ExitCode -ne 0) "Expected omitted PAA trust store to fail when a manifest is present."
 Assert-True ($trustStoreOmittedPaa.Output.Contains("requires a PAA trust store directory")) (
@@ -238,6 +251,22 @@ $trustStoreWithCd = Invoke-GradleArtifactVerification -ArtifactRoot $cdLayoutRoo
     "-PopenhabMatterChipCdTrustStoreDir=$cdLayoutRoot\cd-certs"
 )
 Assert-True ($trustStoreWithCd.ExitCode -eq 0) ("Expected optional manifest-covered CD assets to package, got exit " + $trustStoreWithCd.ExitCode + ". Output:`n" + $trustStoreWithCd.Output)
+
+$trustStoreAssetsRoot = Join-Path $ProjectRoot "app/build/generated/openhabMatter/truststoreAssets"
+$apkProvenancePath = Join-Path $trustStoreAssetsRoot "matter/connectedhomeip/apk-truststore-provenance.json"
+Assert-True (Test-Path -LiteralPath $apkProvenancePath -PathType Leaf) "APK trust-store provenance was not generated."
+$apkProvenance = Get-Content -LiteralPath $apkProvenancePath -Raw | ConvertFrom-Json
+Assert-True ($apkProvenance.cd_omitted -eq $false) "Expected full CD assets to be marked as packaged."
+Assert-True (@($apkProvenance.cd_files).Count -eq 1) "Expected one packaged CD file in APK provenance."
+Assert-True (@($apkProvenance.paa_files).Count -eq 2) "Expected all PAA files in APK provenance."
+
+$trustStoreCdOmitted = Invoke-GradleArtifactVerification -ArtifactRoot $cdLayoutRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets" -ExtraGradleArgs @(
+    "-PopenhabMatterChipPaaTrustStoreDir=$cdLayoutRoot\paa-root-certs"
+)
+Assert-True ($trustStoreCdOmitted.ExitCode -eq 0) ("Expected optional CD omission to remain allowed, got exit " + $trustStoreCdOmitted.ExitCode + ". Output:`n" + $trustStoreCdOmitted.Output)
+$apkProvenanceOmittedCd = Get-Content -LiteralPath $apkProvenancePath -Raw | ConvertFrom-Json
+Assert-True ($apkProvenanceOmittedCd.cd_omitted -eq $true) "Expected omitted CD assets to be recorded in APK provenance."
+Assert-True (@($apkProvenanceOmittedCd.cd_files).Count -eq 0) "Expected no packaged CD files when CD is omitted."
 
 $externalCdRoot = Join-Path $tmpRoot "chip-cd-external-mismatch"
 Remove-Item -LiteralPath $externalCdRoot -Recurse -Force -ErrorAction SilentlyContinue

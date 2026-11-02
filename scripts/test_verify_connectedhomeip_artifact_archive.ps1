@@ -203,6 +203,19 @@ Assert-True ($collisionResult.Output.Contains("case-colliding entry")) ("Expecte
 Assert-True (@(Get-ChildItem -LiteralPath $collisionTarget -Force).Count -eq 0) (
     "Verifier extracted files before rejecting case-colliding ZIP entries.")
 
+# Differently-cased parent paths collide on Windows even when complete names differ.
+$prefixCollisionZip = Join-Path $tmpRoot "parent-prefix-collision.zip"
+Copy-Item -LiteralPath $validArchive -Destination $prefixCollisionZip -Force
+$prefixCollisionHash = Add-ZipEntry -ArchivePath $prefixCollisionZip -EntryName "PAA-ROOT-CERTS/upper.pem" -Content "prefix collision"
+$prefixCollisionTarget = Join-Path $tmpRoot "parent-prefix-collision-target"
+New-EmptyDirectory -Path $prefixCollisionTarget
+$prefixCollisionResult = Invoke-VerifierCase -ArchivePath $prefixCollisionZip -Hash $prefixCollisionHash -ExtraArgs @("-ExtractTo", $prefixCollisionTarget)
+Assert-True ($prefixCollisionResult.ExitCode -ne 0) "Expected case-colliding parent path to fail."
+Assert-True ($prefixCollisionResult.Output.Contains("case-colliding path prefix")) (
+    "Expected parent-prefix collision error. Output:`n" + $prefixCollisionResult.Output)
+Assert-True (@(Get-ChildItem -LiteralPath $prefixCollisionTarget -Force).Count -eq 0) (
+    "Verifier extracted files before rejecting a case-colliding parent path.")
+
 # ZIP traversal names must be rejected before extraction.
 $traversalZip = Join-Path $tmpRoot "archive-traversal.zip"
 Copy-Item -LiteralPath $validArchive -Destination $traversalZip -Force

@@ -141,8 +141,9 @@ All commands below were executed locally on 2026-11-01 and 2026-11-02.
   - Wrong expected archive SHA-256 failed with
     `artifact archive SHA-256 mismatch ... Refusing to extract.`
   - Wrong expected source tag failed with `Artifact source tag mismatch`.
-  - Duplicate ZIP entry names, Windows case collisions, and traversal entry
-    names failed before extraction; the destination remained empty.
+  - Duplicate ZIP entry names, Windows case collisions, case-colliding parent
+    prefixes, and traversal entry names failed before extraction; the
+    destination remained empty.
   - Empty or incomplete manifest coverage, unlisted/tampered files,
     traversal/unsafe manifest paths, duplicate top-level or nested JSON
     properties, missing PAA certificates, and a non-empty caller extraction
@@ -154,11 +155,12 @@ All commands below were executed locally on 2026-11-01 and 2026-11-02.
   controller jar, a missing `libCHIPController.so`, an extra unlisted file, a
   tampered manifest checksum, unsafe manifest paths, and duplicate top-level or
   nested JSON properties. The APK provenance preparation task failed when
-  artifact verification failed, and rejected omitted PAA and mismatched PAA/CD
-  trust-store files that were not covered by the manifest. Optional CD assets
-  remain optional; if supplied, they must be manifest-covered.
-- The APK trust-store smoke check verified every packaged PAA/CD certificate
-  asset hash against the embedded artifact manifest.
+  artifact verification failed, and rejected omitted PAA, subset PAA, and
+  mismatched PAA/CD trust-store files. Optional full CD coverage passes; CD
+  omission remains allowed and is recorded in generated APK provenance.
+- The APK trust-store smoke check verified packaged PAA/CD certificate hashes,
+  exact packaged trust-store file lists, and the APK provenance link to the
+  embedded artifact manifest.
 - `:app:testDebugUnitTest` with the real 1.6.1 jars: **499 tests, 0 failures,
   0 skipped**. `ConnectedHomeIpV161CompatibilityTest` ran against the packaged
   jars and confirmed the reflected controller signatures, deferred ICD factory,

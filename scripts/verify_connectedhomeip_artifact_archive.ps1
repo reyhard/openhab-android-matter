@@ -59,15 +59,37 @@ function Assert-ArchiveStructure {
     try {
         $exactNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
         $caseInsensitiveNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $normalizedPaths = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
         foreach ($entry in $zip.Entries) {
             $entryPath = $entry.FullName
-            if ($entryPath.EndsWith("/", [System.StringComparison]::Ordinal)) {
+            $isDirectory = $entryPath.EndsWith("/", [System.StringComparison]::Ordinal)
+            if ($isDirectory) {
                 $entryPath = $entryPath.Substring(0, $entryPath.Length - 1)
             }
             Assert-True (Test-SafeRelativePath $entryPath) "Archive contains an unsafe entry path: $($entry.FullName)"
             Assert-True ($exactNames.Add($entryPath)) "Archive contains a duplicate entry: $($entry.FullName)"
             Assert-True ($caseInsensitiveNames.Add($entryPath)) (
                 "Archive contains a case-colliding entry: $($entry.FullName)")
+
+            $segments = $entryPath.Split('/')
+            $prefix = ""
+            for ($index = 0; $index -lt $segments.Length; $index++) {
+                $prefix = if ($index -eq 0) {
+                    $segments[$index]
+                } else {
+                    "$prefix/$($segments[$index])"
+                }
+                $kind = if ($index -eq $segments.Length - 1 -and -not $isDirectory) { "file" } else { "directory" }
+                if ($normalizedPaths.ContainsKey($prefix)) {
+                    $existing = $normalizedPaths[$prefix]
+                    Assert-True ($existing.Canonical -ceq $prefix) (
+                        "Archive contains a case-colliding path prefix: $($entry.FullName)")
+                    Assert-True ($existing.Kind -ceq $kind) (
+                        "Archive contains a file/directory collision: $($entry.FullName)")
+                } else {
+                    $normalizedPaths[$prefix] = @{ Canonical = $prefix; Kind = $kind }
+                }
+            }
 
             $rawAttributes = [int64] $entry.ExternalAttributes
             if ($rawAttributes -lt 0) {

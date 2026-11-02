@@ -345,6 +345,15 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
             if (!(manifest instanceof Map)) {
                 throw new GradleException("connectedhomeip artifact manifest must be a JSON object: " + manifestFile)
             }
+            if (manifest.connectedhomeip_tag == null
+                    || manifest.connectedhomeip_tag.toString().trim().isEmpty()
+                    || manifest.connectedhomeip_commit == null
+                    || manifest.connectedhomeip_commit.toString().trim().isEmpty()
+                    || manifest.abi == null
+                    || manifest.abi.toString().trim().isEmpty()) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest is missing tag, commit, or ABI provenance")
+            }
             if (!chipArtifactExpectedSourceTag.isEmpty()
                     && manifest.connectedhomeip_tag != chipArtifactExpectedSourceTag) {
                 throw new GradleException(
@@ -555,38 +564,71 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
                         "connectedhomeip artifact manifest requires a PAA trust store directory")
             }
         }
-        def verifyTrustStoreCoverage = { File sourceRoot, String manifestPrefix ->
-            def sourceFiles = fileTree(sourceRoot)
-                    .matching { include "**/*.pem", "**/*.der" }
-                    .files
+        def manifestCertFiles = { String manifestPrefix ->
             if (manifestData == null) {
-                return sourceFiles.size()
+                return null
             }
             def manifestFiles = manifestData.files
             if (!(manifestFiles instanceof Map)) {
                 throw new GradleException(
                         "connectedhomeip artifact manifest does not list trust-store checksums")
             }
-            sourceFiles.each { File sourceFile ->
-                String relative = sourceRoot.toPath()
-                        .relativize(sourceFile.toPath())
-                        .toString()
-                        .replace(File.separator, "/")
-                String manifestPath = manifestPrefix + "/" + relative
-                if (!manifestFiles.containsKey(manifestPath)) {
-                    throw new GradleException(
-                            "Trust-store file is not covered by the connectedhomeip artifact manifest: "
-                                    + sourceFile)
-                }
+            return new TreeSet<String>(manifestFiles.keySet()
+                    .collect { it.toString() }
+                    .findAll { path ->
+                        path.startsWith(manifestPrefix) &&
+                                (path.endsWith(".pem") || path.endsWith(".der"))
+                    }
+                    .collect { path -> path.substring(manifestPrefix.length()) })
+        }
+        def sourceCertFiles = { File sourceRoot ->
+            return new TreeSet<String>(fileTree(sourceRoot)
+                    .matching { include "**/*.pem", "**/*.der" }
+                    .files
+                    .collect { File sourceFile ->
+                        sourceRoot.toPath()
+                                .relativize(sourceFile.toPath())
+                                .toString()
+                                .replace(File.separator, "/")
+                    })
+        }
+        def assertExactTrustStoreCoverage = {
+                File sourceRoot, String manifestPrefix, List<String> sourceFiles ->
+            if (manifestData == null) {
+                return
+            }
+            def expectedFiles = manifestCertFiles(manifestPrefix)
+            def missingFiles = new TreeSet<String>(expectedFiles)
+            missingFiles.removeAll(sourceFiles)
+            def unexpectedFiles = new TreeSet<String>(sourceFiles)
+            unexpectedFiles.removeAll(expectedFiles)
+            if (!missingFiles.isEmpty()) {
+                throw new GradleException(
+                        "Trust store is missing manifest-covered files for "
+                                + manifestPrefix + ": " + missingFiles.join(", "))
+            }
+            if (!unexpectedFiles.isEmpty()) {
+                throw new GradleException(
+                        "Trust store contains files not covered by the artifact manifest for "
+                                + manifestPrefix + ": " + unexpectedFiles.join(", "))
+            }
+            def manifestFiles = manifestData.files
+            sourceFiles.each { String relative ->
+                File sourceFile = new File(sourceRoot, relative)
+                String manifestPath = manifestPrefix + relative
                 String expectedDigest = manifestFiles[manifestPath]?.toString()
                 String actualDigest = sha256File(sourceFile)
                 if (actualDigest != expectedDigest) {
                     throw new GradleException(
                             "Trust-store file checksum does not match the connectedhomeip artifact manifest: "
-                                    + sourceFile)
+                                    + sourceFile
+                                    + " (expected "
+                                    + expectedDigest
+                                    + ", found "
+                                    + actualDigest
+                                    + ")")
                 }
             }
-            return sourceFiles.size()
         }
         outRoot.mkdirs()
 
@@ -597,15 +639,24 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
             }
         }
 
+        def packagedPaaFiles = new ArrayList<String>()
         if (!chipPaaTrustStoreDir.isEmpty()) {
             File paaRoot = file(chipPaaTrustStoreDir)
             if (!paaRoot.isDirectory()) {
                 throw new GradleException("PAA trust store directory does not exist: " + paaRoot)
             }
-            int paaCount = verifyTrustStoreCoverage(paaRoot, "paa-root-certs")
-            if (hasArtifactManifest && paaCount < 1) {
-                throw new GradleException(
-                        "connectedhomeip artifact manifest requires packaged PAA trust-store certificates")
+            packagedPaaFiles.addAll(sourceCertFiles(paaRoot))
+            if (hasArtifactManifest) {
+                def expectedPaaFiles = manifestCertFiles("paa-root-certs/")
+                if (expectedPaaFiles.isEmpty()) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest lists no PAA trust-store certificates")
+                }
+                if (packagedPaaFiles.isEmpty()) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest requires packaged PAA trust-store certificates")
+                }
+                assertExactTrustStoreCoverage(paaRoot, "paa-root-certs/", packagedPaaFiles)
             }
             copy {
                 from paaRoot
@@ -614,19 +665,44 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
             }
         }
 
+        def packagedCdFiles = new ArrayList<String>()
+        boolean cdOmitted = false
         if (!chipCdTrustStoreDir.isEmpty()) {
             File cdRoot = file(chipCdTrustStoreDir)
             if (!cdRoot.isDirectory()) {
                 throw new GradleException("CD trust store directory does not exist: " + cdRoot)
             }
-            int cdCount = verifyTrustStoreCoverage(cdRoot, "cd-certs")
-            if (cdCount > 0) {
+            packagedCdFiles.addAll(sourceCertFiles(cdRoot))
+            if (hasArtifactManifest) {
+                assertExactTrustStoreCoverage(cdRoot, "cd-certs/", packagedCdFiles)
+            }
+            if (!packagedCdFiles.isEmpty()) {
                 copy {
                     from cdRoot
                     include "**/*.pem", "**/*.der"
                     into new File(outRoot, "matter/truststore/cd")
                 }
             }
+        } else if (hasArtifactManifest) {
+            def expectedCdFiles = manifestCertFiles("cd-certs/")
+            cdOmitted = !expectedCdFiles.isEmpty()
+        }
+
+        if (hasArtifactManifest) {
+            File provenanceFile = new File(outRoot, "matter/connectedhomeip/apk-truststore-provenance.json")
+            provenanceFile.parentFile.mkdirs()
+            def provenance = [
+                    schema                  : 1,
+                    connectedhomeip_tag     : manifestData.connectedhomeip_tag,
+                    connectedhomeip_commit  : manifestData.connectedhomeip_commit,
+                    artifact_manifest_sha256: sha256File(artifactManifest),
+                    paa_files               : packagedPaaFiles,
+                    cd_files                : packagedCdFiles,
+                    cd_omitted              : cdOmitted
+            ]
+            provenanceFile.setText(
+                    groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(provenance)),
+                    "UTF-8")
         }
     }
 }

@@ -124,6 +124,45 @@ try {
                     "APK trust-store asset checksum does not match the embedded connectedhomeip manifest: " + $entry.FullName)
             }
         }
+
+        $provenanceEntry = $zip.GetEntry("assets/matter/connectedhomeip/apk-truststore-provenance.json")
+        Assert-True ($null -ne $provenanceEntry) (
+            "APK is missing trust-store provenance assets/matter/connectedhomeip/apk-truststore-provenance.json.")
+        $provenanceReader = [System.IO.StreamReader]::new($provenanceEntry.Open())
+        try {
+            $trustStoreProvenance = $provenanceReader.ReadToEnd() | ConvertFrom-Json
+        } finally {
+            $provenanceReader.Dispose()
+        }
+        Assert-True ($trustStoreProvenance.artifact_manifest_sha256 -eq (Get-ZipEntrySha256 -Entry $manifestEntry)) (
+            "APK trust-store provenance does not reference the embedded artifact manifest.")
+
+        $packagedPaaFiles = @(Get-TrustStoreEntries -Zip $zip -Prefix "assets/matter/truststore/paa/" |
+            ForEach-Object { $_.FullName.Substring("assets/matter/truststore/paa/".Length) })
+        $packagedCdFiles = @(Get-TrustStoreEntries -Zip $zip -Prefix "assets/matter/truststore/cd/" |
+            ForEach-Object { $_.FullName.Substring("assets/matter/truststore/cd/".Length) })
+        $provenancePaaFiles = @($trustStoreProvenance.paa_files)
+        $provenanceCdFiles = @($trustStoreProvenance.cd_files)
+        Assert-True ((($packagedPaaFiles | Sort-Object) -join "`n") -eq (($provenancePaaFiles | Sort-Object) -join "`n")) (
+            "APK PAA files do not match the packaged trust-store provenance.")
+        Assert-True ((($packagedCdFiles | Sort-Object) -join "`n") -eq (($provenanceCdFiles | Sort-Object) -join "`n")) (
+            "APK CD files do not match the packaged trust-store provenance.")
+
+        $manifestPaaFiles = @($manifestFileChecksums.Keys |
+            Where-Object { $_ -like "paa-root-certs/*" -and ($_ -like "*.pem" -or $_ -like "*.der") } |
+            ForEach-Object { $_.Substring("paa-root-certs/".Length) })
+        $manifestCdFiles = @($manifestFileChecksums.Keys |
+            Where-Object { $_ -like "cd-certs/*" -and ($_ -like "*.pem" -or $_ -like "*.der") } |
+            ForEach-Object { $_.Substring("cd-certs/".Length) })
+        Assert-True ((($provenancePaaFiles | Sort-Object) -join "`n") -eq (($manifestPaaFiles | Sort-Object) -join "`n")) (
+            "APK PAA provenance does not cover the embedded artifact manifest exactly.")
+        if ($trustStoreProvenance.cd_omitted -eq $true) {
+            Assert-True ($provenanceCdFiles.Count -eq 0) "APK CD provenance is marked omitted but lists CD files."
+            Assert-True ($manifestCdFiles.Count -gt 0) "APK CD provenance is marked omitted but the manifest has no CD files."
+        } else {
+            Assert-True ((($provenanceCdFiles | Sort-Object) -join "`n") -eq (($manifestCdFiles | Sort-Object) -join "`n")) (
+                "APK CD provenance does not cover the embedded artifact manifest exactly.")
+        }
     }
 } finally {
     $zip.Dispose()
