@@ -249,11 +249,70 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
             def sha256 = { File file ->
                 MessageDigest.getInstance("SHA-256").digest(file.bytes).encodeHex().toString()
             }
+            def safeRelativePath = { String path ->
+                if (path == null || path.isEmpty() || path.contains("\\") || path.contains(":") || path.contains("\u0000")) {
+                    return false
+                }
+                if (path.startsWith("/") || (path ==~ /^[A-Za-z]:.*/)) {
+                    return false
+                }
+                return !path.split("/", -1).any { segment ->
+                    segment.isEmpty() || segment == "." || segment == ".."
+                }
+            }
+            def manifestText = manifestFile.getText("UTF-8")
+            def filesBlockMatcher = manifestText =~ /(?s)"files"\s*:\s*\{(.*?)\}\s*(?:,|\})/
+            if (!filesBlockMatcher.find()) {
+                throw new GradleException("connectedhomeip artifact manifest does not contain a files object")
+            }
+            def rawFileKeys = new LinkedHashSet<String>()
+            def fileKeyMatcher = filesBlockMatcher.group(1) =~ /"((?:\\.|[^"\\])*)"\s*:/
+            while (fileKeyMatcher.find()) {
+                String rawKey = fileKeyMatcher.group(1)
+                if (!rawFileKeys.add(rawKey)) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest contains a duplicate file entry: " + rawKey)
+                }
+            }
+            if (rawFileKeys.size() != manifest.files.size()) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest files object is ambiguous; "
+                                + "duplicate or malformed file entries are not allowed")
+            }
+            def manifestFiles = new LinkedHashSet<String>()
+            def manifestFilesCaseInsensitive = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER)
             manifest.files.each { path, expectedDigest ->
-                File artifactFile = new File(root, path.toString())
+                String relative = path.toString()
+                if (!safeRelativePath(relative)) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest contains an unsafe file path: " + relative)
+                }
+                if (relative == "chip-artifact-manifest.json") {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest must not list itself as a checksummed file")
+                }
+                if (!manifestFiles.add(relative) || !manifestFilesCaseInsensitive.add(relative)) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest contains a duplicate file entry: " + relative)
+                }
+                if (!(expectedDigest.toString() ==~ /^[0-9a-f]{64}$/)) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest has an invalid checksum for " + relative)
+                }
+                File artifactFile = new File(root, relative)
+                String rootPrefix = root.canonicalPath + File.separator
+                if (!artifactFile.canonicalPath.startsWith(rootPrefix)) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest path escapes the artifact directory: "
+                                    + relative)
+                }
                 if (!artifactFile.isFile()) {
                     throw new GradleException(
                             "connectedhomeip artifact manifest lists a missing file: " + artifactFile)
+                }
+                if (java.nio.file.Files.isSymbolicLink(artifactFile.toPath())) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest lists a symbolic link: " + artifactFile)
                 }
                 String actualDigest = sha256(artifactFile)
                 if (actualDigest != expectedDigest.toString()) {
@@ -265,6 +324,62 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
                                     + " but found "
                                     + actualDigest)
                 }
+            }
+
+            def packagedFiles = new LinkedHashSet<String>()
+            def packagedFilesCaseInsensitive = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER)
+            root.eachFileRecurse { File packagedFile ->
+                if (!packagedFile.isFile() || packagedFile.canonicalFile == manifestFile.canonicalFile) {
+                    return
+                }
+                if (java.nio.file.Files.isSymbolicLink(packagedFile.toPath())) {
+                    throw new GradleException(
+                            "connectedhomeip artifact directory contains a symbolic link: " + packagedFile)
+                }
+                String relative = root.toPath()
+                        .relativize(packagedFile.toPath())
+                        .toString()
+                        .replace(File.separator, "/")
+                if (!safeRelativePath(relative)
+                        || !packagedFiles.add(relative)
+                        || !packagedFilesCaseInsensitive.add(relative)) {
+                    throw new GradleException(
+                            "connectedhomeip artifact directory contains an unsafe or duplicate path: "
+                                    + relative)
+                }
+            }
+            def unlistedFiles = packagedFiles.findAll { !manifestFiles.contains(it) }
+            if (!unlistedFiles.isEmpty()) {
+                throw new GradleException(
+                        "connectedhomeip artifact directory contains unlisted files: "
+                                + unlistedFiles.join(", "))
+            }
+            def uncoveredFiles = manifestFiles.findAll { !packagedFiles.contains(it) }
+            if (!uncoveredFiles.isEmpty()) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest is missing packaged files: "
+                                + uncoveredFiles.join(", "))
+            }
+            def requiredManifestFiles = new ArrayList<String>()
+            chipControllerRequiredJars.each { requiredManifestFiles.add(it) }
+            chipControllerRequiredNativeLibraries.each { library ->
+                chipControllerSupportedAbis.each { abi ->
+                    requiredManifestFiles.add("jniLibs/" + abi + "/" + library)
+                }
+            }
+            requiredManifestFiles.each { required ->
+                if (!manifestFiles.contains(required)) {
+                    throw new GradleException(
+                            "connectedhomeip artifact manifest does not cover required file: " + required)
+                }
+            }
+            def paaCertificateCount = fileTree(new File(root, "paa-root-certs"))
+                    .matching { include "**/*.pem", "**/*.der" }
+                    .files
+                    .size()
+            if (paaCertificateCount < 1) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest has no packaged PAA trust-store certificates")
             }
         }
         Set<String> discoveredClassEntries = new LinkedHashSet<>()
@@ -369,6 +484,9 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
 preBuild.dependsOn("verifyOpenhabMatterChipNativeInputs")
 preBuild.dependsOn("verifyConnectedHomeIpControllerArtifacts")
 preBuild.dependsOn("prepareConnectedHomeIpTrustStoreAssets")
+tasks.named("prepareConnectedHomeIpTrustStoreAssets").configure {
+    dependsOn("verifyConnectedHomeIpControllerArtifacts")
+}
 
 dependencies {
     def camerax_version = "1.6.1"

@@ -56,6 +56,10 @@ function New-ArtifactLayout {
             Set-Content -LiteralPath (Join-Path $abiDir $library) -Value "synthetic $abi $library" -NoNewline
         }
     }
+
+    $paaDir = Join-Path $Root "paa-root-certs"
+    New-Item -ItemType Directory -Force -Path $paaDir | Out-Null
+    Set-Content -LiteralPath (Join-Path $paaDir "synthetic-IKEA-0x117C.pem") -Value "synthetic PAA" -NoNewline
 }
 
 function New-SyntheticJar {
@@ -224,6 +228,55 @@ $missingManifest = Invoke-GradleArtifactVerification -ArtifactRoot $missingManif
 )
 Assert-True ($missingManifest.ExitCode -ne 0) "Expected missing provenance manifest to fail when a source tag is required."
 Assert-True ($missingManifest.Output.Contains("Missing connectedhomeip artifact provenance manifest")) ("Expected missing-manifest failure message. Output:`n" + $missingManifest.Output)
+
+$emptyMapRoot = Join-Path $tmpRoot "chip-controller-artifacts-empty-map"
+New-ArtifactLayout -Root $emptyMapRoot -JarMode "Valid"
+New-ArtifactManifest -Root $emptyMapRoot
+$emptyMapManifest = Get-Content -LiteralPath (Join-Path $emptyMapRoot "chip-artifact-manifest.json") -Raw | ConvertFrom-Json
+$emptyMapManifest.files = [pscustomobject]@{}
+$emptyMapManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $emptyMapRoot "chip-artifact-manifest.json") -Encoding utf8NoBOM
+$emptyMap = Invoke-GradleArtifactVerification -ArtifactRoot $emptyMapRoot
+Assert-True ($emptyMap.ExitCode -ne 0) "Expected empty manifest files map to fail validation."
+Assert-True ($emptyMap.Output.Contains("unlisted files")) ("Expected unlisted-files failure for empty map. Output:`n" + $emptyMap.Output)
+
+$omittedRoot = Join-Path $tmpRoot "chip-controller-artifacts-omitted-required"
+New-ArtifactLayout -Root $omittedRoot -JarMode "Valid"
+New-ArtifactManifest -Root $omittedRoot
+$omittedManifest = Get-Content -LiteralPath (Join-Path $omittedRoot "chip-artifact-manifest.json") -Raw | ConvertFrom-Json
+$omittedManifest.files.PSObject.Properties.Remove("CHIPController.jar")
+$omittedManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $omittedRoot "chip-artifact-manifest.json") -Encoding utf8NoBOM
+$omitted = Invoke-GradleArtifactVerification -ArtifactRoot $omittedRoot
+Assert-True ($omitted.ExitCode -ne 0) "Expected omitted required file to fail validation."
+Assert-True ($omitted.Output.Contains("unlisted files")) ("Expected unlisted-files failure for omitted required file. Output:`n" + $omitted.Output)
+
+$unlistedRoot = Join-Path $tmpRoot "chip-controller-artifacts-unlisted-file"
+New-ArtifactLayout -Root $unlistedRoot -JarMode "Valid"
+New-ArtifactManifest -Root $unlistedRoot
+Set-Content -LiteralPath (Join-Path $unlistedRoot "unlisted.bin") -Value "unlisted" -NoNewline
+$unlisted = Invoke-GradleArtifactVerification -ArtifactRoot $unlistedRoot
+Assert-True ($unlisted.ExitCode -ne 0) "Expected unlisted packaged file to fail validation."
+Assert-True ($unlisted.Output.Contains("unlisted files")) ("Expected unlisted-files failure. Output:`n" + $unlisted.Output)
+
+$traversalRoot = Join-Path $tmpRoot "chip-controller-artifacts-traversal"
+New-ArtifactLayout -Root $traversalRoot -JarMode "Valid"
+New-ArtifactManifest -Root $traversalRoot
+$traversalManifest = Get-Content -LiteralPath (Join-Path $traversalRoot "chip-artifact-manifest.json") -Raw | ConvertFrom-Json
+$traversalManifest.files | Add-Member -MemberType NoteProperty -Name "../escape.txt" -Value ("0" * 64)
+$traversalManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $traversalRoot "chip-artifact-manifest.json") -Encoding utf8NoBOM
+$traversal = Invoke-GradleArtifactVerification -ArtifactRoot $traversalRoot
+Assert-True ($traversal.ExitCode -ne 0) "Expected traversal manifest path to fail validation."
+Assert-True ($traversal.Output.Contains("unsafe file path")) ("Expected unsafe-path failure. Output:`n" + $traversal.Output)
+
+$duplicateRoot = Join-Path $tmpRoot "chip-controller-artifacts-duplicate-key"
+New-ArtifactLayout -Root $duplicateRoot -JarMode "Valid"
+New-ArtifactManifest -Root $duplicateRoot
+$duplicateManifestPath = Join-Path $duplicateRoot "chip-artifact-manifest.json"
+$duplicateText = Get-Content -LiteralPath $duplicateManifestPath -Raw
+$duplicateText = $duplicateText -replace '("CHIPController\.jar"\s*:\s*"[0-9a-f]{64}")', '$1, $1'
+Set-Content -LiteralPath $duplicateManifestPath -Value $duplicateText -NoNewline -Encoding utf8NoBOM
+$duplicate = Invoke-GradleArtifactVerification -ArtifactRoot $duplicateRoot
+Assert-True ($duplicate.ExitCode -ne 0) "Expected duplicate manifest key to fail validation."
+Assert-True ($duplicate.Output.Contains("duplicate file entry")) ("Expected duplicate-key failure. Output:`n" + $duplicate.Output)
 
 New-ArtifactLayout -Root $emptyRoot -JarMode "EmptyControllerJar"
 $negative = Invoke-GradleArtifactVerification -ArtifactRoot $emptyRoot
