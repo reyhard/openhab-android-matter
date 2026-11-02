@@ -208,21 +208,34 @@ the CHIP controller.
 The artifact source path is managed automatically:
 
 - Workflow `Build CHIP Controller Artifacts` builds arm64 CHIPTool-style
-  artifacts from connectedhomeip and publishes release tag
-  `chip-controller-artifacts-latest` with asset
-  `openhab-chip-artifacts-arm64.zip`.
-- `Android CI` downloads that release asset by tag on every run. No manual
-  URL/secret path updates are required after the release asset is published.
-- Workflow `Release APK` is manually dispatched. It downloads the same CHIP
-  controller artifact, runs tests/lint/artifact checks, builds the APK, generates
-  release notes from commit history, and creates or updates a GitHub release.
-  See `CONTRIBUTING.md` for commit message rules used by the generated changelog.
+  artifacts from an allowlisted connectedhomeip release. It now defaults to
+  `v1.6.1.0` and produces a versioned candidate archive
+  (`openhab-chip-artifacts-arm64-v1.6.1.0.zip`), a SHA-256 sidecar, and an
+  embedded `chip-artifact-manifest.json`. The sidecar is only a convenience
+  copy; consumers must verify against a separately trusted, maintainer-approved
+  digest. Publishing requires an explicit `publish=true` dispatch and refuses to
+  overwrite an existing version tag.
+- `Android CI` still downloads the legacy mutable
+  `chip-controller-artifacts-latest` asset until the immutable `v1.6.1.0`
+  artifact release is published and verified. Do not switch consumers before
+  that release exists.
+- Workflow `Release APK` is manually dispatched. It uses the same current CHIP
+  controller artifact source as CI, runs tests/lint/artifact checks, builds the
+  APK, generates release notes from commit history, and creates or updates a
+  GitHub release. See `CONTRIBUTING.md` for commit message rules used by the
+  generated changelog.
 
 For production attestation verification, also package local trust-store
 certificates with `-PopenhabMatterChipPaaTrustStoreDir=<dir>` and optionally
 `-PopenhabMatterChipCdTrustStoreDir=<dir>`, where `<dir>` paths point to local
 connectedhomeip DCL mirror outputs such as
 `credentials\production\paa-root-certs` and `credentials\production\cd-certs`.
+When the controller artifact contains `chip-artifact-manifest.json`, a PAA
+trust store is required and must contain every manifest-listed PAA certificate
+exactly. CD certificates remain optional; if supplied, they must exactly cover
+the manifest-listed CD files. An omitted CD set is recorded in the generated
+`assets/matter/connectedhomeip/apk-truststore-provenance.json` so the embedded
+artifact manifest is not presented as proof that CD assets were packaged.
 
 The Gradle verifier rejects missing native libraries, empty files, corrupt
 controller jars, and controller jar sets that do not contain the class entries

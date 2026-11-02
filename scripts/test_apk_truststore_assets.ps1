@@ -2,7 +2,10 @@ param(
     [string] $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
     [string] $ApkPath = "",
     [int] $MinimumPaaCertificates = 1,
-    [switch] $RequireCdTrustKeys
+    [switch] $RequireCdTrustKeys,
+    [switch] $RequireChipControllerNativeLibraries,
+    [string] $ExpectedChipSourceTag = "",
+    [string] $ExpectedChipSourceCommit = ""
 )
 
 Set-StrictMode -Version Latest
@@ -32,6 +35,22 @@ function Get-TrustStoreEntries {
     })
 }
 
+function Get-ZipEntrySha256 {
+    param([Parameter(Mandatory = $true)] [System.IO.Compression.ZipArchiveEntry] $Entry)
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = $Entry.Open()
+        try {
+            return ([System.BitConverter]::ToString($sha256.ComputeHash($stream)) -replace '-', '').ToLowerInvariant()
+        } finally {
+            $stream.Dispose()
+        }
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
 if (-not (Test-Path -LiteralPath $ProjectRoot -PathType Container)) {
     throw "Project root does not exist: $ProjectRoot"
 }
@@ -55,6 +74,95 @@ try {
     if ($RequireCdTrustKeys) {
         $cdEntries = @(Get-TrustStoreEntries -Zip $zip -Prefix "assets/matter/truststore/cd/")
         Assert-True ($cdEntries.Count -gt 0) "APK is missing packaged CD trust keys under assets/matter/truststore/cd/."
+    }
+
+    if ($RequireChipControllerNativeLibraries) {
+        foreach ($library in @("libCHIPController.so", "libc++_shared.so")) {
+            $entry = $zip.GetEntry("lib/arm64-v8a/$library")
+            Assert-True ($null -ne $entry -and $entry.Length -gt 0) (
+                "APK is missing packaged connectedhomeip native library lib/arm64-v8a/$library.")
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedChipSourceTag) -or
+        -not [string]::IsNullOrWhiteSpace($ExpectedChipSourceCommit)) {
+        $manifestEntry = $zip.GetEntry("assets/matter/connectedhomeip/chip-artifact-manifest.json")
+        Assert-True ($null -ne $manifestEntry) (
+            "APK is missing connectedhomeip provenance manifest assets/matter/connectedhomeip/chip-artifact-manifest.json.")
+        $reader = [System.IO.StreamReader]::new($manifestEntry.Open())
+        try {
+            $manifest = $reader.ReadToEnd() | ConvertFrom-Json
+        } finally {
+            $reader.Dispose()
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedChipSourceTag)) {
+            Assert-True ($manifest.connectedhomeip_tag -eq $ExpectedChipSourceTag) (
+                "APK connectedhomeip tag mismatch: expected $ExpectedChipSourceTag but found $($manifest.connectedhomeip_tag).")
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedChipSourceCommit)) {
+            Assert-True ($manifest.connectedhomeip_commit -eq $ExpectedChipSourceCommit) (
+                "APK connectedhomeip commit mismatch: expected $ExpectedChipSourceCommit but found $($manifest.connectedhomeip_commit).")
+        }
+
+        Assert-True ($null -ne $manifest.files) (
+            "APK connectedhomeip manifest does not list artifact file checksums.")
+        $manifestFileChecksums = @{}
+        foreach ($property in $manifest.files.PSObject.Properties) {
+            $manifestFileChecksums[$property.Name] = $property.Value.ToString().ToLowerInvariant()
+        }
+        foreach ($trustStore in @(
+            @{ ApkPrefix = "assets/matter/truststore/paa/"; ManifestPrefix = "paa-root-certs/" },
+            @{ ApkPrefix = "assets/matter/truststore/cd/"; ManifestPrefix = "cd-certs/" }
+        )) {
+            foreach ($entry in @(Get-TrustStoreEntries -Zip $zip -Prefix $trustStore.ApkPrefix)) {
+                $relative = $entry.FullName.Substring($trustStore.ApkPrefix.Length)
+                $manifestPath = $trustStore.ManifestPrefix + $relative
+                Assert-True ($manifestFileChecksums.ContainsKey($manifestPath)) (
+                    "APK trust-store asset is not covered by the embedded connectedhomeip manifest: " + $entry.FullName)
+                $actualHash = Get-ZipEntrySha256 -Entry $entry
+                Assert-True ($actualHash -eq $manifestFileChecksums[$manifestPath]) (
+                    "APK trust-store asset checksum does not match the embedded connectedhomeip manifest: " + $entry.FullName)
+            }
+        }
+
+        $provenanceEntry = $zip.GetEntry("assets/matter/connectedhomeip/apk-truststore-provenance.json")
+        Assert-True ($null -ne $provenanceEntry) (
+            "APK is missing trust-store provenance assets/matter/connectedhomeip/apk-truststore-provenance.json.")
+        $provenanceReader = [System.IO.StreamReader]::new($provenanceEntry.Open())
+        try {
+            $trustStoreProvenance = $provenanceReader.ReadToEnd() | ConvertFrom-Json
+        } finally {
+            $provenanceReader.Dispose()
+        }
+        Assert-True ($trustStoreProvenance.artifact_manifest_sha256 -eq (Get-ZipEntrySha256 -Entry $manifestEntry)) (
+            "APK trust-store provenance does not reference the embedded artifact manifest.")
+
+        $packagedPaaFiles = @(Get-TrustStoreEntries -Zip $zip -Prefix "assets/matter/truststore/paa/" |
+            ForEach-Object { $_.FullName.Substring("assets/matter/truststore/paa/".Length) })
+        $packagedCdFiles = @(Get-TrustStoreEntries -Zip $zip -Prefix "assets/matter/truststore/cd/" |
+            ForEach-Object { $_.FullName.Substring("assets/matter/truststore/cd/".Length) })
+        $provenancePaaFiles = @($trustStoreProvenance.paa_files)
+        $provenanceCdFiles = @($trustStoreProvenance.cd_files)
+        Assert-True ((($packagedPaaFiles | Sort-Object) -join "`n") -eq (($provenancePaaFiles | Sort-Object) -join "`n")) (
+            "APK PAA files do not match the packaged trust-store provenance.")
+        Assert-True ((($packagedCdFiles | Sort-Object) -join "`n") -eq (($provenanceCdFiles | Sort-Object) -join "`n")) (
+            "APK CD files do not match the packaged trust-store provenance.")
+
+        $manifestPaaFiles = @($manifestFileChecksums.Keys |
+            Where-Object { $_ -like "paa-root-certs/*" -and ($_ -like "*.pem" -or $_ -like "*.der") } |
+            ForEach-Object { $_.Substring("paa-root-certs/".Length) })
+        $manifestCdFiles = @($manifestFileChecksums.Keys |
+            Where-Object { $_ -like "cd-certs/*" -and ($_ -like "*.pem" -or $_ -like "*.der") } |
+            ForEach-Object { $_.Substring("cd-certs/".Length) })
+        Assert-True ((($provenancePaaFiles | Sort-Object) -join "`n") -eq (($manifestPaaFiles | Sort-Object) -join "`n")) (
+            "APK PAA provenance does not cover the embedded artifact manifest exactly.")
+        if ($trustStoreProvenance.cd_omitted -eq $true) {
+            Assert-True ($provenanceCdFiles.Count -eq 0) "APK CD provenance is marked omitted but lists CD files."
+            Assert-True ($manifestCdFiles.Count -gt 0) "APK CD provenance is marked omitted but the manifest has no CD files."
+        } else {
+            Assert-True ((($provenanceCdFiles | Sort-Object) -join "`n") -eq (($manifestCdFiles | Sort-Object) -join "`n")) (
+                "APK CD provenance does not cover the embedded artifact manifest exactly.")
+        }
     }
 } finally {
     $zip.Dispose()
