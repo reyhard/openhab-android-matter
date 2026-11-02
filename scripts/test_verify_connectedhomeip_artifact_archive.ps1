@@ -109,6 +109,34 @@ function New-Archive {
     return (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function Add-ZipEntry {
+    param(
+        [Parameter(Mandatory = $true)] [string] $ArchivePath,
+        [Parameter(Mandatory = $true)] [string] $EntryName,
+        [Parameter(Mandatory = $true)] [string] $Content
+    )
+
+    $zip = [System.IO.Compression.ZipFile]::Open($ArchivePath, [System.IO.Compression.ZipArchiveMode]::Update)
+    try {
+        $entry = $zip.CreateEntry($EntryName)
+        $writer = [System.IO.StreamWriter]::new($entry.Open())
+        try {
+            $writer.Write($Content)
+        } finally {
+            $writer.Dispose()
+        }
+    } finally {
+        $zip.Dispose()
+    }
+    return (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function New-EmptyDirectory {
+    param([Parameter(Mandatory = $true)] [string] $Path)
+    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path $Path | Out-Null
+}
+
 function Invoke-VerifierCase {
     param(
         [Parameter(Mandatory = $true)] [string] $ArchivePath,
@@ -150,6 +178,42 @@ $cdArchive = Join-Path $tmpRoot "valid-cd.zip"
 $cdHash = New-Archive -Root $cdRoot -ArchivePath $cdArchive
 $cd = Invoke-VerifierCase -ArchivePath $cdArchive -Hash $cdHash
 Assert-True ($cd.ExitCode -eq 0) ("Expected valid archive with optional CD certificates to pass. Output:`n" + $cd.Output)
+
+# Duplicate ZIP entry names must be rejected before extraction.
+$duplicateZip = Join-Path $tmpRoot "duplicate-entry.zip"
+Copy-Item -LiteralPath $validArchive -Destination $duplicateZip -Force
+$duplicateZipHash = Add-ZipEntry -ArchivePath $duplicateZip -EntryName "CHIPController.jar" -Content "duplicate"
+$duplicateZipTarget = Join-Path $tmpRoot "duplicate-entry-target"
+New-EmptyDirectory -Path $duplicateZipTarget
+$duplicateZipResult = Invoke-VerifierCase -ArchivePath $duplicateZip -Hash $duplicateZipHash -ExtraArgs @("-ExtractTo", $duplicateZipTarget)
+Assert-True ($duplicateZipResult.ExitCode -ne 0) "Expected duplicate ZIP entry names to fail."
+Assert-True ($duplicateZipResult.Output.Contains("duplicate entry")) ("Expected duplicate-entry error. Output:`n" + $duplicateZipResult.Output)
+Assert-True (@(Get-ChildItem -LiteralPath $duplicateZipTarget -Force).Count -eq 0) (
+    "Verifier extracted files before rejecting duplicate ZIP entries.")
+
+# Windows case collisions must be rejected before extraction.
+$collisionZip = Join-Path $tmpRoot "case-collision.zip"
+Copy-Item -LiteralPath $validArchive -Destination $collisionZip -Force
+$collisionHash = Add-ZipEntry -ArchivePath $collisionZip -EntryName "CHIPController.JAR" -Content "case collision"
+$collisionTarget = Join-Path $tmpRoot "case-collision-target"
+New-EmptyDirectory -Path $collisionTarget
+$collisionResult = Invoke-VerifierCase -ArchivePath $collisionZip -Hash $collisionHash -ExtraArgs @("-ExtractTo", $collisionTarget)
+Assert-True ($collisionResult.ExitCode -ne 0) "Expected case-colliding ZIP entry names to fail."
+Assert-True ($collisionResult.Output.Contains("case-colliding entry")) ("Expected case-collision error. Output:`n" + $collisionResult.Output)
+Assert-True (@(Get-ChildItem -LiteralPath $collisionTarget -Force).Count -eq 0) (
+    "Verifier extracted files before rejecting case-colliding ZIP entries.")
+
+# ZIP traversal names must be rejected before extraction.
+$traversalZip = Join-Path $tmpRoot "archive-traversal.zip"
+Copy-Item -LiteralPath $validArchive -Destination $traversalZip -Force
+$traversalZipHash = Add-ZipEntry -ArchivePath $traversalZip -EntryName "../escape.txt" -Content "escape"
+$traversalZipTarget = Join-Path $tmpRoot "archive-traversal-target"
+New-EmptyDirectory -Path $traversalZipTarget
+$traversalZipResult = Invoke-VerifierCase -ArchivePath $traversalZip -Hash $traversalZipHash -ExtraArgs @("-ExtractTo", $traversalZipTarget)
+Assert-True ($traversalZipResult.ExitCode -ne 0) "Expected traversal ZIP entry name to fail."
+Assert-True ($traversalZipResult.Output.Contains("unsafe entry path")) ("Expected archive traversal error. Output:`n" + $traversalZipResult.Output)
+Assert-True (@(Get-ChildItem -LiteralPath $traversalZipTarget -Force).Count -eq 0) (
+    "Verifier extracted files before rejecting a traversal ZIP entry.")
 
 # Empty files map must not pass.
 $emptyRoot = New-SyntheticArtifact -Name "empty-map"
@@ -195,7 +259,7 @@ $traversal = Invoke-VerifierCase -ArchivePath $traversalArchive -Hash $traversal
 Assert-True ($traversal.ExitCode -ne 0) "Expected traversal manifest path to fail."
 Assert-True ($traversal.Output.Contains("unsafe file path")) ("Expected unsafe-path error. Output:`n" + $traversal.Output)
 
-# Duplicate manifest keys must fail even though JSON parsers may collapse them.
+# Duplicate JSON properties must fail even though JSON parsers may collapse them.
 $duplicateRoot = New-SyntheticArtifact -Name "duplicate-key"
 $duplicateFiles = Get-FileChecksums -Root $duplicateRoot
 Write-Manifest -Root $duplicateRoot -Files $duplicateFiles
@@ -207,7 +271,36 @@ $duplicateArchive = Join-Path $tmpRoot "duplicate-key.zip"
 $duplicateHash = New-Archive -Root $duplicateRoot -ArchivePath $duplicateArchive
 $duplicate = Invoke-VerifierCase -ArchivePath $duplicateArchive -Hash $duplicateHash
 Assert-True ($duplicate.ExitCode -ne 0) "Expected duplicate manifest key to fail."
-Assert-True ($duplicate.Output.Contains("duplicate file entry")) ("Expected duplicate-key error. Output:`n" + $duplicate.Output)
+Assert-True ($duplicate.Output.Contains("duplicate JSON property")) ("Expected duplicate-key error. Output:`n" + $duplicate.Output)
+
+# Duplicate top-level manifest keys must fail.
+$duplicateTopRoot = Join-Path $tmpRoot "duplicate-top-level"
+Copy-Item -LiteralPath $validRoot -Destination $duplicateTopRoot -Recurse -Force
+$duplicateTopManifest = Join-Path $duplicateTopRoot "chip-artifact-manifest.json"
+$duplicateTopText = Get-Content -LiteralPath $duplicateTopManifest -Raw
+$duplicateTopText = $duplicateTopText -replace '"connectedhomeip_tag"\s*:\s*"v1\.6\.1\.0"', '"connectedhomeip_tag": "v1.6.1.0", "connectedhomeip_tag": "v1.6.1.0"'
+Set-Content -LiteralPath $duplicateTopManifest -Value $duplicateTopText -NoNewline -Encoding utf8NoBOM
+$duplicateTopArchive = Join-Path $tmpRoot "duplicate-top-level.zip"
+$duplicateTopHash = New-Archive -Root $duplicateTopRoot -ArchivePath $duplicateTopArchive
+$duplicateTop = Invoke-VerifierCase -ArchivePath $duplicateTopArchive -Hash $duplicateTopHash
+Assert-True ($duplicateTop.ExitCode -ne 0) "Expected duplicate top-level manifest key to fail."
+Assert-True ($duplicateTop.Output.Contains("duplicate JSON property 'connectedhomeip_tag'")) (
+    "Expected duplicate top-level JSON property error. Output:`n" + $duplicateTop.Output)
+
+# Duplicate nested manifest keys must fail.
+$duplicateNestedRoot = Join-Path $tmpRoot "duplicate-nested"
+Copy-Item -LiteralPath $validRoot -Destination $duplicateNestedRoot -Recurse -Force
+$duplicateNestedManifest = Join-Path $duplicateNestedRoot "chip-artifact-manifest.json"
+$duplicateNestedText = (Get-Content -LiteralPath $duplicateNestedManifest -Raw).TrimEnd()
+$duplicateNestedText = $duplicateNestedText.Substring(0, $duplicateNestedText.Length - 1) +
+    ', "metadata": {"duplicate": "a", "duplicate": "b"}}'
+Set-Content -LiteralPath $duplicateNestedManifest -Value $duplicateNestedText -NoNewline -Encoding utf8NoBOM
+$duplicateNestedArchive = Join-Path $tmpRoot "duplicate-nested.zip"
+$duplicateNestedHash = New-Archive -Root $duplicateNestedRoot -ArchivePath $duplicateNestedArchive
+$duplicateNested = Invoke-VerifierCase -ArchivePath $duplicateNestedArchive -Hash $duplicateNestedHash
+Assert-True ($duplicateNested.ExitCode -ne 0) "Expected duplicate nested manifest key to fail."
+Assert-True ($duplicateNested.Output.Contains("duplicate JSON property 'duplicate'")) (
+    "Expected duplicate nested JSON property error. Output:`n" + $duplicateNested.Output)
 
 # Missing PAA certificates must fail even if the rest of the manifest is complete.
 $missingPaaRoot = New-SyntheticArtifact -Name "missing-paa" -OmitPaa

@@ -10,6 +10,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 function Assert-True {
     param(
@@ -49,6 +50,57 @@ function Test-SafeRelativePath {
         }
     }
     return $true
+}
+
+function Assert-ArchiveStructure {
+    param([Parameter(Mandatory = $true)] [string] $ArchivePath)
+
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($ArchivePath)
+    try {
+        $exactNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        $caseInsensitiveNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($entry in $zip.Entries) {
+            $entryPath = $entry.FullName
+            if ($entryPath.EndsWith("/", [System.StringComparison]::Ordinal)) {
+                $entryPath = $entryPath.Substring(0, $entryPath.Length - 1)
+            }
+            Assert-True (Test-SafeRelativePath $entryPath) "Archive contains an unsafe entry path: $($entry.FullName)"
+            Assert-True ($exactNames.Add($entryPath)) "Archive contains a duplicate entry: $($entry.FullName)"
+            Assert-True ($caseInsensitiveNames.Add($entryPath)) (
+                "Archive contains a case-colliding entry: $($entry.FullName)")
+
+            $rawAttributes = [int64] $entry.ExternalAttributes
+            if ($rawAttributes -lt 0) {
+                $rawAttributes += [int64] 4294967296
+            }
+            $unixMode = ($rawAttributes -shr 16) -band 0xF000
+            Assert-True ($unixMode -ne 0xA000) "Archive contains a symbolic-link entry: $($entry.FullName)"
+        }
+    } finally {
+        $zip.Dispose()
+    }
+}
+
+function Assert-NoDuplicateJsonKeys {
+    param(
+        [Parameter(Mandatory = $true)] [System.Text.Json.JsonElement] $Element,
+        [string] $Path = "$"
+    )
+
+    if ($Element.ValueKind -eq [System.Text.Json.JsonValueKind]::Object) {
+        $keys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        foreach ($property in $Element.EnumerateObject()) {
+            Assert-True ($keys.Add($property.Name)) (
+                "Artifact manifest contains duplicate JSON property '$($property.Name)' at $Path.")
+            Assert-NoDuplicateJsonKeys -Element $property.Value -Path "$Path.$($property.Name)"
+        }
+    } elseif ($Element.ValueKind -eq [System.Text.Json.JsonValueKind]::Array) {
+        $index = 0
+        foreach ($item in $Element.EnumerateArray()) {
+            Assert-NoDuplicateJsonKeys -Element $item -Path "$Path[$index]"
+            $index++
+        }
+    }
 }
 
 function Get-ExtractedFileMap {
@@ -111,6 +163,8 @@ if (-not [string]::IsNullOrWhiteSpace($SidecarPath)) {
         "Artifact SHA-256 sidecar does not match the pinned digest: expected $expected but sidecar has $sidecarHash.")
 }
 
+Assert-ArchiveStructure -ArchivePath $ArchivePath
+
 $tempRoot = $null
 if ([string]::IsNullOrWhiteSpace($ExtractTo)) {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("openhab-chip-verify-" + [System.Guid]::NewGuid().ToString("N"))
@@ -143,6 +197,7 @@ try {
 
     try {
         $manifestRoot = $manifestDocument.RootElement
+        Assert-NoDuplicateJsonKeys -Element $manifestRoot
         Assert-True ($manifestRoot.ValueKind -eq [System.Text.Json.JsonValueKind]::Object) (
             "Artifact manifest must be a JSON object.")
 

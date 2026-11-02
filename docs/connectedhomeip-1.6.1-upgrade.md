@@ -141,17 +141,24 @@ All commands below were executed locally on 2026-11-01 and 2026-11-02.
   - Wrong expected archive SHA-256 failed with
     `artifact archive SHA-256 mismatch ... Refusing to extract.`
   - Wrong expected source tag failed with `Artifact source tag mismatch`.
+  - Duplicate ZIP entry names, Windows case collisions, and traversal entry
+    names failed before extraction; the destination remained empty.
   - Empty or incomplete manifest coverage, unlisted/tampered files,
-    traversal/unsafe paths, duplicate entries, missing PAA certificates, and a
-    non-empty caller extraction directory failed as expected.
+    traversal/unsafe manifest paths, duplicate top-level or nested JSON
+    properties, missing PAA certificates, and a non-empty caller extraction
+    directory failed as expected.
 - Gradle artifact verification with the real candidate passed, including the
-  manifest tag/commit, exact packaged-file coverage, and embedded file
-  checksums.
+  manifest tag/commit, exact packaged-file coverage, embedded file checksums,
+  and duplicate-JSON-property rejection.
 - Gradle negative checks rejected empty/incomplete manifest coverage, a missing
   controller jar, a missing `libCHIPController.so`, an extra unlisted file, a
-  tampered manifest checksum, and unsafe manifest paths. The APK provenance
-  preparation task also failed when artifact verification failed, proving the
-  manifest asset cannot be copied from an incomplete artifact.
+  tampered manifest checksum, unsafe manifest paths, and duplicate top-level or
+  nested JSON properties. The APK provenance preparation task failed when
+  artifact verification failed, and rejected omitted PAA and mismatched PAA/CD
+  trust-store files that were not covered by the manifest. Optional CD assets
+  remain optional; if supplied, they must be manifest-covered.
+- The APK trust-store smoke check verified every packaged PAA/CD certificate
+  asset hash against the embedded artifact manifest.
 - `:app:testDebugUnitTest` with the real 1.6.1 jars: **499 tests, 0 failures,
   0 skipped**. `ConnectedHomeIpV161CompatibilityTest` ran against the packaged
   jars and confirmed the reflected controller signatures, deferred ICD factory,

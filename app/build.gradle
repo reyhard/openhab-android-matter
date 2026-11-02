@@ -24,6 +24,128 @@ def hasReleaseSigning = !releaseStoreFilePath.isEmpty()
         && !releaseStorePassword.isEmpty()
         && !releaseKeyAlias.isEmpty()
         && !releaseKeyPassword.isEmpty()
+def sha256File = { File file ->
+    MessageDigest.getInstance("SHA-256").digest(file.bytes).encodeHex().toString()
+}
+def assertNoDuplicateJsonKeys = { String jsonText, File manifestFile ->
+    def tokens = []
+    try {
+        def lexer = new groovy.json.JsonLexer(new java.io.StringReader(jsonText))
+        while (lexer.hasNext()) {
+            tokens.add(lexer.next())
+        }
+    } catch (Exception exception) {
+        throw new GradleException(
+                "Invalid connectedhomeip artifact provenance manifest: " + manifestFile,
+                exception)
+    }
+    int[] cursor = [0]
+    def peek = { cursor[0] < tokens.size() ? tokens[cursor[0]] : null }
+    def syntaxError = { String message ->
+        throw new GradleException(
+                "Invalid connectedhomeip artifact provenance manifest " + manifestFile + ": " + message)
+    }
+    def parseValue = null
+    def parseObject = null
+    def parseArray = null
+    parseValue = {
+        def token = peek()
+        if (token == null) {
+            syntaxError("unexpected end of JSON")
+        }
+        switch (token.getType()) {
+            case groovy.json.JsonTokenType.OPEN_CURLY:
+                cursor[0]++
+                parseObject()
+                break
+            case groovy.json.JsonTokenType.OPEN_BRACKET:
+                cursor[0]++
+                parseArray()
+                break
+            case groovy.json.JsonTokenType.STRING:
+            case groovy.json.JsonTokenType.NUMBER:
+            case groovy.json.JsonTokenType.TRUE:
+            case groovy.json.JsonTokenType.FALSE:
+            case groovy.json.JsonTokenType.NULL:
+                cursor[0]++
+                break
+            default:
+                syntaxError("unexpected token " + token.getText())
+        }
+    }
+    parseObject = {
+        def keys = new HashSet<String>()
+        def token = peek()
+        if (token == null) {
+            syntaxError("unexpected end of object")
+        }
+        if (token.getType() == groovy.json.JsonTokenType.CLOSE_CURLY) {
+            cursor[0]++
+            return
+        }
+        while (true) {
+            token = peek()
+            if (token == null || token.getType() != groovy.json.JsonTokenType.STRING) {
+                syntaxError("expected an object key")
+            }
+            String key = token.getValue() == null ? token.getText() : token.getValue().toString()
+            if (!keys.add(key)) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest contains duplicate JSON property: " + key)
+            }
+            cursor[0]++
+            token = peek()
+            if (token == null || token.getType() != groovy.json.JsonTokenType.COLON) {
+                syntaxError("expected ':' after object key")
+            }
+            cursor[0]++
+            parseValue()
+            token = peek()
+            if (token == null) {
+                syntaxError("unexpected end of object")
+            }
+            if (token.getType() == groovy.json.JsonTokenType.COMMA) {
+                cursor[0]++
+                continue
+            }
+            if (token.getType() == groovy.json.JsonTokenType.CLOSE_CURLY) {
+                cursor[0]++
+                return
+            }
+            syntaxError("expected ',' or '}' after object value")
+        }
+    }
+    parseArray = {
+        def token = peek()
+        if (token == null) {
+            syntaxError("unexpected end of array")
+        }
+        if (token.getType() == groovy.json.JsonTokenType.CLOSE_BRACKET) {
+            cursor[0]++
+            return
+        }
+        while (true) {
+            parseValue()
+            token = peek()
+            if (token == null) {
+                syntaxError("unexpected end of array")
+            }
+            if (token.getType() == groovy.json.JsonTokenType.COMMA) {
+                cursor[0]++
+                continue
+            }
+            if (token.getType() == groovy.json.JsonTokenType.CLOSE_BRACKET) {
+                cursor[0]++
+                return
+            }
+            syntaxError("expected ',' or ']' after array value")
+        }
+    }
+    parseValue()
+    if (cursor[0] != tokens.size()) {
+        syntaxError("trailing JSON content")
+    }
+}
 def chipControllerSupportedAbis = (findProperty("openhabMatterChipControllerAbis")
         ?: "arm64-v8a;armeabi-v7a;x86;x86_64")
         .toString()
@@ -211,6 +333,7 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
                         "Missing connectedhomeip artifact provenance manifest: " + manifestFile)
             }
         } else {
+            assertNoDuplicateJsonKeys(manifestFile.getText("UTF-8"), manifestFile)
             def manifest
             try {
                 manifest = new JsonSlurper().parse(manifestFile)
@@ -246,9 +369,6 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
             if (manifest.files == null || !(manifest.files instanceof Map)) {
                 throw new GradleException("connectedhomeip artifact manifest does not list file checksums")
             }
-            def sha256 = { File file ->
-                MessageDigest.getInstance("SHA-256").digest(file.bytes).encodeHex().toString()
-            }
             def safeRelativePath = { String path ->
                 if (path == null || path.isEmpty() || path.contains("\\") || path.contains(":") || path.contains("\u0000")) {
                     return false
@@ -259,25 +379,6 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
                 return !path.split("/", -1).any { segment ->
                     segment.isEmpty() || segment == "." || segment == ".."
                 }
-            }
-            def manifestText = manifestFile.getText("UTF-8")
-            def filesBlockMatcher = manifestText =~ /(?s)"files"\s*:\s*\{(.*?)\}\s*(?:,|\})/
-            if (!filesBlockMatcher.find()) {
-                throw new GradleException("connectedhomeip artifact manifest does not contain a files object")
-            }
-            def rawFileKeys = new LinkedHashSet<String>()
-            def fileKeyMatcher = filesBlockMatcher.group(1) =~ /"((?:\\.|[^"\\])*)"\s*:/
-            while (fileKeyMatcher.find()) {
-                String rawKey = fileKeyMatcher.group(1)
-                if (!rawFileKeys.add(rawKey)) {
-                    throw new GradleException(
-                            "connectedhomeip artifact manifest contains a duplicate file entry: " + rawKey)
-                }
-            }
-            if (rawFileKeys.size() != manifest.files.size()) {
-                throw new GradleException(
-                        "connectedhomeip artifact manifest files object is ambiguous; "
-                                + "duplicate or malformed file entries are not allowed")
             }
             def manifestFiles = new LinkedHashSet<String>()
             def manifestFilesCaseInsensitive = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER)
@@ -314,7 +415,7 @@ tasks.register("verifyConnectedHomeIpControllerArtifacts") {
                     throw new GradleException(
                             "connectedhomeip artifact manifest lists a symbolic link: " + artifactFile)
                 }
-                String actualDigest = sha256(artifactFile)
+                String actualDigest = sha256File(artifactFile)
                 if (actualDigest != expectedDigest.toString()) {
                     throw new GradleException(
                             "connectedhomeip artifact checksum mismatch for "
@@ -446,6 +547,47 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
         if (chipPaaTrustStoreDir.isEmpty() && chipCdTrustStoreDir.isEmpty() && !hasArtifactManifest) {
             return
         }
+        def manifestData = null
+        if (hasArtifactManifest) {
+            manifestData = new JsonSlurper().parse(artifactManifest)
+            if (chipPaaTrustStoreDir.isEmpty()) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest requires a PAA trust store directory")
+            }
+        }
+        def verifyTrustStoreCoverage = { File sourceRoot, String manifestPrefix ->
+            def sourceFiles = fileTree(sourceRoot)
+                    .matching { include "**/*.pem", "**/*.der" }
+                    .files
+            if (manifestData == null) {
+                return sourceFiles.size()
+            }
+            def manifestFiles = manifestData.files
+            if (!(manifestFiles instanceof Map)) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest does not list trust-store checksums")
+            }
+            sourceFiles.each { File sourceFile ->
+                String relative = sourceRoot.toPath()
+                        .relativize(sourceFile.toPath())
+                        .toString()
+                        .replace(File.separator, "/")
+                String manifestPath = manifestPrefix + "/" + relative
+                if (!manifestFiles.containsKey(manifestPath)) {
+                    throw new GradleException(
+                            "Trust-store file is not covered by the connectedhomeip artifact manifest: "
+                                    + sourceFile)
+                }
+                String expectedDigest = manifestFiles[manifestPath]?.toString()
+                String actualDigest = sha256File(sourceFile)
+                if (actualDigest != expectedDigest) {
+                    throw new GradleException(
+                            "Trust-store file checksum does not match the connectedhomeip artifact manifest: "
+                                    + sourceFile)
+                }
+            }
+            return sourceFiles.size()
+        }
         outRoot.mkdirs()
 
         if (hasArtifactManifest) {
@@ -460,6 +602,11 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
             if (!paaRoot.isDirectory()) {
                 throw new GradleException("PAA trust store directory does not exist: " + paaRoot)
             }
+            int paaCount = verifyTrustStoreCoverage(paaRoot, "paa-root-certs")
+            if (hasArtifactManifest && paaCount < 1) {
+                throw new GradleException(
+                        "connectedhomeip artifact manifest requires packaged PAA trust-store certificates")
+            }
             copy {
                 from paaRoot
                 include "**/*.pem", "**/*.der"
@@ -472,10 +619,13 @@ tasks.register("prepareConnectedHomeIpTrustStoreAssets") {
             if (!cdRoot.isDirectory()) {
                 throw new GradleException("CD trust store directory does not exist: " + cdRoot)
             }
-            copy {
-                from cdRoot
-                include "**/*.pem", "**/*.der"
-                into new File(outRoot, "matter/truststore/cd")
+            int cdCount = verifyTrustStoreCoverage(cdRoot, "cd-certs")
+            if (cdCount > 0) {
+                copy {
+                    from cdRoot
+                    include "**/*.pem", "**/*.der"
+                    into new File(outRoot, "matter/truststore/cd")
+                }
             }
         }
     }

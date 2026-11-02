@@ -230,6 +230,10 @@ certificates with `-PopenhabMatterChipPaaTrustStoreDir=<dir>` and optionally
 `-PopenhabMatterChipCdTrustStoreDir=<dir>`, where `<dir>` paths point to local
 connectedhomeip DCL mirror outputs such as
 `credentials\production\paa-root-certs` and `credentials\production\cd-certs`.
+When the controller artifact contains `chip-artifact-manifest.json`, a PAA
+trust store is required and every packaged PAA/CD certificate must be listed in
+that manifest with a matching checksum. CD certificates remain optional, but
+supplied CD files must also be manifest-covered.
 
 The Gradle verifier rejects missing native libraries, empty files, corrupt
 controller jars, and controller jar sets that do not contain the class entries

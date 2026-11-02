@@ -206,6 +206,52 @@ $manifestPositive = Invoke-GradleArtifactVerification -ArtifactRoot $manifestRoo
 )
 Assert-True ($manifestPositive.ExitCode -eq 0) ("Expected matching provenance manifest to pass, got exit " + $manifestPositive.ExitCode + ". Output:`n" + $manifestPositive.Output)
 
+$trustStorePositive = Invoke-GradleArtifactVerification -ArtifactRoot $manifestRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets" -ExtraGradleArgs @(
+    "-PopenhabMatterChipPaaTrustStoreDir=$manifestRoot\paa-root-certs"
+)
+Assert-True ($trustStorePositive.ExitCode -eq 0) ("Expected manifest-covered PAA assets to package, got exit " + $trustStorePositive.ExitCode + ". Output:`n" + $trustStorePositive.Output)
+
+$trustStoreOmittedPaa = Invoke-GradleArtifactVerification -ArtifactRoot $manifestRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets"
+Assert-True ($trustStoreOmittedPaa.ExitCode -ne 0) "Expected omitted PAA trust store to fail when a manifest is present."
+Assert-True ($trustStoreOmittedPaa.Output.Contains("requires a PAA trust store directory")) (
+    "Expected omitted-PAA failure. Output:`n" + $trustStoreOmittedPaa.Output)
+
+$externalPaaRoot = Join-Path $tmpRoot "chip-paa-external-mismatch"
+Remove-Item -LiteralPath $externalPaaRoot -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $externalPaaRoot | Out-Null
+Copy-Item -Path (Join-Path $manifestRoot "paa-root-certs\*") -Destination $externalPaaRoot -Recurse -Force
+Set-Content -LiteralPath (Join-Path $externalPaaRoot "synthetic-IKEA-0x117C.pem") -Value "tampered external PAA" -NoNewline
+$trustStoreMismatchedPaa = Invoke-GradleArtifactVerification -ArtifactRoot $manifestRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets" -ExtraGradleArgs @(
+    "-PopenhabMatterChipPaaTrustStoreDir=$externalPaaRoot"
+)
+Assert-True ($trustStoreMismatchedPaa.ExitCode -ne 0) "Expected mismatched PAA trust-store assets to fail."
+Assert-True ($trustStoreMismatchedPaa.Output.Contains("checksum does not match")) (
+    "Expected mismatched-PAA failure. Output:`n" + $trustStoreMismatchedPaa.Output)
+
+$cdLayoutRoot = Join-Path $tmpRoot "chip-controller-artifacts-with-cd"
+New-ArtifactLayout -Root $cdLayoutRoot -JarMode "Valid"
+New-Item -ItemType Directory -Force -Path (Join-Path $cdLayoutRoot "cd-certs") | Out-Null
+Set-Content -LiteralPath (Join-Path $cdLayoutRoot "cd-certs/synthetic-CD.pem") -Value "synthetic CD" -NoNewline
+New-ArtifactManifest -Root $cdLayoutRoot
+$trustStoreWithCd = Invoke-GradleArtifactVerification -ArtifactRoot $cdLayoutRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets" -ExtraGradleArgs @(
+    "-PopenhabMatterChipPaaTrustStoreDir=$cdLayoutRoot\paa-root-certs",
+    "-PopenhabMatterChipCdTrustStoreDir=$cdLayoutRoot\cd-certs"
+)
+Assert-True ($trustStoreWithCd.ExitCode -eq 0) ("Expected optional manifest-covered CD assets to package, got exit " + $trustStoreWithCd.ExitCode + ". Output:`n" + $trustStoreWithCd.Output)
+
+$externalCdRoot = Join-Path $tmpRoot "chip-cd-external-mismatch"
+Remove-Item -LiteralPath $externalCdRoot -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $externalCdRoot | Out-Null
+Copy-Item -Path (Join-Path $cdLayoutRoot "cd-certs\*") -Destination $externalCdRoot -Recurse -Force
+Set-Content -LiteralPath (Join-Path $externalCdRoot "synthetic-CD.pem") -Value "tampered external CD" -NoNewline
+$trustStoreMismatchedCd = Invoke-GradleArtifactVerification -ArtifactRoot $cdLayoutRoot -TaskName ":app:prepareConnectedHomeIpTrustStoreAssets" -ExtraGradleArgs @(
+    "-PopenhabMatterChipPaaTrustStoreDir=$cdLayoutRoot\paa-root-certs",
+    "-PopenhabMatterChipCdTrustStoreDir=$externalCdRoot"
+)
+Assert-True ($trustStoreMismatchedCd.ExitCode -ne 0) "Expected mismatched CD trust-store assets to fail."
+Assert-True ($trustStoreMismatchedCd.Output.Contains("checksum does not match")) (
+    "Expected mismatched-CD failure. Output:`n" + $trustStoreMismatchedCd.Output)
+
 $wrongTagRoot = Join-Path $tmpRoot "chip-controller-artifacts-wrong-tag"
 New-ArtifactLayout -Root $wrongTagRoot -JarMode "Valid"
 New-ArtifactManifest -Root $wrongTagRoot
@@ -283,7 +329,19 @@ $duplicateText = $duplicateText -replace '("CHIPController\.jar"\s*:\s*"[0-9a-f]
 Set-Content -LiteralPath $duplicateManifestPath -Value $duplicateText -NoNewline -Encoding utf8NoBOM
 $duplicate = Invoke-GradleArtifactVerification -ArtifactRoot $duplicateRoot
 Assert-True ($duplicate.ExitCode -ne 0) "Expected duplicate manifest key to fail validation."
-Assert-True ($duplicate.Output.Contains("duplicate file entry")) ("Expected duplicate-key failure. Output:`n" + $duplicate.Output)
+Assert-True ($duplicate.Output.Contains("duplicate JSON property")) ("Expected duplicate-key failure. Output:`n" + $duplicate.Output)
+
+$duplicateTopRoot = Join-Path $tmpRoot "chip-controller-artifacts-duplicate-top-level"
+New-ArtifactLayout -Root $duplicateTopRoot -JarMode "Valid"
+New-ArtifactManifest -Root $duplicateTopRoot
+$duplicateTopManifestPath = Join-Path $duplicateTopRoot "chip-artifact-manifest.json"
+$duplicateTopText = Get-Content -LiteralPath $duplicateTopManifestPath -Raw
+$duplicateTopText = $duplicateTopText -replace '"connectedhomeip_tag"\s*:\s*"v1\.6\.1\.0"', '"connectedhomeip_tag": "v1.6.1.0", "connectedhomeip_tag": "v1.6.1.0"'
+Set-Content -LiteralPath $duplicateTopManifestPath -Value $duplicateTopText -NoNewline -Encoding utf8NoBOM
+$duplicateTop = Invoke-GradleArtifactVerification -ArtifactRoot $duplicateTopRoot
+Assert-True ($duplicateTop.ExitCode -ne 0) "Expected duplicate top-level manifest key to fail validation."
+Assert-True ($duplicateTop.Output.Contains("duplicate JSON property")) (
+    "Expected duplicate top-level JSON property failure. Output:`n" + $duplicateTop.Output)
 
 New-ArtifactLayout -Root $emptyRoot -JarMode "EmptyControllerJar"
 $negative = Invoke-GradleArtifactVerification -ArtifactRoot $emptyRoot

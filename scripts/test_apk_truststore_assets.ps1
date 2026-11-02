@@ -35,6 +35,22 @@ function Get-TrustStoreEntries {
     })
 }
 
+function Get-ZipEntrySha256 {
+    param([Parameter(Mandatory = $true)] [System.IO.Compression.ZipArchiveEntry] $Entry)
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = $Entry.Open()
+        try {
+            return ([System.BitConverter]::ToString($sha256.ComputeHash($stream)) -replace '-', '').ToLowerInvariant()
+        } finally {
+            $stream.Dispose()
+        }
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
 if (-not (Test-Path -LiteralPath $ProjectRoot -PathType Container)) {
     throw "Project root does not exist: $ProjectRoot"
 }
@@ -86,6 +102,27 @@ try {
         if (-not [string]::IsNullOrWhiteSpace($ExpectedChipSourceCommit)) {
             Assert-True ($manifest.connectedhomeip_commit -eq $ExpectedChipSourceCommit) (
                 "APK connectedhomeip commit mismatch: expected $ExpectedChipSourceCommit but found $($manifest.connectedhomeip_commit).")
+        }
+
+        Assert-True ($null -ne $manifest.files) (
+            "APK connectedhomeip manifest does not list artifact file checksums.")
+        $manifestFileChecksums = @{}
+        foreach ($property in $manifest.files.PSObject.Properties) {
+            $manifestFileChecksums[$property.Name] = $property.Value.ToString().ToLowerInvariant()
+        }
+        foreach ($trustStore in @(
+            @{ ApkPrefix = "assets/matter/truststore/paa/"; ManifestPrefix = "paa-root-certs/" },
+            @{ ApkPrefix = "assets/matter/truststore/cd/"; ManifestPrefix = "cd-certs/" }
+        )) {
+            foreach ($entry in @(Get-TrustStoreEntries -Zip $zip -Prefix $trustStore.ApkPrefix)) {
+                $relative = $entry.FullName.Substring($trustStore.ApkPrefix.Length)
+                $manifestPath = $trustStore.ManifestPrefix + $relative
+                Assert-True ($manifestFileChecksums.ContainsKey($manifestPath)) (
+                    "APK trust-store asset is not covered by the embedded connectedhomeip manifest: " + $entry.FullName)
+                $actualHash = Get-ZipEntrySha256 -Entry $entry
+                Assert-True ($actualHash -eq $manifestFileChecksums[$manifestPath]) (
+                    "APK trust-store asset checksum does not match the embedded connectedhomeip manifest: " + $entry.FullName)
+            }
         }
     }
 } finally {
