@@ -186,6 +186,11 @@ jobs:
           perl -0pi -e 's/(_kotlinc_flags = \[\n)\s+"-Werror",\n(\s+"-Xlint:all",\n\s+\])/$1$2/g' \
             build/chip/java/rules.gni
 
+          # Upstream android_deps has build.gradle but no settings.gradle. Gradle
+          # otherwise finds this repository's ancestor settings.gradle and
+          # refuses to run the independent setUpAndroidDeps project.
+          printf "rootProject.name = 'chip-android-deps'\n" > third_party/android_deps/settings.gradle
+
           python3 scripts/build/build_examples.py \
             --target android-arm64-chip-tool \
             build
