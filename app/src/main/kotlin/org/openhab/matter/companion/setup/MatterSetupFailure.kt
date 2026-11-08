@@ -4,10 +4,33 @@ data class MatterSetupFailure(
     val step: MatterSetupStage,
     val message: String,
     val details: String = "",
-    val suggestions: List<String> = defaultSuggestions(step)
+    val suggestions: List<String> = defaultSuggestions(step, details)
 ) {
     companion object {
-        fun defaultSuggestions(step: MatterSetupStage): List<String> = when (step) {
+        fun defaultSuggestions(step: MatterSetupStage, details: String = ""): List<String> {
+            if (step == MatterSetupStage.CommissioningToPhone) {
+                val failedStage = Regex(
+                    """Matter stage ([A-Za-z0-9_]+) error \d+""",
+                    RegexOption.IGNORE_CASE
+                ).find(details)?.groupValues?.get(1).orEmpty()
+
+                if (failedStage.contains("CertificateRequest", ignoreCase = true) ||
+                    failedStage.contains("AttestationRequest", ignoreCase = true)) {
+                    return listOf(
+                        "Keep the phone near the device and check the Bluetooth connection.",
+                        "Restart the device's pairing mode and try again.",
+                        "If it repeats, inspect BLE/GATT logs and the device's attestation response."
+                    )
+                }
+                if (failedStage.startsWith("FindOperational", ignoreCase = true)) {
+                    return listOf(
+                        "Check that the device joined your Thread network.",
+                        "Check IPv6 reachability and Matter mDNS discovery from the phone.",
+                        "Check the Thread Border Router and disable VPN or network filters for a retry."
+                    )
+                }
+            }
+            return when (step) {
             MatterSetupStage.ScanningQr,
             MatterSetupStage.QrScanned -> listOf("Scan the Matter QR code again.", "Enter the setup code manually.")
 
@@ -37,6 +60,7 @@ data class MatterSetupFailure(
             )
 
             else -> listOf("Try again.", "Open troubleshooting for more checks.")
+            }
         }
     }
 }

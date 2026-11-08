@@ -203,12 +203,90 @@ class MatterSetupWorkflowTest {
         assertEquals(
             listOf(
                 "Seeking Bluetooth device",
-                "Sending setup data over BLE",
-                "Connecting device to Thread network",
-                "Waiting for device on the Thread network"
+                "Connecting over Bluetooth",
+                "Verifying device certificates",
+                "Finding device on Thread network"
             ),
             commissioningDetails
         )
+    }
+
+    @Test
+    fun commissioningStageCallbacksDoNotRegressToLateGattMessages() {
+        val ports = FakeMatterSetupPorts().apply {
+            commissionProgressMessages = listOf(
+                "Matter BLE scan round 1 of 2 for discriminator 3840",
+                "Bluetooth GATT connected; discovering Matter services",
+                "connectedhomeip commissioning stage started: SecurePairing",
+                "connectedhomeip commissioning stage started: SendPAICertificateRequest",
+                "Bluetooth GATT state changed: status 0, newState 0",
+                "connectedhomeip commissioning stage update: SendPAICertificateRequest succeeded",
+                "connectedhomeip commissioning stage started: NetworkSetup",
+                "connectedhomeip commissioning stage started: FindOperationalForStayActive",
+                "Bluetooth GATT connection ready for connectedhomeip",
+                "connectedhomeip commissioning stage started: SendPAICertificateRequest"
+            )
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        MatterSetupWorkflow(ports) { states.add(it) }.startAutomatedSetup("MT:TEST")
+
+        assertEquals(
+            listOf(
+                "Seeking Bluetooth device",
+                "Connecting over Bluetooth",
+                "Establishing secure pairing",
+                "Verifying device certificates",
+                "Sending Thread network credentials",
+                "Finding device on Thread network"
+            ),
+            states.filter { it.stage == MatterSetupStage.CommissioningToPhone }
+                .mapNotNull { it.activeDetail }
+        )
+    }
+
+    @Test
+    fun paiCertificateTimeoutShowsRelevantTroubleshootingAndPreservesSdkStage() {
+        val ports = FakeMatterSetupPorts().apply {
+            commissionProgressMessages = listOf(
+                "connectedhomeip commissioning stage started: SendPAICertificateRequest",
+                "connectedhomeip commissioning stage update: SendPAICertificateRequest error 50",
+                "Bluetooth GATT state changed: status 133, newState 0"
+            )
+            commissionError = IllegalStateException("Commissioning failed with error 50")
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        MatterSetupWorkflow(ports) { states.add(it) }.startAutomatedSetup("MT:TEST")
+
+        val updates = states.filter { it.stage == MatterSetupStage.CommissioningToPhone }
+            .mapNotNull { it.activeDetail }
+        assertEquals(
+            listOf(
+                "Verifying device certificates",
+                "Matter stage SendPAICertificateRequest error 50 (awaiting final result)"
+            ),
+            updates
+        )
+        val failure = states.last().failure!!
+        assertTrue(failure.details.contains("SendPAICertificateRequest error 50"))
+        assertTrue(failure.suggestions.any { it.contains("attestation response") })
+        assertFalse(failure.suggestions.any { it.contains("precise Location") })
+    }
+
+    @Test
+    fun operationalDiscoveryTimeoutUsesThreadNetworkAdvice() {
+        val ports = FakeMatterSetupPorts().apply {
+            commissionProgressMessages = listOf(
+                "connectedhomeip commissioning stage started: FindOperationalForStayActive",
+                "connectedhomeip commissioning stage update: FindOperationalForStayActive error 50"
+            )
+            commissionError = IllegalStateException("Commissioning failed with error 50")
+        }
+        val states = mutableListOf<MatterSetupUiState>()
+        MatterSetupWorkflow(ports) { states.add(it) }.startAutomatedSetup("MT:TEST")
+
+        val failure = states.last().failure!!
+        assertTrue(failure.suggestions.any { it.contains("IPv6 reachability") })
+        assertFalse(failure.suggestions.any { it.contains("Bluetooth connection") })
     }
 
     @Test

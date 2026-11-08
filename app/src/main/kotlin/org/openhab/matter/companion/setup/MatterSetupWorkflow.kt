@@ -9,6 +9,7 @@ class MatterSetupWorkflow(
         var diagnosticsContext = emptyDiagnosticsContext()
         val redactor = SensitiveValueRedactor(setupPayload)
         var lastCommissioningStageError: String? = null
+        val progressTracker = MatterCommissioningProgressTracker()
 
         runCatching {
             val config = ports.loadConfig()
@@ -39,7 +40,7 @@ class MatterSetupWorkflow(
             activeStage = MatterSetupStage.CommissioningToPhone
             emit(MatterSetupUiState.progress(activeStage))
             val commission = ports.commissionToPhone(setupPayload, config) { progressMessage ->
-                val detail = commissioningProgressDetail(redactor.sanitize(progressMessage))
+                val detail = progressTracker.accept(redactor.sanitize(progressMessage))
                 if (detail != null) {
                     if (detail.startsWith("Matter stage ")) {
                         lastCommissioningStageError = detail
@@ -156,49 +157,6 @@ class MatterSetupWorkflow(
         )
     }
 
-    private fun commissioningProgressDetail(message: String): String? {
-        val value = message.trim()
-        if (value.isBlank()) {
-            return null
-        }
-        val stageError = Regex(
-            """commissioning stage update:\s*([A-Za-z0-9_]+)\s+error\s+(\d+)""",
-            RegexOption.IGNORE_CASE
-        ).find(value)
-        if (stageError != null) {
-            val (stage, errorCode) = stageError.destructured
-            return "Matter stage $stage error $errorCode (awaiting final result)"
-        }
-        return when {
-            value.contains("BLE scan", ignoreCase = true) ||
-                value.contains("advertisement", ignoreCase = true) ||
-                value.contains("discriminator", ignoreCase = true) -> "Seeking Bluetooth device"
-
-            value.contains("GATT", ignoreCase = true) ||
-                value.contains("Matter services", ignoreCase = true) ||
-                value.contains("MTU", ignoreCase = true) -> "Sending setup data over BLE"
-
-            value.contains("attestation", ignoreCase = true) ||
-                value.contains("PASE", ignoreCase = true) ||
-                value.contains("Thread dataset", ignoreCase = true) ||
-                value.contains("commissioning stage started", ignoreCase = true) -> {
-                if (value.contains("FindOperational", ignoreCase = true)) {
-                    "Waiting for device on the Thread network"
-                } else {
-                    "Connecting device to Thread network"
-                }
-            }
-
-            value.contains("FindOperational", ignoreCase = true) ||
-                value.contains("operational", ignoreCase = true) ||
-                value.contains("commissioning complete", ignoreCase = true) -> {
-                "Waiting for device on the Thread network"
-            }
-
-            else -> value.take(120)
-        }
-    }
-
     private fun emptyDiagnosticsContext(): MatterSetupDiagnosticsContext {
         return MatterSetupDiagnosticsContext(
             openHabBaseUrl = "",
@@ -242,3 +200,140 @@ class MatterSetupWorkflow(
         }
     }
 }
+/**
+ * Converts native commissioning stage callbacks to monotonic, user-facing progress.
+ *
+ * The connectedhomeip diagnostic stream also contains asynchronous GATT callbacks.
+ * Once a commissioning stage has started, transport diagnostics must not rewind
+ * progress to "connecting over Bluetooth".
+ */
+private class MatterCommissioningProgressTracker {
+    private enum class Phase(val order: Int) {
+        Scan(0),
+        Bluetooth(1),
+        SecurePairing(2),
+        Attestation(3),
+        Credentials(4),
+        Network(5),
+        Operational(6),
+        Complete(7)
+    }
+
+    private data class Presentation(val phase: Phase, val detail: String)
+
+    private val stageStarted = Regex(
+        """commissioning stage started:\s*([A-Za-z0-9_]+)""",
+        RegexOption.IGNORE_CASE
+    )
+    private val stageFailed = Regex(
+        """commissioning stage update:\s*([A-Za-z0-9_]+)\s+error\s+(\d+)""",
+        RegexOption.IGNORE_CASE
+    )
+    private val stageSucceeded = Regex(
+        """commissioning stage update:\s*([A-Za-z0-9_]+)\s+succeeded""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private var highestPhase = Phase.Scan
+    private var sdkStageObserved = false
+    private var stageFailureObserved = false
+    private var currentDetail: String? = null
+
+    fun accept(message: String): String? {
+        val value = message.trim()
+        if (value.isBlank()) return null
+
+        // A failing SDK status is authoritative, even if it arrives after a later
+        // generic BLE diagnostic. Keep it visible until the final result arrives.
+        stageFailed.find(value)?.let { match ->
+            val (stage, errorCode) = match.destructured
+            stageFailureObserved = true
+            val detail = "Matter stage $stage error $errorCode (awaiting final result)"
+            currentDetail = detail
+            return detail
+        }
+        if (stageFailureObserved) return null
+
+        // "succeeded" acknowledges the preceding stage; it is not a new phase.
+        if (stageSucceeded.containsMatchIn(value)) return null
+
+        stageStarted.find(value)?.let { match ->
+            sdkStageObserved = true
+            val presentation = presentStage(match.groupValues[1])
+            return advance(presentation)
+        }
+
+        // BLE scan and GATT diagnostics are lower-level transport messages.
+        // They should help before SDK stage callbacks begin, never override them.
+        if (sdkStageObserved) return null
+        val presentation = when {
+            value.contains("BLE scan", ignoreCase = true) ||
+                value.contains("advertisement", ignoreCase = true) ||
+                value.contains("discriminator", ignoreCase = true) ->
+                Presentation(Phase.Scan, "Seeking Bluetooth device")
+
+            value.contains("GATT", ignoreCase = true) ||
+                value.contains("Matter services", ignoreCase = true) ||
+                value.contains("MTU", ignoreCase = true) ->
+                Presentation(Phase.Bluetooth, "Connecting over Bluetooth")
+
+            value.contains("PASE", ignoreCase = true) ->
+                Presentation(Phase.SecurePairing, "Establishing secure pairing")
+
+            value.contains("attestation", ignoreCase = true) ->
+                Presentation(Phase.Attestation, "Verifying device certificates")
+
+            value.contains("Thread dataset", ignoreCase = true) ->
+                Presentation(Phase.Network, "Sending Thread network credentials")
+
+            value.contains("FindOperational", ignoreCase = true) ||
+                value.contains("operational discovery", ignoreCase = true) ->
+                Presentation(Phase.Operational, "Finding device on Thread network")
+
+            else -> null
+        }
+        return presentation?.let(::advance)
+    }
+
+    private fun advance(presentation: Presentation): String? {
+        if (presentation.phase.order < highestPhase.order) return null
+        highestPhase = presentation.phase
+        if (presentation.detail == currentDetail) return null
+        currentDetail = presentation.detail
+        return presentation.detail
+    }
+
+    private fun presentStage(stage: String): Presentation {
+        val name = stage.lowercase()
+        return when {
+            name.contains("findoperational") || name.contains("casesession") ->
+                Presentation(Phase.Operational, "Finding device on Thread network")
+
+            name.contains("sendcomplete") || name.contains("cleanup") ||
+                name.contains("icd") || name.contains("commissioningcomplete") ->
+                Presentation(Phase.Complete, "Finishing device setup")
+
+            name.contains("connectnetwork") || name.contains("enablenetwork") ->
+                Presentation(Phase.Network, "Connecting device to Thread network")
+
+            name.contains("network") || name.contains("thread") || name.contains("wifi") ->
+                Presentation(Phase.Network, "Sending Thread network credentials")
+
+            name.contains("noc") || name.contains("trustedroot") || name.contains("fabric") ->
+                Presentation(Phase.Credentials, "Installing device credentials")
+
+            name.contains("attest") || name.contains("certificate") ||
+                name.contains("csr") || name.contains("sendpai") || name.contains("senddac") ->
+                Presentation(Phase.Attestation, "Verifying device certificates")
+
+            name.contains("securepair") || name.contains("pase") ||
+                name.contains("failsafe") || name.contains("regulatory") ||
+                name.contains("readcommissioning") ->
+                Presentation(Phase.SecurePairing, "Establishing secure pairing")
+
+            // Do not claim that an unrecognized SDK stage means Thread is joining.
+            else -> Presentation(Phase.SecurePairing, "Commissioning device ($stage)")
+        }
+    }
+}
+
