@@ -42,7 +42,7 @@ class MatterSetupWorkflow(
             }
 
             activeStage = MatterSetupStage.CommissioningToPhone
-            commissioningStartedAtMs = android.os.SystemClock.elapsedRealtime()
+            commissioningStartedAtMs = System.nanoTime() / 1_000_000L
             stageStartedAtMs = commissioningStartedAtMs
             emit(MatterSetupUiState.progress(
                 activeStage,
@@ -51,7 +51,7 @@ class MatterSetupWorkflow(
             ))
             val commission = ports.commissionToPhone(setupPayload, config) { progressMessage ->
                 val safeMessage = redactor.sanitize(progressMessage)
-                val now = android.os.SystemClock.elapsedRealtime()
+                val now = System.nanoTime() / 1_000_000L
                 val started = Regex(
                     """commissioning stage started:\s*([A-Za-z0-9_]+)""",
                     RegexOption.IGNORE_CASE
@@ -152,7 +152,7 @@ class MatterSetupWorkflow(
                 error.message?.takeIf { it.isNotBlank() },
                 lastCommissioningStageError?.takeIf { activeStage == MatterSetupStage.CommissioningToPhone },
                 if (activeStage == MatterSetupStage.CommissioningToPhone && commissioningStartedAtMs > 0L) {
-                    val now = android.os.SystemClock.elapsedRealtime()
+                    val now = System.nanoTime() / 1_000_000L
                     (stageTimeline + listOfNotNull(lastStageName?.let {
                         "$it: ${now - stageStartedAtMs} ms (last)"
                     })).joinToString("; ", prefix = "Stage timeline: ")

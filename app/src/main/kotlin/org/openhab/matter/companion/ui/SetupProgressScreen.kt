@@ -24,7 +24,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import android.os.SystemClock
 import org.openhab.matter.companion.setup.MatterSetupStage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,12 +55,12 @@ fun SetupProgressScreen(
 
     val commissioningStart = state.commissioningStartedAtMs
     var nowMs by remember(commissioningStart) {
-        mutableLongStateOf(SystemClock.elapsedRealtime())
+        mutableLongStateOf(System.nanoTime() / 1_000_000L)
     }
     LaunchedEffect(commissioningStart) {
         if (commissioningStart != null) {
             while (true) {
-                nowMs = SystemClock.elapsedRealtime()
+                nowMs = System.nanoTime() / 1_000_000L
                 delay(250L)
             }
         }
