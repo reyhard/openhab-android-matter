@@ -10,6 +10,10 @@ class MatterSetupWorkflow(
         val redactor = SensitiveValueRedactor(setupPayload)
         var lastCommissioningStageError: String? = null
         val progressTracker = MatterCommissioningProgressTracker()
+        var commissioningStartedAtMs = 0L
+        var stageStartedAtMs = 0L
+        val stageTimeline = mutableListOf<String>()
+        var lastStageName: String? = null
 
         runCatching {
             val config = ports.loadConfig()
@@ -38,14 +42,41 @@ class MatterSetupWorkflow(
             }
 
             activeStage = MatterSetupStage.CommissioningToPhone
-            emit(MatterSetupUiState.progress(activeStage))
+            commissioningStartedAtMs = android.os.SystemClock.elapsedRealtime()
+            stageStartedAtMs = commissioningStartedAtMs
+            emit(MatterSetupUiState.progress(
+                activeStage,
+                commissioningStartedAtMs = commissioningStartedAtMs,
+                commissioningStageStartedAtMs = stageStartedAtMs
+            ))
             val commission = ports.commissionToPhone(setupPayload, config) { progressMessage ->
-                val detail = progressTracker.accept(redactor.sanitize(progressMessage))
+                val safeMessage = redactor.sanitize(progressMessage)
+                val now = android.os.SystemClock.elapsedRealtime()
+                val started = Regex(
+                    """commissioning stage started:\s*([A-Za-z0-9_]+)""",
+                    RegexOption.IGNORE_CASE
+                ).find(safeMessage)
+                if (started != null) {
+                    val nextStage = started.groupValues[1]
+                    if (lastStageName != nextStage) {
+                        lastStageName?.let { previous ->
+                            stageTimeline.add("$previous: ${now - stageStartedAtMs} ms")
+                        }
+                        lastStageName = nextStage
+                        stageStartedAtMs = now
+                    }
+                }
+                val detail = progressTracker.accept(safeMessage)
                 if (detail != null) {
                     if (detail.startsWith("Matter stage ")) {
                         lastCommissioningStageError = detail
                     }
-                    emit(MatterSetupUiState.progress(activeStage, activeDetail = detail))
+                    emit(MatterSetupUiState.progress(
+                        activeStage,
+                        activeDetail = detail,
+                        commissioningStartedAtMs = commissioningStartedAtMs,
+                        commissioningStageStartedAtMs = stageStartedAtMs
+                    ))
                 }
             }
             lastCommissioningStageError = null
@@ -119,7 +150,14 @@ class MatterSetupWorkflow(
         }.onFailure { error ->
             val details = listOfNotNull(
                 error.message?.takeIf { it.isNotBlank() },
-                lastCommissioningStageError?.takeIf { activeStage == MatterSetupStage.CommissioningToPhone }
+                lastCommissioningStageError?.takeIf { activeStage == MatterSetupStage.CommissioningToPhone },
+                if (activeStage == MatterSetupStage.CommissioningToPhone && commissioningStartedAtMs > 0L) {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    (stageTimeline + listOfNotNull(lastStageName?.let {
+                        "$it: ${now - stageStartedAtMs} ms (last)"
+                    })).joinToString("; ", prefix = "Stage timeline: ")
+                        .takeIf { stageTimeline.isNotEmpty() || lastStageName != null }
+                } else null
             ).joinToString("; ")
             fail(activeStage, "Setup could not finish", details, diagnosticsContext, redactor)
         }

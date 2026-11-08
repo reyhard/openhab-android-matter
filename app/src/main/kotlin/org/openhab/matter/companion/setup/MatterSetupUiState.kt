@@ -7,6 +7,8 @@ data class MatterSetupUiState(
     val steps: List<MatterSetupStep> = emptyList(),
     val activeDetail: String? = null,
     val countdownSeconds: Int? = null,
+    val commissioningStartedAtMs: Long? = null,
+    val commissioningStageStartedAtMs: Long? = null,
     val deviceIdentity: MatterSetupDeviceIdentity? = null,
     val primaryAction: MatterSetupAction? = null,
     val primaryActionLabel: String = "",
@@ -53,7 +55,9 @@ data class MatterSetupUiState(
             stage: MatterSetupStage,
             countdownSeconds: Int? = null,
             activeDetail: String? = null,
-            deviceIdentity: MatterSetupDeviceIdentity? = null
+            deviceIdentity: MatterSetupDeviceIdentity? = null,
+            commissioningStartedAtMs: Long? = null,
+            commissioningStageStartedAtMs: Long? = null
         ): MatterSetupUiState {
             return MatterSetupUiState(
                 stage = stage,
@@ -62,6 +66,8 @@ data class MatterSetupUiState(
                 steps = progressSteps(stage, activeDetail.orEmpty()),
                 activeDetail = activeDetail?.takeIf { it.isNotBlank() },
                 countdownSeconds = countdownSeconds,
+                commissioningStartedAtMs = commissioningStartedAtMs,
+                commissioningStageStartedAtMs = commissioningStageStartedAtMs,
                 deviceIdentity = deviceIdentity?.takeIf { it.visible() },
                 secondaryActions = listOf(MatterSetupAction.ShowTroubleshooting)
             )

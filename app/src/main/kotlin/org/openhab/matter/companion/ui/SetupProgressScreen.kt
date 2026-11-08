@@ -13,15 +13,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import android.os.SystemClock
+import org.openhab.matter.companion.setup.MatterSetupStage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -50,6 +54,19 @@ fun SetupProgressScreen(
         }
     }
 
+    val commissioningStart = state.commissioningStartedAtMs
+    var nowMs by remember(commissioningStart) {
+        mutableLongStateOf(SystemClock.elapsedRealtime())
+    }
+    LaunchedEffect(commissioningStart) {
+        if (commissioningStart != null) {
+            while (true) {
+                nowMs = SystemClock.elapsedRealtime()
+                delay(250L)
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -63,6 +80,34 @@ fun SetupProgressScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(text = state.message)
+        if (state.stage == MatterSetupStage.CommissioningToPhone && commissioningStart != null) {
+            val elapsedMs = (nowMs - commissioningStart).coerceAtLeast(0L)
+            val stageElapsedMs = (nowMs - (state.commissioningStageStartedAtMs ?: commissioningStart))
+                .coerceAtLeast(0L)
+            // The native completion listener has a 300-second wait budget.
+            // This is an approximation, not a per-stage SDK deadline.
+            val estimatedRemainingSeconds = ((300_000L - elapsedMs).coerceAtLeast(0L) / 1_000L)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Estimated commissioning budget remaining: ${estimatedRemainingSeconds / 60}:${(estimatedRemainingSeconds % 60).toString().padStart(2, '0')}",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { (elapsedMs / 300_000f).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Total elapsed: ${elapsedMs / 1_000}s  •  Current SDK stage: ${stageElapsedMs / 1_000}s",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = "Estimate only — the Matter SDK may time out earlier.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         val countdownText = countdownSeconds?.let {
             CommissioningWindowCountdown.displayText(displayedCountdownSeconds)
         }
